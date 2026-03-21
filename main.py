@@ -1,20 +1,27 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordRequestForm
-from fastapi.responses import RedirectResponse
-from starlette.middleware.sessions import SessionMiddleware
-from authlib.integrations.starlette_client import OAuth
-from sqlalchemy import inspect, or_, text
-from sqlalchemy.orm import Session
-from openai import OpenAI
-import os
+﻿from pathlib import Path
 import re
 from typing import List
-from fastapi.staticfiles import StaticFiles
-import pypdf
 
-import models, schemas, auth
+import os
+import pypdf
+from authlib.integrations.starlette_client import OAuth
+from fastapi import FastAPI, Depends, HTTPException, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.staticfiles import StaticFiles
+from openai import OpenAI
+from sqlalchemy import inspect, or_, text
+from sqlalchemy.orm import Session
+from starlette.middleware.sessions import SessionMiddleware
+
+import auth
+import models
+import schemas
 from database import engine, get_db
+
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
 
 # Create DB tables
 models.Base.metadata.create_all(bind=engine)
@@ -48,19 +55,104 @@ oauth.register(
     client_kwargs={"scope": "openid email profile"},
 )
 
-pdf_context = ""
-try:
-    with open("📘 Section 1_ Preface & Purpose.pdf", "rb") as f:
-        reader = pypdf.PdfReader(f)
-        for page in reader.pages:
-            pdf_context += page.extract_text() + "\n"
-except Exception as e:
-    print(f"Failed to load PDF context: {e}")
+
+def _find_guidelines_pdf() -> Path | None:
+    configured = os.getenv("GUIDELINES_PDF_PATH")
+    if configured:
+        pdf_path = Path(configured)
+        if pdf_path.exists():
+            return pdf_path
+
+    pdf_files = sorted(BASE_DIR.glob("*.pdf"))
+    return pdf_files[0] if pdf_files else None
+
+
+def _clean_whitespace(value: str) -> str:
+    return re.sub(r"\s+", " ", value or "").strip()
+
+
+def _chunk_text(text: str, chunk_size: int = 180, overlap: int = 40) -> list[str]:
+    words = text.split()
+    if not words:
+        return []
+
+    chunks = []
+    step = max(1, chunk_size - overlap)
+    for start in range(0, len(words), step):
+        chunk = " ".join(words[start:start + chunk_size]).strip()
+        if chunk:
+            chunks.append(chunk)
+        if start + chunk_size >= len(words):
+            break
+    return chunks
+
+
+def _tokenize(value: str) -> set[str]:
+    return set(re.findall(r"[a-z0-9]+", value.lower()))
+
+
+def _load_pdf_chunks() -> tuple[str, list[dict]]:
+    pdf_path = _find_guidelines_pdf()
+    if not pdf_path:
+        return "", []
+
+    full_text_parts: list[str] = []
+    chunks: list[dict] = []
+
+    try:
+        reader = pypdf.PdfReader(str(pdf_path))
+        for page_index, page in enumerate(reader.pages, start=1):
+            page_text = _clean_whitespace(page.extract_text() or "")
+            if not page_text:
+                continue
+
+            full_text_parts.append(page_text)
+            for chunk in _chunk_text(page_text):
+                chunks.append(
+                    {
+                        "page": page_index,
+                        "text": chunk,
+                        "tokens": _tokenize(chunk),
+                    }
+                )
+    except Exception as exc:
+        print(f"Failed to load PDF context: {exc}")
+        return "", []
+
+    return "\n".join(full_text_parts), chunks
+
+
+pdf_context, pdf_chunks = _load_pdf_chunks()
 
 SYSTEM_PROMPT = f"""You are RxAI, a warm, calm, expert AI Pharmacist. You speak like a kind, reassuring doctor. Respond in the same language the patient writes in (English, Twi, Hausa, or French). Provide straightforward, friendly, and concise medical advice based on standard health guidelines without explicitly referencing them in your answers. ALWAYS flag red signs (convulsions, confusion, jaundice, severe dehydration, difficulty breathing) for immediate hospital referral. Be concise, warm, and end with a counseling tip.
 
-ADDITIONAL CONTEXT FROM MEDICAL GUIDELINES:
-{pdf_context}"""
+BASE MEDICAL GUIDELINES CONTEXT:
+{pdf_context[:4000]}"""
+
+
+def _get_relevant_pdf_context(messages: list[dict], limit: int = 3) -> str:
+    if not pdf_chunks:
+        return ""
+
+    query_text = " ".join(message["content"] for message in messages if message.get("role") == "user")
+    query_tokens = _tokenize(query_text)
+    if not query_tokens:
+        return ""
+
+    scored_chunks = []
+    for chunk in pdf_chunks:
+        overlap = query_tokens.intersection(chunk["tokens"])
+        if overlap:
+            scored_chunks.append((len(overlap), chunk["page"], chunk["text"]))
+
+    scored_chunks.sort(key=lambda item: item[0], reverse=True)
+    top_chunks = scored_chunks[:limit]
+    if not top_chunks:
+        return ""
+
+    return "\n\n".join(
+        f"PDF page {page}: {text}" for _, page, text in top_chunks
+    )
 
 
 def _ensure_user_auth_columns():
@@ -146,7 +238,6 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
 
     user = db.query(models.User).filter(models.User.email == email).first()
     if not user:
-        # Placeholder local password hash so account remains compatible with existing model.
         placeholder_hash = auth.get_password_hash(os.urandom(16).hex())
         user = models.User(
             username=_build_unique_username(db, email.split("@")[0]),
@@ -219,11 +310,20 @@ def get_profile(current_user: models.User = Depends(auth.get_current_user), db: 
 @app.post("/api/chat", response_model=schemas.ChatResponse)
 def chat(request: schemas.ChatRequest, current_user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
+    relevant_pdf_context = _get_relevant_pdf_context(messages)
+
+    prompt_parts = [SYSTEM_PROMPT]
+    if relevant_pdf_context:
+        prompt_parts.append(
+            "Use the following PDF guideline excerpts when they are relevant to the user question. "
+            "Prefer these excerpts over guessing.\n\n"
+            f"{relevant_pdf_context}"
+        )
 
     try:
         response = openai_client.chat.completions.create(
             model="deepseek-chat",
-            messages=[{"role": "system", "content": SYSTEM_PROMPT}] + messages,
+            messages=[{"role": "system", "content": "\n\n".join(prompt_parts)}] + messages,
             max_tokens=1000,
         )
         reply = response.choices[0].message.content
@@ -252,7 +352,7 @@ def chat(request: schemas.ChatRequest, current_user: models.User = Depends(auth.
     except Exception as e:
         if "dummy_key" in os.getenv("DEEPSEEK_API_KEY", "dummy_key"):
             return {
-                "reply": "(Demo fallback - Auth API Error) Yes, you should take Paracetamol. Dose: 500mg-1g every 4-6 hours (max 4g/day)."
+                "reply": "(Demo fallback) I can answer from the uploaded guideline PDF once your AI API key is configured."
             }
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -307,12 +407,10 @@ def update_emergency(emergency: schemas.EmergencyUpdate, current_user: models.Us
     return {"status": "success"}
 
 
-# Serve static files as the very last route
-import os as _os
-if _os.path.exists("static"):
-    app.mount("/", StaticFiles(directory="static", html=True), name="static")
+if STATIC_DIR.exists():
+    app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=False)
+    uvicorn.run("main:app", host="0.0.0.0", port=int(os.getenv("PORT", "8000")), reload=False)
