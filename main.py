@@ -56,7 +56,7 @@ else:
     else:
         base_url = "https://api.deepseek.com"
 
-print(f"DEBUG: Loaded API key starting with: {api_key[:10]}..., base_url={base_url}")
+
 
 openai_client = OpenAI(
     api_key=api_key,
