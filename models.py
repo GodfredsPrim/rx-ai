@@ -79,7 +79,7 @@ class Emergency(Base):
     name = Column(String, default="")
     rel = Column(String, default="")
     phone = Column(String, default="")
-    phone2 = Column(String, default="")
+    phone_alt = Column(String, default="")
     address = Column(String, default="")
     alert = Column(Text, default="")
 

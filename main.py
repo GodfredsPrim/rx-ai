@@ -1,8 +1,10 @@
-﻿from pathlib import Path
+from pathlib import Path
 import re
+import csv
 from typing import List
 
 import os
+from dotenv import load_dotenv
 import pypdf
 from authlib.integrations.starlette_client import OAuth
 from fastapi import FastAPI, Depends, HTTPException, Request, status
@@ -21,6 +23,7 @@ import schemas
 from database import engine, get_db
 
 BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / '.env', override=True, verbose=True)
 STATIC_DIR = BASE_DIR / "static"
 
 # Create DB tables
@@ -41,9 +44,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+api_key = os.getenv("DEEPSEEK_API_KEY", os.getenv("OPENAI_API_KEY", "dummy_key"))
+configured_base_url = os.getenv("DEEPSEEK_BASE_URL", "").strip()
+
+if configured_base_url:
+    base_url = configured_base_url
+else:
+    # If DEEPSEEK_BASE_URL is not set, use OpenAI for sk- keys, otherwise DeepSeek default.
+    if api_key.startswith("sk-"):
+        base_url = "https://api.openai.com/v1"
+    else:
+        base_url = "https://api.deepseek.com"
+
+print(f"DEBUG: Loaded API key starting with: {api_key[:10]}..., base_url={base_url}")
+
 openai_client = OpenAI(
-    api_key=os.getenv("DEEPSEEK_API_KEY", "dummy_key"),
-    base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+    api_key=api_key,
+    base_url=base_url,
 )
 
 oauth = OAuth()
@@ -124,10 +141,97 @@ def _load_pdf_chunks() -> tuple[str, list[dict]]:
 
 pdf_context, pdf_chunks = _load_pdf_chunks()
 
-SYSTEM_PROMPT = f"""You are RxAI, a warm, calm, expert AI Pharmacist. You speak like a kind, reassuring doctor. Respond in the same language the patient writes in (English, Twi, Hausa, or French). Provide straightforward, friendly, and concise medical advice based on standard health guidelines without explicitly referencing them in your answers. ALWAYS flag red signs (convulsions, confusion, jaundice, severe dehydration, difficulty breathing) for immediate hospital referral. Be concise, warm, and end with a counseling tip.
+
+def _load_medicine_dataset() -> List[dict]:
+    csv_path = BASE_DIR / "medicine_dataset.csv"
+    if not csv_path.exists():
+        return []
+    
+    medicines = []
+    try:
+        with open(csv_path, mode='r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                # Pre-tokenize names for faster search
+                row["_tokens"] = _tokenize(row.get("Name", "") + " " + row.get("Category", ""))
+                medicines.append(row)
+    except Exception as exc:
+        print(f"Failed to load medicine dataset: {exc}")
+    return medicines
+
+
+medicine_dataset = _load_medicine_dataset()
+
+
+def _load_twi_dataset() -> List[dict]:
+    csv_path = BASE_DIR / "Public - Twi[Twi-En]_70.csv"
+    if not csv_path.exists():
+        csv_path = BASE_DIR / "Public%20-%20Twi%5BTwi-En%5D_70.csv"
+    if not csv_path.exists():
+        return []
+
+    twi_entries = []
+    try:
+        with open(csv_path, mode="r", encoding="utf-8", errors="replace") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                twi_text = (row.get("text") or "").strip()
+                en_text = (row.get("label") or row.get("Comments") or "").strip()
+                if twi_text and en_text:
+                    twi_entries.append({"twi": twi_text, "en": en_text})
+    except Exception as exc:
+        print(f"Failed to load Twi dataset: {exc}")
+
+    return twi_entries
+
+
+twi_dataset = _load_twi_dataset()
+
+
+def _translate_twi_to_english(text: str) -> str | None:
+    normalized = text.strip().lower()
+    for pair in twi_dataset:
+        if pair["twi"].strip().lower() == normalized:
+            return pair["en"]
+    return None
+
+
+SYSTEM_PROMPT = f"""You are RxAI, a warm, calm, expert AI Pharmacist. You speak like a kind, reassuring doctor. Respond in the same language the patient writes in (English, Twi, Hausa, or French). Provide straightforward, friendly, and concise medical advice based on standard health guidelines and the provided medicine dataset without explicitly referencing them in your answers. ALWAYS flag red signs (convulsions, confusion, jaundice, severe dehydration, difficulty breathing) for immediate hospital referral. Be concise, warm, and end with a counseling tip. Do not use asterisks, bold, italics, or any markdown formatting in your responses. Give straight, direct answers based on the data provided. Recommend specific medications from the medicine dataset when relevant, including name, dosage form, strength, and indication. Do not ask questions; provide direct recommendations.
 
 BASE MEDICAL GUIDELINES CONTEXT:
 {pdf_context[:4000]}"""
+
+
+def _get_relevant_medicine_context(messages: list[dict], limit: int = 5) -> str:
+    if not medicine_dataset:
+        return ""
+
+    query_text = " ".join(message["content"] for message in messages if message.get("role") == "user")
+    query_tokens = _tokenize(query_text)
+    if not query_tokens:
+        return ""
+
+    scored = []
+    for med in medicine_dataset:
+        overlap = query_tokens.intersection(med["_tokens"])
+        if overlap:
+            scored.append((len(overlap), med))
+
+    scored.sort(key=lambda item: item[0], reverse=True)
+    top = scored[:limit]
+    if not top:
+        return ""
+
+    context_parts = []
+    for _, med in top:
+        parts = [f"Drug: {med.get('Name')}"]
+        if med.get("Category"): parts.append(f"Category: {med.get('Category')}")
+        if med.get("Indication"): parts.append(f"Indication: {med.get('Indication')}")
+        if med.get("Dosage Form"): parts.append(f"Form: {med.get('Dosage Form')}")
+        if med.get("Strength"): parts.append(f"Strength: {med.get('Strength')}")
+        context_parts.append(" | ".join(parts))
+
+    return "\n".join(context_parts)
 
 
 def _get_relevant_pdf_context(messages: list[dict], limit: int = 3) -> str:
@@ -155,17 +259,25 @@ def _get_relevant_pdf_context(messages: list[dict], limit: int = 3) -> str:
     )
 
 
-def _ensure_user_auth_columns():
+def _ensure_db_migrations():
     inspector = inspect(engine)
-    if not inspector.has_table("users"):
-        return
+    
+    # Migrations for 'users' table
+    if inspector.has_table("users"):
+        columns = {column["name"] for column in inspector.get_columns("users")}
+        with engine.begin() as conn:
+            if "username" not in columns:
+                conn.execute(text("ALTER TABLE users ADD COLUMN username VARCHAR"))
+            conn.execute(text("UPDATE users SET username = email WHERE username IS NULL OR TRIM(username) = ''"))
+            # SQLite supports IF NOT EXISTS for indexes
+            conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_username ON users (username)"))
 
-    columns = {column["name"] for column in inspector.get_columns("users")}
-    with engine.begin() as conn:
-        if "username" not in columns:
-            conn.execute(text("ALTER TABLE users ADD COLUMN username VARCHAR"))
-        conn.execute(text("UPDATE users SET username = email WHERE username IS NULL OR TRIM(username) = ''"))
-        conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_username ON users (username)"))
+    # Migrations for 'emergencies' table
+    if inspector.has_table("emergencies"):
+        columns = {column["name"] for column in inspector.get_columns("emergencies")}
+        if "phone_alt" not in columns and "phone2" in columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE emergencies RENAME COLUMN phone2 TO phone_alt"))
 
 
 def _normalize_username(value: str) -> str:
@@ -190,7 +302,7 @@ def _build_unique_username(db: Session, base_value: str, exclude_user_id: int | 
         candidate = f"{base_username}{suffix}"
 
 
-_ensure_user_auth_columns()
+_ensure_db_migrations()
 
 
 def _ensure_user_profile_records(db: Session, user_id: int, first_name: str = "", last_name: str = ""):
@@ -217,7 +329,11 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
     try:
         token = await oauth.google.authorize_access_token(request)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Google OAuth failed: {e}")
+        env_exists = (BASE_DIR / ".env").exists()
+        google_client_id = os.getenv("GOOGLE_CLIENT_ID", "")
+        key_prefix = google_client_id[:4] if google_client_id else "N/A"
+        detail = f"Google OAuth failed: {str(e)} | KeyPrefix: {key_prefix} | EnvExists: {env_exists} | BaseDir: {BASE_DIR}"
+        raise HTTPException(status_code=500, detail=detail)
 
     user_info = token.get("userinfo")
     if not user_info:
@@ -310,7 +426,24 @@ def get_profile(current_user: models.User = Depends(auth.get_current_user), db: 
 @app.post("/api/chat", response_model=schemas.ChatResponse)
 def chat(request: schemas.ChatRequest, current_user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
-    relevant_pdf_context = _get_relevant_pdf_context(messages)
+
+    # Detect Twi using exact dataset mapping and translate to English for model prompt context
+    input_language = "en"
+    for m in messages:
+        if m["role"] == "user" and _translate_twi_to_english(m["content"]):
+            input_language = "twi"
+            break
+
+    translated_messages = []
+    for m in messages:
+        if m["role"] == "user" and input_language == "twi":
+            translated = _translate_twi_to_english(m["content"])
+            translated_messages.append({"role": "user", "content": translated or m["content"]})
+        else:
+            translated_messages.append(m)
+
+    relevant_pdf_context = _get_relevant_pdf_context(translated_messages)
+    relevant_med_context = _get_relevant_medicine_context(translated_messages)
 
     prompt_parts = [SYSTEM_PROMPT]
     if relevant_pdf_context:
@@ -319,14 +452,37 @@ def chat(request: schemas.ChatRequest, current_user: models.User = Depends(auth.
             "Prefer these excerpts over guessing.\n\n"
             f"{relevant_pdf_context}"
         )
+    
+    if relevant_med_context:
+        prompt_parts.append(
+            "Use the following medicine dataset information for drug details. "
+            "If a drug is mentioned or the symptom matches an indication, recommend specific medications directly from this data.\n\n"
+            f"{relevant_med_context}"
+        )
+
+    # Add explicit language instruction for the model if input is Twi
+    if input_language == "twi":
+        prompt_parts.append("Answer in Twi in a caring, clear way. If you need to translate medical terms, keep them understandable for non-English speakers.")
 
     try:
         response = openai_client.chat.completions.create(
             model="deepseek-chat",
-            messages=[{"role": "system", "content": "\n\n".join(prompt_parts)}] + messages,
+            messages=[{"role": "system", "content": "\n\n".join(prompt_parts)}] + translated_messages,
             max_tokens=1000,
         )
         reply = response.choices[0].message.content
+
+        # If input was Twi, translate the reply back to Twi for fluency
+        if input_language == "twi":
+            translation_response = openai_client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[
+                    {"role": "system", "content": "Translate the following English medical advice to fluent Twi. Keep it natural, caring, and concise. Use simple terms for medical concepts."},
+                    {"role": "user", "content": reply}
+                ],
+                max_tokens=1000,
+            )
+            reply = translation_response.choices[0].message.content
 
         lower_reply = reply.lower()
         drugs_to_check = {
@@ -413,4 +569,4 @@ if STATIC_DIR.exists():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=int(os.getenv("PORT", "8000")), reload=False)
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8000")))

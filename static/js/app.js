@@ -197,6 +197,7 @@ async function send(){
     rmTyping();addMsg('ai',reply);history.push({role:'assistant',content:reply});
     document.getElementById('ai-summary').textContent=`Patient: "${text.substring(0,100)}..."\n\nAI: ${reply.substring(0,250)}...`;
     if(ttsOn)speak(reply);
+    showDynamicChips(reply);
     
     // Refresh history dynamically
     const data = await callApi('/profile');
@@ -209,13 +210,78 @@ async function send(){
 // TTS & VOICE
 function speak(text){
   if(!synth)return;synth.cancel();
-  const utt=new SpeechSynthesisUtterance(text.replace(/<[^>]*>/g,'').substring(0,400));
-  utt.rate=0.88;utt.pitch=1.0;utt.lang=lang==='fr'?'fr-FR':lang==='ha'?'ha-NG':'en-GH';
-  const btn=document.getElementById('spk-btn');
-  utt.onstart=()=>btn.classList.add('speaking');utt.onend=()=>btn.classList.remove('speaking');
-  synth.speak(utt);
+  const maxLen = 300; // Speak in chunks to avoid cutoff
+  if (text.length > maxLen) {
+    const chunks = text.match(new RegExp('.{1,' + maxLen + '}(\\s|$)', 'g')) || [text];
+    let i = 0;
+    const speakNext = () => {
+      if (i < chunks.length) {
+        const utt = new SpeechSynthesisUtterance(chunks[i].replace(/<[^>]*>/g, ''));
+        utt.rate = 0.88;
+        utt.pitch = 1.0;
+        utt.lang = lang === 'fr' ? 'fr-FR' : lang === 'ha' ? 'ha-NG' : lang === 'tw' ? 'ak-GH' : 'en-GH';
+        const btn = document.getElementById('spk-btn');
+        utt.onstart = () => btn.classList.add('speaking');
+        utt.onend = () => {
+          i++;
+          if (i < chunks.length) speakNext();
+          else btn.classList.remove('speaking');
+        };
+        synth.speak(utt);
+      }
+    };
+    speakNext();
+  } else {
+    const utt = new SpeechSynthesisUtterance(text.replace(/<[^>]*>/g, ''));
+    utt.rate = 0.88;
+    utt.pitch = 1.0;
+    utt.lang = lang === 'fr' ? 'fr-FR' : lang === 'ha' ? 'ha-NG' : lang === 'tw' ? 'ak-GH' : 'en-GH';
+    const btn = document.getElementById('spk-btn');
+    utt.onstart = () => btn.classList.add('speaking');
+    utt.onend = () => btn.classList.remove('speaking');
+    synth.speak(utt);
+  }
 }
-function toggleTTS(){ttsOn=!ttsOn;document.getElementById('spk-btn').style.opacity=ttsOn?'1':'0.4';if(!ttsOn&&synth)synth.cancel();}
+function showDynamicChips(reply){
+  const chipsEl = document.getElementById('chips');
+  chipsEl.innerHTML = '';
+  const dynamicChips = [];
+  
+  const lowerReply = reply.toLowerCase();
+  
+  // Always show some options
+  dynamicChips.push('Ask another question', 'View my profile');
+  
+  // Add specific ones based on content
+  if (lowerReply.includes('medication') || lowerReply.includes('drug') || lowerReply.includes('take') || lowerReply.includes('paracetamol') || lowerReply.includes('ibuprofen') || lowerReply.includes('coartem') ||
+      lowerReply.includes('ɔdɔ') || lowerReply.includes('aduro') || lowerReply.includes('faa') || lowerReply.includes('paracetamol') || lowerReply.includes('ibuprofen')) {  // Twi keywords
+    dynamicChips.unshift('Order this medication', 'More details on dosage', 'Ask about side effects');
+  }
+  
+  if (lowerReply.includes('symptom') || lowerReply.includes('pain') || lowerReply.includes('fever') ||
+      lowerReply.includes('yareɛ') || lowerReply.includes('yaw') || lowerReply.includes('atiri')) {  // Twi
+    dynamicChips.push('Tell me more about my symptoms', 'What should I avoid?');
+  }
+  
+  if (lowerReply.includes('hospital') || lowerReply.includes('refer') || lowerReply.includes('emergency') ||
+      lowerReply.includes('ɔdɔkota') || lowerReply.includes('ahɔho')) {  // Twi
+    dynamicChips.push('Find nearest hospital', 'Call emergency');
+  }
+  
+  dynamicChips.forEach(c => {
+    const d = document.createElement('div');
+    d.className = 'chip';
+    d.textContent = c;
+    d.onclick = () => {
+      document.getElementById('tinput').value = c;
+      chipsEl.style.display = 'none';
+      send();
+    };
+    chipsEl.appendChild(d);
+  });
+  
+  chipsEl.style.display = 'flex';
+}
 function toggleVoice(){if(!('webkitSpeechRecognition'in window||'SpeechRecognition'in window)){addMsg('ai','Voice input not supported in this browser. Please type.');return;}isRecording?stopVoice():startVoice();}
 function startVoice(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;recognition=new SR();
