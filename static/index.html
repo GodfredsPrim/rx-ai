@@ -3,350 +3,673 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RxAI - AI Pharmacist</title>
-<meta name="description" content="AI-powered pharmacist with voice support, multilingual guidance, and patient records.">
+<title>RxAI - Your AI Pharmacist</title>
+<meta name="description" content="Your friendly AI pharmacist with voice support, multilingual guidance, and personal health records.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
-<div class="page-glow page-glow-left"></div>
-<div class="page-glow page-glow-right"></div>
 
+<!-- Login Screen -->
 <div id="login-gate">
-  <div class="screen on" id="screen-auth">
-    <div class="auth-shell">
-      <div class="auth-wrap auth-card">
-        <div class="auth-hero">
-          <div class="brand-pill">
-            <span class="brand-pill-dot"></span>
-            <span>RxAI Care</span>
+  <div class="login-wrapper">
+    <div class="login-header">
+      <div class="logo-container">
+        <img src="logo.png" alt="RxAI Logo" class="logo-img">
+      </div>
+      <h1 class="brand-title">RxAI</h1>
+      <p class="brand-subtitle">Your AI Pharmacist</p>
+    </div>
+
+    <div class="login-card">
+      <div class="welcome-section">
+        <h2>Welcome Back</h2>
+        <p>Sign in to continue your health journey</p>
+      </div>
+
+      <div class="tab-container">
+        <button class="tab on" id="tab-login" onclick="switchAuthTab('login')">Sign In</button>
+        <button class="tab" id="tab-reg" onclick="switchAuthTab('register')">Create Account</button>
+      </div>
+
+      <!-- Login Form -->
+      <form id="form-login" onsubmit="event.preventDefault(); doLogin();">
+        <div class="form-group">
+          <label for="login-username">Username</label>
+          <input type="text" id="login-username" placeholder="Enter your username" required>
+        </div>
+        <div class="form-group">
+          <label for="login-pass">Password</label>
+          <input type="password" id="login-pass" placeholder="Enter your password" required>
+        </div>
+        <div id="login-err"></div>
+        <button type="submit" class="btn btn-primary">
+          <span>Sign In</span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </button>
+      </form>
+
+      <!-- Register Form -->
+      <form id="form-register" onsubmit="event.preventDefault(); doRegister();" style="display: none;">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="reg-fname">First Name</label>
+            <input type="text" id="reg-fname" placeholder="First name" required>
           </div>
-          <div class="hero-visual">
-            <div class="hero-orbit hero-orbit-one"></div>
-            <div class="hero-orbit hero-orbit-two"></div>
-            <img src="logo.png" alt="RxAI Logo" class="bot-illustration">
-          </div>
-          <div class="hero-copy-block">
-            <h1>Providing calm, clear health guidance.</h1>
-            <p>Talk with an AI pharmacist, review your medications, and keep your care notes in one focused place.</p>
+          <div class="form-group">
+            <label for="reg-lname">Last Name</label>
+            <input type="text" id="reg-lname" placeholder="Last name" required>
           </div>
         </div>
-
-        <div class="auth-panel">
-          <div class="auth-panel-head">
-            <div>
-              <div class="eyebrow">Secure access</div>
-              <div class="auth-title">Welcome back</div>
-            </div>
-            <div class="auth-badge">Patient portal</div>
-          </div>
-
-          <div class="tab-bar">
-            <div class="tab on" id="tab-login" onclick="switchAuthTab('login')">Sign in</div>
-            <div class="tab" id="tab-reg" onclick="switchAuthTab('register')">Create account</div>
-          </div>
-
-          <div id="form-login">
-            <div class="fld"><label>Username</label><input type="text" id="login-username" placeholder="yourusername"></div>
-            <div class="fld"><label>Password</label><input type="password" id="login-pass" placeholder="Your password" onkeydown="if(event.key==='Enter')doLogin()"></div>
-            <div id="login-err"></div>
-            <div class="action-stack"><button class="btn primary full" onclick="doLogin()">Start a conversation</button></div>
-            <div class="auth-alt-divider"><span>OR</span></div>
-            <button class="btn google full" onclick="doGoogleLogin()">
-              <span class="google-mark">G</span>
-              <span>Continue with Google</span>
-            </button>
-            <div class="auth-foot-note">Already have an account? Your sessions stay private to your profile.</div>
-          </div>
-
-          <div id="form-register" style="display:none">
-            <div class="row">
-              <div class="fld"><label>First name</label><input type="text" id="reg-fname" placeholder="Kofi"></div>
-              <div class="fld"><label>Last name</label><input type="text" id="reg-lname" placeholder="Mensah"></div>
-            </div>
-            <div class="fld"><label>Username</label><input type="text" id="reg-username" placeholder="yourusername"></div>
-            <div class="fld"><label>Email address</label><input type="email" id="reg-email" placeholder="you@example.com"></div>
-            <div class="fld">
-              <label>Password</label>
-              <input type="password" id="reg-pass" placeholder="Min. 6 characters" oninput="checkStrength(this.value)">
-              <div class="strength-bar"><div class="strength-fill" id="strength-fill" style="width:0%;background:var(--danger)"></div></div>
-              <div class="strength-label" id="strength-label">Enter a password</div>
-            </div>
-            <div class="fld"><label>Confirm password</label><input type="password" id="reg-pass2" placeholder="Repeat password"></div>
-            <div id="reg-err"></div>
-            <div class="action-stack"><button class="btn primary full" onclick="doRegister()">Create account</button></div>
-          </div>
-
-          <div class="privacy-note">
-            <span>Privacy</span>
-            <p>Your records stay tied to your account and are only used inside this care workspace.</p>
-          </div>
+        <div class="form-group">
+          <label for="reg-username">Username</label>
+          <input type="text" id="reg-username" placeholder="Choose a username" required>
         </div>
+        <div class="form-group">
+          <label for="reg-email">Email</label>
+          <input type="email" id="reg-email" placeholder="you@example.com" required>
+        </div>
+        <div class="form-group">
+          <label for="reg-pass">Password</label>
+          <input type="password" id="reg-pass" placeholder="Create a password" required oninput="checkStrength(this.value)">
+          <div class="strength-bar">
+            <div class="strength-fill" id="strength-fill"></div>
+          </div>
+          <span class="strength-label" id="strength-label">Password strength</span>
+        </div>
+        <div class="form-group">
+          <label for="reg-pass2">Confirm Password</label>
+          <input type="password" id="reg-pass2" placeholder="Confirm your password" required>
+        </div>
+        <div id="reg-err"></div>
+        <button type="submit" class="btn btn-primary">Create Account</button>
+      </form>
+
+      <div class="divider">
+        <span>or</span>
+      </div>
+
+      <button class="btn btn-google" onclick="doGoogleLogin()">
+        <svg width="20" height="20" viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+        </svg>
+        <span>Continue with Google</span>
+      </button>
+
+      <div class="privacy-notice">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/>
+        </svg>
+        <p>Your health data is encrypted and private. Only you can access your records.</p>
       </div>
     </div>
+
+    <div class="features-bar">
+      <div class="feature-item">
+        <div class="feature-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        </div>
+        <span>Voice Support</span>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+        </div>
+        <span>Multilingual</span>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+          </svg>
+        </div>
+        <span>24/7 Care</span>
+      </div>
+    </div>
+
+    <p class="disclaimer">This app provides health guidance only. Always consult a healthcare professional for medical advice.</p>
   </div>
 </div>
 
-<div id="main-app" style="display:none">
-  <div class="app">
-    <aside class="sidebar">
-      <div class="logo">
-        <div class="logo-mark"><img src="logo.png" style="width:100%;height:100%;object-fit:contain"></div>
-        <div>
-          <div class="logo-name">RxAI</div>
-          <div class="logo-tag">PHARMACY ASSISTANT</div>
+<!-- Main Application -->
+<div id="main-app" style="display: none;">
+  <div class="app-container">
+    <!-- Mobile Header -->
+    <header class="mobile-header">
+      <div class="mobile-logo">
+        <img src="logo.png" alt="RxAI">
+        <span>RxAI</span>
+      </div>
+      <button class="mobile-menu-btn" onclick="toggleMobileMenu()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+    </header>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">
+          <img src="logo.png" alt="RxAI">
+          <div class="sidebar-brand">
+            <span class="brand-name">RxAI</span>
+            <span class="brand-tag">Pharmacist</span>
+          </div>
         </div>
       </div>
 
-      <div class="nav-sec">Conversation</div>
-      <div class="nav on" onclick="go('chat',this)"><span class="nav-ic">01</span><span>Talk with RxAI</span></div>
-      <div class="nav" onclick="go('bodymap',this)"><span class="nav-ic">02</span><span>Body map</span></div>
-
-      <div class="nav-sec">Guides</div>
-      <div class="nav" onclick="go('conditions',this)"><span class="nav-ic">03</span><span>Conditions</span></div>
-      <div class="nav" onclick="go('redflag',this)"><span class="nav-ic">04</span><span>Red flags</span></div>
-
-      <div class="nav-sec">Records</div>
-      <div class="nav" onclick="go('profile',this)"><span class="nav-ic">05</span><span>My profile</span></div>
-      <div class="nav" onclick="go('connect',this)"><span class="nav-ic">06</span><span>Pharmacists</span></div>
-      <div class="nav" onclick="go('history',this)"><span class="nav-ic">07</span><span>Rx history</span></div>
-
-      <div class="lang-bar">
-        <div class="lang-btn on" onclick="setLang('en',this)">EN</div>
-        <div class="lang-btn" onclick="setLang('tw',this)">TWI</div>
-        <div class="lang-btn" onclick="setLang('ha',this)">HA</div>
-        <div class="lang-btn" onclick="setLang('fr',this)">FR</div>
-      </div>
-
-      <div class="sfooter">
-        <div class="status-line">
-          <span class="pulse"></span>
-          <span>Live assistant</span>
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <span class="nav-label">Main</span>
+          <a href="#" class="nav-item on" onclick="go('chat', this)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            <span>Chat</span>
+          </a>
+          <a href="#" class="nav-item" onclick="go('bodymap', this)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="5" r="3"/>
+              <line x1="12" y1="8" x2="12" y2="21"/>
+              <line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="12" x2="6" y2="17"/>
+              <line x1="12" y1="12" x2="18" y2="17"/>
+            </svg>
+            <span>Body Map</span>
+          </a>
         </div>
-        <small>Voice enabled and multilingual</small>
+
+        <div class="nav-section">
+          <span class="nav-label">Reference</span>
+          <a href="#" class="nav-item" onclick="go('conditions', this)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
+            <span>Conditions</span>
+          </a>
+          <a href="#" class="nav-item" onclick="go('redflag', this)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <span>Red Flags</span>
+          </a>
+        </div>
+
+        <div class="nav-section">
+          <span class="nav-label">Records</span>
+          <a href="#" class="nav-item" onclick="go('profile', this)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+            <span>My Profile</span>
+          </a>
+          <a href="#" class="nav-item" onclick="go('connect', this)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            <span>Pharmacists</span>
+          </a>
+          <a href="#" class="nav-item" onclick="go('history', this)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <span>History</span>
+          </a>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="language-selector">
+          <span class="lang-label">Language</span>
+          <div class="lang-buttons">
+            <button class="lang-btn on" onclick="setLang('en', this)">EN</button>
+            <button class="lang-btn" onclick="setLang('tw', this)">TWI</button>
+            <button class="lang-btn" onclick="setLang('ha', this)">HA</button>
+            <button class="lang-btn" onclick="setLang('fr', this)">FR</button>
+          </div>
+        </div>
+        <div class="status-info">
+          <span class="status-dot"></span>
+          <span>Assistant Online</span>
+        </div>
       </div>
     </aside>
 
-    <div class="main">
-      <div class="panel on" id="panel-chat">
-        <div class="topbar chatbar">
-          <div class="topbar-left">
-            <div class="eyebrow">Talk with RxAI</div>
-            <h2 id="chat-title">AI Pharmacist</h2>
-            <p id="chat-sub">Voice ready and multilingual</p>
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Chat Panel -->
+      <section class="panel on" id="panel-chat">
+        <div class="panel-header">
+          <div class="panel-info">
+            <h2 id="chat-title">Chat with RxAI</h2>
+            <p id="chat-sub">Your AI pharmacist is ready to help</p>
           </div>
-          <div class="topbar-actions">
-            <span class="badge g">Live</span>
-            <span class="badge b" id="lang-badge">EN</span>
+          <div class="panel-badges">
+            <span class="badge badge-success">Live</span>
+            <span class="badge badge-primary" id="lang-badge">EN</span>
           </div>
         </div>
 
         <div class="chat-hero">
-          <div class="chat-hero-copy">
-            <div class="eyebrow">Personal assistant</div>
+          <div class="chat-intro">
             <h3>How can I help you today?</h3>
-            <p>Describe symptoms, ask about medication, or use voice when typing feels slow.</p>
+            <p>Ask about medications, describe symptoms, or use voice input for hands-free assistance.</p>
           </div>
-          <div class="voice-art" aria-hidden="true">
-            <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+          <div class="ai-avatar">
+            <img src="logo.png" alt="RxAI">
           </div>
         </div>
 
-        <div class="disc"><strong id="disc-label">Disclaimer:</strong> <span id="disc-text">Based on standard health guidance. This does not replace a licensed pharmacist or physician.</span></div>
-        <div class="vstatus-bar" id="vstatus-bar">
-          <div class="vwave"><span style="height:6px"></span><span></span><span></span><span></span><span style="height:6px"></span></div>
+        <div class="disclaimer-banner">
+          <strong id="disc-label">Note:</strong> <span id="disc-text">This provides general health guidance and does not replace professional medical advice.</span>
+        </div>
+
+        <div class="voice-indicator" id="vstatus-bar">
+          <div class="voice-waves">
+            <span></span><span></span><span></span>
+          </div>
           <span id="vstatus-text">Listening...</span>
         </div>
-        <div class="msgs" id="msgs"></div>
-        <div class="chips-row" id="chips"></div>
-        <div class="input-bar">
-          <button class="ibtn mic" id="mic-btn" onclick="toggleVoice()" title="Voice input">Mic</button>
-          <textarea class="tinput" id="tinput" placeholder="Describe your symptoms..." rows="1" onkeydown="handleKey(event)" oninput="autoR(this)"></textarea>
-          <button class="ibtn spk" id="spk-btn" onclick="toggleTTS()" title="Toggle voice">Vol</button>
-          <button class="ibtn send" id="send-btn" onclick="send()">Go</button>
-        </div>
-      </div>
 
-      <div class="panel" id="panel-bodymap">
-        <div class="topbar">
-          <div class="topbar-left"><div class="eyebrow">Body guide</div><h2>Symptom body map</h2><p>Tap the area where you feel discomfort</p></div>
-          <span class="badge b">Interactive</span>
-        </div>
-        <div class="pbody">
-          <div class="bodymap-wrap feature-card">
-            <svg class="bodymap-svg" width="160" height="340" viewBox="0 0 160 340">
-              <ellipse cx="80" cy="35" rx="28" ry="32" fill="#171a24" stroke="#2a3a5d" stroke-width="1.5" class="body-zone" data-zone="head" onclick="selectZone('head')" style="cursor:pointer"/>
-              <text x="80" y="39" text-anchor="middle" fill="#6f7da4" font-size="9" font-family="IBM Plex Mono">HEAD</text>
-              <rect x="68" y="64" width="24" height="18" rx="4" fill="#171a24" stroke="#2a3a5d" stroke-width="1.5" class="body-zone" data-zone="throat" onclick="selectZone('throat')" style="cursor:pointer"/>
-              <rect x="45" y="82" width="70" height="60" rx="8" fill="#171a24" stroke="#2a3a5d" stroke-width="1.5" class="body-zone" data-zone="chest" onclick="selectZone('chest')" style="cursor:pointer"/>
-              <text x="80" y="116" text-anchor="middle" fill="#6f7da4" font-size="9" font-family="IBM Plex Mono">CHEST</text>
-              <rect x="14" y="84" width="28" height="70" rx="8" fill="#171a24" stroke="#2a3a5d" stroke-width="1.5" class="body-zone" data-zone="arm" onclick="selectZone('arm')" style="cursor:pointer"/>
-              <rect x="118" y="84" width="28" height="70" rx="8" fill="#171a24" stroke="#2a3a5d" stroke-width="1.5" class="body-zone" data-zone="arm" onclick="selectZone('arm')" style="cursor:pointer"/>
-              <rect x="45" y="144" width="70" height="55" rx="8" fill="#171a24" stroke="#2a3a5d" stroke-width="1.5" class="body-zone" data-zone="abdomen" onclick="selectZone('abdomen')" style="cursor:pointer"/>
-              <text x="80" y="175" text-anchor="middle" fill="#6f7da4" font-size="9" font-family="IBM Plex Mono">ABDOMEN</text>
-              <rect x="50" y="200" width="60" height="30" rx="6" fill="#171a24" stroke="#2a3a5d" stroke-width="1.5" class="body-zone" data-zone="lower" onclick="selectZone('lower')" style="cursor:pointer"/>
-              <text x="80" y="219" text-anchor="middle" fill="#6f7da4" font-size="9" font-family="IBM Plex Mono">LOWER</text>
-              <rect x="48" y="232" width="26" height="80" rx="8" fill="#171a24" stroke="#2a3a5d" stroke-width="1.5" class="body-zone" data-zone="leg" onclick="selectZone('leg')" style="cursor:pointer"/>
-              <rect x="86" y="232" width="26" height="80" rx="8" fill="#171a24" stroke="#2a3a5d" stroke-width="1.5" class="body-zone" data-zone="leg" onclick="selectZone('leg')" style="cursor:pointer"/>
-              <ellipse cx="61" cy="320" rx="18" ry="11" fill="#171a24" stroke="#2a3a5d" stroke-width="1.5" class="body-zone" data-zone="foot" onclick="selectZone('foot')" style="cursor:pointer"/>
-              <ellipse cx="99" cy="320" rx="18" ry="11" fill="#171a24" stroke="#2a3a5d" stroke-width="1.5" class="body-zone" data-zone="foot" onclick="selectZone('foot')" style="cursor:pointer"/>
-              <text x="80" y="337" text-anchor="middle" fill="#6f7da4" font-size="8" font-family="IBM Plex Mono">TAP AREA</text>
+        <div class="messages-container" id="msgs"></div>
+
+        <div class="quick-actions" id="chips"></div>
+
+        <div class="chat-input-container">
+          <button class="icon-btn voice-btn" id="mic-btn" onclick="toggleVoice()" title="Voice input">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="23"/>
             </svg>
-            <div id="bodymap-info" class="bodymap-info-panel">
-              <div class="zone-card">
-                <div class="zone-title">Find the right area</div>
-                <div class="zone-sub">Choose a body region to get focused symptom questions and next-step guidance.</div>
-              </div>
+          </button>
+          <textarea class="chat-input" id="tinput" placeholder="Type your message here..." rows="1" onkeydown="handleKey(event)" oninput="autoR(this)"></textarea>
+          <button class="icon-btn sound-btn" id="spk-btn" onclick="toggleTTS()" title="Toggle voice output">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+            </svg>
+          </button>
+          <button class="send-btn" id="send-btn" onclick="send()">
+            <span>Send</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="22" y1="2" x2="11" y2="13"/>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- Body Map Panel -->
+      <section class="panel" id="panel-bodymap">
+        <div class="panel-header">
+          <div class="panel-info">
+            <h2>Body Map</h2>
+            <p>Tap where you feel discomfort</p>
+          </div>
+          <span class="badge badge-primary">Interactive</span>
+        </div>
+        <div class="bodymap-wrapper">
+          <svg class="bodymap-svg" viewBox="0 0 160 340">
+            <ellipse cx="80" cy="35" rx="28" ry="32" class="body-zone" data-zone="head" onclick="selectZone('head')"/>
+            <text x="80" y="39" text-anchor="middle" fill="var(--teal-dark)" font-size="9" font-weight="600">HEAD</text>
+            <rect x="68" y="64" width="24" height="18" rx="4" class="body-zone" data-zone="throat" onclick="selectZone('throat')"/>
+            <rect x="45" y="82" width="70" height="60" rx="8" class="body-zone" data-zone="chest" onclick="selectZone('chest')"/>
+            <text x="80" y="116" text-anchor="middle" fill="var(--teal-dark)" font-size="9" font-weight="600">CHEST</text>
+            <rect x="14" y="84" width="28" height="70" rx="8" class="body-zone" data-zone="arm" onclick="selectZone('arm')"/>
+            <rect x="118" y="84" width="28" height="70" rx="8" class="body-zone" data-zone="arm" onclick="selectZone('arm')"/>
+            <rect x="45" y="144" width="70" height="55" rx="8" class="body-zone" data-zone="abdomen" onclick="selectZone('abdomen')"/>
+            <text x="80" y="175" text-anchor="middle" fill="var(--teal-dark)" font-size="9" font-weight="600">ABDOMEN</text>
+            <rect x="50" y="200" width="60" height="30" rx="6" class="body-zone" data-zone="lower" onclick="selectZone('lower')"/>
+            <text x="80" y="219" text-anchor="middle" fill="var(--teal-dark)" font-size="9" font-weight="600">LOWER</text>
+            <rect x="48" y="232" width="26" height="80" rx="8" class="body-zone" data-zone="leg" onclick="selectZone('leg')"/>
+            <rect x="86" y="232" width="26" height="80" rx="8" class="body-zone" data-zone="leg" onclick="selectZone('leg')"/>
+            <ellipse cx="61" cy="320" rx="18" ry="11" class="body-zone" data-zone="foot" onclick="selectZone('foot')"/>
+            <ellipse cx="99" cy="320" rx="18" ry="11" class="body-zone" data-zone="foot" onclick="selectZone('foot')"/>
+            <text x="80" y="337" text-anchor="middle" fill="var(--teal-dark)" font-size="8" font-weight="600">TAP AREA</text>
+          </svg>
+          <div class="zone-info" id="bodymap-info">
+            <div class="zone-card">
+              <h4>Select an Area</h4>
+              <p>Tap a body region to get guidance and symptom questions.</p>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div class="panel" id="panel-conditions">
-        <div class="topbar">
-          <div class="topbar-left"><div class="eyebrow">Quick library</div><h2>Conditions and drugs</h2><p>Common first-line treatments</p></div>
-          <span class="badge g">Reference</span>
+      <!-- Conditions Panel -->
+      <section class="panel" id="panel-conditions">
+        <div class="panel-header">
+          <div class="panel-info">
+            <h2>Conditions & Drugs</h2>
+            <p>Common treatments and information</p>
+          </div>
+          <span class="badge badge-success">Reference</span>
         </div>
-        <div class="pbody"><div class="cgrid" id="cgrid"></div></div>
-      </div>
+        <div class="conditions-grid" id="cgrid"></div>
+      </section>
 
-      <div class="panel" id="panel-redflag">
-        <div class="topbar">
-          <div class="topbar-left"><div class="eyebrow">Urgent signs</div><h2>Red flag guide</h2><p>Symptoms requiring immediate hospital referral</p></div>
-          <span class="badge r">Urgent</span>
+      <!-- Red Flags Panel -->
+      <section class="panel" id="panel-redflag">
+        <div class="panel-header">
+          <div class="panel-info">
+            <h2>Red Flag Symptoms</h2>
+            <p>Signs that need immediate attention</p>
+          </div>
+          <span class="badge badge-danger">Urgent</span>
         </div>
-        <div class="pbody" id="rfbody"></div>
-      </div>
+        <div class="redflags-list" id="rfbody"></div>
+      </section>
 
-      <div class="panel" id="panel-profile">
-        <div class="topbar">
-          <div class="topbar-left"><div class="eyebrow">Patient record</div><h2>My profile</h2><p>Personal and medical information</p></div>
-          <span class="badge b">Patient</span>
+      <!-- Profile Panel -->
+      <section class="panel" id="panel-profile">
+        <div class="panel-header">
+          <div class="panel-info">
+            <h2>My Profile</h2>
+            <p>Your health information</p>
+          </div>
+          <span class="badge badge-primary">Patient</span>
         </div>
-        <div class="nav-tabs">
-          <div class="ntab on" onclick="showPTab('overview',this)">Overview</div>
-          <div class="ntab" onclick="showPTab('personal',this)">Personal</div>
-          <div class="ntab" onclick="showPTab('medical',this)">Medical history</div>
-          <div class="ntab" onclick="showPTab('medications',this)">Medications</div>
-          <div class="ntab" onclick="showPTab('emergency',this)">Emergency</div>
+
+        <div class="profile-tabs">
+          <button class="profile-tab ntab on" onclick="showPTab('overview', this)">Overview</button>
+          <button class="profile-tab ntab" onclick="showPTab('personal', this)">Personal</button>
+          <button class="profile-tab ntab" onclick="showPTab('medical', this)">Medical</button>
+          <button class="profile-tab ntab" onclick="showPTab('medications', this)">Meds</button>
+          <button class="profile-tab ntab" onclick="showPTab('emergency', this)">Emergency</button>
         </div>
-        <div class="profile-scroll">
+
+        <div class="profile-content">
+          <!-- Overview Tab -->
           <div id="ptab-overview">
             <div class="stats-grid">
-              <div class="stat-card"><div class="stat-label">Blood type</div><div class="stat-value blood" id="ov-blood">--</div></div>
-              <div class="stat-card"><div class="stat-label">Age</div><div class="stat-value blue" id="ov-age">--</div></div>
-              <div class="stat-card"><div class="stat-label">Conditions</div><div class="stat-value gold" id="ov-conds">0</div></div>
-              <div class="stat-card"><div class="stat-label">Allergies</div><div class="stat-value red" id="ov-allergies">0</div></div>
-            </div>
-            <div class="overview-grid">
-              <div class="card"><div class="section-title">Active medications</div><div id="ov-meds-list"><div class="empty-note">None recorded</div></div></div>
-              <div class="card"><div class="section-title">Known allergies</div><div id="ov-allergy-list"><div class="empty-note">None recorded</div></div></div>
-            </div>
-            <div class="card section-spacer"><div class="section-title">Chronic conditions</div><div id="ov-conds-list"><div class="empty-note">None recorded</div></div></div>
-          </div>
-
-          <div id="ptab-personal" style="display:none">
-            <div class="section-title">Basic information</div>
-            <div class="row"><div class="fld"><label>First name</label><input type="text" id="p-fname" placeholder="First name"></div><div class="fld"><label>Last name</label><input type="text" id="p-lname" placeholder="Last name"></div></div>
-            <div class="row3"><div class="fld"><label>Date of birth</label><input type="date" id="p-dob"></div><div class="fld"><label>Gender</label><select id="p-gender"><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option><option>Prefer not to say</option></select></div><div class="fld"><label>Phone</label><input type="tel" id="p-phone" placeholder="+233 20 000 0000"></div></div>
-            <div class="fld"><label>Address</label><input type="text" id="p-address" placeholder="Accra, Ghana"></div>
-            <div class="row"><div class="fld"><label>City / Region</label><input type="text" id="p-city" placeholder="Accra"></div><div class="fld"><label>Ghana Card ID (optional)</label><input type="text" id="p-ghcard" placeholder="GHA-XXXXXXXXX-X"></div></div>
-            <div class="section-title">Blood type</div>
-            <div class="blood-grid">
-              <button class="blood-btn" onclick="selBlood(this,'A+')">A+</button><button class="blood-btn" onclick="selBlood(this,'A-')">A-</button><button class="blood-btn" onclick="selBlood(this,'B+')">B+</button><button class="blood-btn" onclick="selBlood(this,'B-')">B-</button><button class="blood-btn" onclick="selBlood(this,'AB+')">AB+</button><button class="blood-btn" onclick="selBlood(this,'AB-')">AB-</button><button class="blood-btn" onclick="selBlood(this,'O+')">O+</button><button class="blood-btn" onclick="selBlood(this,'O-')">O-</button><button class="blood-btn blood-btn-wide" onclick="selBlood(this,'Unknown')">Unknown</button>
-            </div>
-            <div id="personal-msg"></div><button class="btn primary" onclick="savePersonal()">Save personal info</button>
-          </div>
-
-          <div id="ptab-medical" style="display:none">
-            <div class="section-title">Chronic conditions</div>
-            <div class="tag-wrap" id="conds-tags"></div>
-            <div class="inline-add"><input type="text" id="cond-input" placeholder="Add condition (e.g. Hypertension)" style="flex:1"><button class="btn ghost" onclick="addCondition()" style="white-space:nowrap">Add</button></div>
-            <div class="section-title">Known allergies</div>
-            <div class="tag-wrap" id="allergy-tags"></div>
-            <div class="inline-add"><input type="text" id="allergy-input" placeholder="Add allergy (e.g. Penicillin)" style="flex:1"><button class="btn ghost" onclick="addAllergy()" style="white-space:nowrap">Add</button></div>
-            <div class="section-title">Lifestyle</div>
-            <div class="row"><div class="fld"><label>Smoking</label><select id="p-smoking"><option value="">Select</option><option>Non-smoker</option><option>Ex-smoker</option><option>Smoker</option></select></div><div class="fld"><label>Alcohol</label><select id="p-alcohol"><option value="">Select</option><option>None</option><option>Occasional</option><option>Regular</option></select></div></div>
-            <div class="fld"><label>Additional notes</label><textarea id="p-notes" rows="3" placeholder="Previous surgeries, family history..."></textarea></div>
-            <div id="medical-msg"></div><button class="btn primary" onclick="saveMedical()">Save medical history</button>
-          </div>
-
-          <div id="ptab-medications" style="display:none">
-            <div class="section-title">Current medications</div>
-            <div id="meds-list" style="margin-bottom:16px"></div>
-            <div class="card">
-              <div class="section-title">Add medication</div>
-              <div class="row"><div class="fld"><label>Drug name</label><input type="text" id="med-name" placeholder="e.g. Metformin"></div><div class="fld"><label>Dosage</label><input type="text" id="med-dose" placeholder="e.g. 500mg"></div></div>
-              <div class="row"><div class="fld"><label>Frequency</label><select id="med-freq"><option value="">Select</option><option>Once daily</option><option>Twice daily</option><option>Three times daily</option><option>As needed</option><option>Weekly</option></select></div><div class="fld"><label>Status</label><select id="med-status"><option>Active</option><option>Completed</option><option>Paused</option></select></div></div>
-              <div class="fld"><label>Prescribed by</label><input type="text" id="med-doctor" placeholder="e.g. Dr. Mensah"></div>
-              <div id="med-msg"></div><button class="btn primary" style="margin-top:8px" onclick="addMed()">Add medication</button>
-            </div>
-          </div>
-
-          <div id="ptab-emergency" style="display:none">
-            <div class="section-title">Primary emergency contact</div>
-            <div class="row"><div class="fld"><label>Full name</label><input type="text" id="ec-name" placeholder="Ama Asante"></div><div class="fld"><label>Relationship</label><select id="ec-rel"><option value="">Select</option><option>Spouse</option><option>Parent</option><option>Child</option><option>Sibling</option><option>Friend</option><option>Other</option></select></div></div>
-            <div class="row"><div class="fld"><label>Phone</label><input type="tel" id="ec-phone" placeholder="+233 20 000 0000"></div><div class="fld"><label>Alt phone</label><input type="tel" id="ec-phone2" placeholder="+233 24 000 0000"></div></div>
-            <div class="fld"><label>Address</label><input type="text" id="ec-address" placeholder="Home or work address"></div>
-            <div class="section-title">Medical alert for first responders</div>
-            <div class="fld"><textarea id="ec-alert" rows="3" placeholder="e.g. Diabetic. Allergic to Penicillin. Do not administer NSAIDs."></textarea></div>
-            <div id="ec-msg"></div><button class="btn primary" onclick="saveEmergency()">Save emergency contacts</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="panel" id="panel-connect">
-        <div class="topbar">
-          <div class="topbar-left"><div class="eyebrow">Human support</div><h2>Connect to a pharmacist</h2><p>Licensed Ghanaian pharmacists</p></div>
-        </div>
-        <div class="pbody connect-layout">
-          <div>
-            <div class="slabel">Available now</div>
-            <div class="pgrid">
-              <div class="pcard"><div class="phdr"><div class="pav" style="background:rgba(61,153,255,.16);color:var(--accent-2)">AM</div><div><div class="pname">Dr. Adjoa Mensah</div><div class="pspec">Clinical Pharmacist - Accra</div></div></div><div class="pcopy">Chronic disease management and medication counseling.</div><div class="pmeta"><span class="obadge"><span class="pulse"></span>Online</span><button class="btn primary" style="padding:6px 12px;font-size:11px">Connect</button></div></div>
-              <div class="pcard"><div class="phdr"><div class="pav" style="background:rgba(80,202,255,.16);color:#7bdcff">KO</div><div><div class="pname">Kwame Osei, PharmD</div><div class="pspec">Hospital Pharmacist - Kumasi</div></div></div><div class="pcopy">Malaria protocols and drug interaction support.</div><div class="pmeta"><span class="obadge"><span class="pulse"></span>Online</span><button class="btn primary" style="padding:6px 12px;font-size:11px">Connect</button></div></div>
-              <div class="pcard"><div class="phdr"><div class="pav" style="background:rgba(255,187,92,.14);color:var(--gold)">AB</div><div><div class="pname">Abena Boateng, RPh</div><div class="pspec">Community Pharmacist - Tema</div></div></div><div class="pcopy">OTC counseling and medication education.</div><div class="pmeta"><span class="muted-pill">Away - 15 min</span><button class="btn ghost" style="padding:6px 12px;font-size:11px">Notify me</button></div></div>
-              <div class="pcard"><div class="phdr"><div class="pav" style="background:rgba(255,110,110,.12);color:#ff8f8f">EK</div><div><div class="pname">Emmanuel Koffi, PharmD</div><div class="pspec">Paediatric Pharmacist - Takoradi</div></div></div><div class="pcopy">Child dosing and acute illness support.</div><div class="pmeta"><span class="muted-pill">Busy - 1 hr</span><button class="btn ghost" style="padding:6px 12px;font-size:11px">Notify me</button></div></div>
-            </div>
-          </div>
-          <div>
-            <div class="slabel">AI summary</div>
-            <div class="summary-card">
-              <div class="summary-visual">
-                <span></span><span></span><span></span><span></span><span></span>
+              <div class="stat-card">
+                <span class="stat-label">Blood Type</span>
+                <span class="stat-value blood" id="ov-blood">--</span>
               </div>
-              <div class="summary-copy" id="ai-summary">Start a consultation and your summary will appear here.</div>
-              <button class="btn ghost full" style="margin-top:12px" onclick="copySummary()">Copy summary</button>
+              <div class="stat-card">
+                <span class="stat-label">Age</span>
+                <span class="stat-value" id="ov-age">--</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-label">Conditions</span>
+                <span class="stat-value" id="ov-conds">0</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-label">Allergies</span>
+                <span class="stat-value" id="ov-allergies">0</span>
+              </div>
+            </div>
+            <div class="info-cards">
+              <div class="info-card">
+                <h4>Active Medications</h4>
+                <div id="ov-meds-list"><p class="empty">No medications recorded</p></div>
+              </div>
+              <div class="info-card">
+                <h4>Known Allergies</h4>
+                <div id="ov-allergy-list"><p class="empty">No allergies recorded</p></div>
+              </div>
+              <div class="info-card full">
+                <h4>Chronic Conditions</h4>
+                <div id="ov-conds-list"><p class="empty">No conditions recorded</p></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Personal Tab -->
+          <div id="ptab-personal" style="display: none;">
+            <h4>Basic Information</h4>
+            <div class="form-row">
+              <div class="form-group"><label>First Name</label><input type="text" id="p-fname" placeholder="First name"></div>
+              <div class="form-group"><label>Last Name</label><input type="text" id="p-lname" placeholder="Last name"></div>
+            </div>
+            <div class="form-row three">
+              <div class="form-group"><label>Date of Birth</label><input type="date" id="p-dob"></div>
+              <div class="form-group"><label>Gender</label><select id="p-gender"><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select></div>
+              <div class="form-group"><label>Phone</label><input type="tel" id="p-phone" placeholder="+233 20 000 0000"></div>
+            </div>
+            <div class="form-group"><label>Address</label><input type="text" id="p-address" placeholder="Your address"></div>
+            <div class="form-row">
+              <div class="form-group"><label>City</label><input type="text" id="p-city" placeholder="City"></div>
+              <div class="form-group"><label>Ghana Card</label><input type="text" id="p-ghcard" placeholder="GHA-XXXXXXXXX-X"></div>
+            </div>
+            <h4>Blood Type</h4>
+            <div class="blood-grid">
+              <button class="blood-btn" onclick="selBlood(this,'A+')">A+</button>
+              <button class="blood-btn" onclick="selBlood(this,'A-')">A-</button>
+              <button class="blood-btn" onclick="selBlood(this,'B+')">B+</button>
+              <button class="blood-btn" onclick="selBlood(this,'B-')">B-</button>
+              <button class="blood-btn" onclick="selBlood(this,'AB+')">AB+</button>
+              <button class="blood-btn" onclick="selBlood(this,'AB-')">AB-</button>
+              <button class="blood-btn" onclick="selBlood(this,'O+')">O+</button>
+              <button class="blood-btn" onclick="selBlood(this,'O-')">O-</button>
+              <button class="blood-btn" onclick="selBlood(this,'Unknown')">Unknown</button>
+            </div>
+            <div id="personal-msg"></div>
+            <button class="btn btn-primary" onclick="savePersonal()">Save Information</button>
+          </div>
+
+          <!-- Medical Tab -->
+          <div id="ptab-medical" style="display: none;">
+            <h4>Chronic Conditions</h4>
+            <div class="tags-container" id="conds-tags"></div>
+            <div class="add-field">
+              <input type="text" id="cond-input" placeholder="Add condition (e.g., Hypertension)">
+              <button class="btn btn-secondary" onclick="addCondition()">Add</button>
+            </div>
+            <h4>Known Allergies</h4>
+            <div class="tags-container" id="allergy-tags"></div>
+            <div class="add-field">
+              <input type="text" id="allergy-input" placeholder="Add allergy (e.g., Penicillin)">
+              <button class="btn btn-secondary" onclick="addAllergy()">Add</button>
+            </div>
+            <h4>Lifestyle</h4>
+            <div class="form-row">
+              <div class="form-group"><label>Smoking</label><select id="p-smoking"><option value="">Select</option><option>Non-smoker</option><option>Ex-smoker</option><option>Smoker</option></select></div>
+              <div class="form-group"><label>Alcohol</label><select id="p-alcohol"><option value="">Select</option><option>None</option><option>Occasional</option><option>Regular</option></select></div>
+            </div>
+            <div class="form-group"><label>Additional Notes</label><textarea id="p-notes" rows="3" placeholder="Previous surgeries, family history..."></textarea></div>
+            <div id="medical-msg"></div>
+            <button class="btn btn-primary" onclick="saveMedical()">Save Medical History</button>
+          </div>
+
+          <!-- Medications Tab -->
+          <div id="ptab-medications" style="display: none;">
+            <h4>Current Medications</h4>
+            <div id="meds-list" class="meds-list"></div>
+            <div class="info-card">
+              <h4>Add Medication</h4>
+              <div class="form-row">
+                <div class="form-group"><label>Drug Name</label><input type="text" id="med-name" placeholder="e.g., Metformin"></div>
+                <div class="form-group"><label>Dosage</label><input type="text" id="med-dose" placeholder="e.g., 500mg"></div>
+              </div>
+              <div class="form-row">
+                <div class="form-group"><label>Frequency</label><select id="med-freq"><option value="">Select</option><option>Once daily</option><option>Twice daily</option><option>Three times daily</option><option>As needed</option><option>Weekly</option></select></div>
+                <div class="form-group"><label>Status</label><select id="med-status"><option>Active</option><option>Completed</option><option>Paused</option></select></div>
+              </div>
+              <div class="form-group"><label>Prescribed By</label><input type="text" id="med-doctor" placeholder="e.g., Dr. Mensah"></div>
+              <div id="med-msg"></div>
+              <button class="btn btn-primary" onclick="addMed()">Add Medication</button>
+            </div>
+          </div>
+
+          <!-- Emergency Tab -->
+          <div id="ptab-emergency" style="display: none;">
+            <h4>Emergency Contact</h4>
+            <div class="form-row">
+              <div class="form-group"><label>Full Name</label><input type="text" id="ec-name" placeholder="Ama Asante"></div>
+              <div class="form-group"><label>Relationship</label><select id="ec-rel"><option value="">Select</option><option>Spouse</option><option>Parent</option><option>Child</option><option>Sibling</option><option>Friend</option><option>Other</option></select></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Phone</label><input type="tel" id="ec-phone" placeholder="+233 20 000 0000"></div>
+              <div class="form-group"><label>Alt Phone</label><input type="tel" id="ec-phone2" placeholder="+233 24 000 0000"></div>
+            </div>
+            <div class="form-group"><label>Address</label><input type="text" id="ec-address" placeholder="Home or work address"></div>
+            <h4>Medical Alert (for first responders)</h4>
+            <div class="form-group"><textarea id="ec-alert" rows="3" placeholder="e.g., Diabetic. Allergic to Penicillin. Do not administer NSAIDs."></textarea></div>
+            <div id="ec-msg"></div>
+            <button class="btn btn-primary" onclick="saveEmergency()">Save Emergency Contacts</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Connect Panel -->
+      <section class="panel" id="panel-connect">
+        <div class="panel-header">
+          <div class="panel-info">
+            <h2>Connect with Pharmacists</h2>
+            <p>Licensed Ghanaian pharmacists available</p>
+          </div>
+        </div>
+        <div class="connect-layout">
+          <div class="pharmacists-section">
+            <h4>Available Now</h4>
+            <div class="pharmacist-card">
+              <div class="pharmacist-avatar" style="background: #e3f2fd; color: #1976d2;">AM</div>
+              <div class="pharmacist-info">
+                <h5>Dr. Adjoa Mensah</h5>
+                <span>Clinical Pharmacist - Accra</span>
+                <p>Chronic disease management and medication counseling.</p>
+              </div>
+              <div class="pharmacist-actions">
+                <span class="online"><span class="dot"></span>Online</span>
+                <button class="btn btn-primary btn-sm">Connect</button>
+              </div>
+            </div>
+            <div class="pharmacist-card">
+              <div class="pharmacist-avatar" style="background: #e0f7fa; color: #00838f;">KO</div>
+              <div class="pharmacist-info">
+                <h5>Kwame Osei, PharmD</h5>
+                <span>Hospital Pharmacist - Kumasi</span>
+                <p>Malaria protocols and drug interaction support.</p>
+              </div>
+              <div class="pharmacist-actions">
+                <span class="online"><span class="dot"></span>Online</span>
+                <button class="btn btn-primary btn-sm">Connect</button>
+              </div>
+            </div>
+            <div class="pharmacist-card">
+              <div class="pharmacist-avatar" style="background: #fff3e0; color: #e65100;">AB</div>
+              <div class="pharmacist-info">
+                <h5>Abena Boateng, RPh</h5>
+                <span>Community Pharmacist - Tema</span>
+                <p>OTC counseling and medication education.</p>
+              </div>
+              <div class="pharmacist-actions">
+                <span class="away">Away - 15 min</span>
+                <button class="btn btn-secondary btn-sm">Notify</button>
+              </div>
+            </div>
+          </div>
+          <div class="summary-section">
+            <h4>AI Summary</h4>
+            <div class="summary-card">
+              <div class="summary-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <line x1="16" y1="13" x2="8" y2="13"/>
+                  <line x1="16" y1="17" x2="8" y2="17"/>
+                </svg>
+              </div>
+              <p id="ai-summary">Start a consultation and your summary will appear here.</p>
+              <button class="btn btn-secondary" onclick="copySummary()">Copy Summary</button>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div class="panel" id="panel-history">
-        <div class="topbar">
-          <div class="topbar-left"><div class="eyebrow">Patient record</div><h2>Prescription history</h2><p>Medication records and AI recommendations</p></div>
-        </div>
-        <div class="pbody">
-          <div class="slabel">Active</div>
-          <div class="rxlist">
-            <div class="rxitem"><div class="rxdot" style="background:var(--success)"></div><div style="flex:1"><div class="rxdrug">Artemether + Lumefantrine (Coartem)</div><div class="rxdet">6 doses / 3 days - Uncomplicated malaria - Mar 2026</div></div><span class="rxst ac">Active</span></div>
-            <div class="rxitem"><div class="rxdot" style="background:var(--success)"></div><div style="flex:1"><div class="rxdrug">Metformin 500mg</div><div class="rxdet">Twice daily - Type 2 Diabetes - Feb 2026</div></div><span class="rxst ac">Active</span></div>
-          </div>
-          <div class="slabel">Past</div>
-          <div class="rxlist">
-            <div class="rxitem"><div class="rxdot" style="background:var(--danger)"></div><div style="flex:1"><div class="rxdrug">ORS + Zinc 20mg</div><div class="rxdet">5-day course - Diarrhea - Dec 2025</div></div><span class="rxst ex">Done</span></div>
-            <div class="rxitem"><div class="rxdot" style="background:var(--danger)"></div><div style="flex:1"><div class="rxdrug">Amoxicillin 500mg</div><div class="rxdet">3x daily / 7 days - URTI - Nov 2025</div></div><span class="rxst ex">Done</span></div>
-            <div class="rxitem"><div class="rxdot" style="background:var(--accent-2)"></div><div style="flex:1"><div class="rxdrug">Amlodipine 5mg</div><div class="rxdet">Pending pharmacist review - Hypertension</div></div><span class="rxst pe">Pending</span></div>
+      <!-- History Panel -->
+      <section class="panel" id="panel-history">
+        <div class="panel-header">
+          <div class="panel-info">
+            <h2>Prescription History</h2>
+            <p>Your medication records</p>
           </div>
         </div>
-      </div>
-    </div>
+        <div class="history-content pbody">
+          <h4>Active</h4>
+          <div class="rx-list">
+            <div class="rx-item">
+              <span class="rx-dot active"></span>
+              <div class="rx-info">
+                <strong>Artemether + Lumefantrine (Coartem)</strong>
+                <span>6 doses / 3 days - Uncomplicated malaria - Mar 2026</span>
+              </div>
+              <span class="rx-status active">Active</span>
+            </div>
+            <div class="rx-item">
+              <span class="rx-dot active"></span>
+              <div class="rx-info">
+                <strong>Metformin 500mg</strong>
+                <span>Twice daily - Type 2 Diabetes - Feb 2026</span>
+              </div>
+              <span class="rx-status active">Active</span>
+            </div>
+          </div>
+          <h4>Past</h4>
+          <div class="rx-list">
+            <div class="rx-item">
+              <span class="rx-dot completed"></span>
+              <div class="rx-info">
+                <strong>ORS + Zinc 20mg</strong>
+                <span>5-day course - Diarrhea - Dec 2025</span>
+              </div>
+              <span class="rx-status completed">Done</span>
+            </div>
+            <div class="rx-item">
+              <span class="rx-dot completed"></span>
+              <div class="rx-info">
+                <strong>Amoxicillin 500mg</strong>
+                <span>3x daily / 7 days - URTI - Nov 2025</span>
+              </div>
+              <span class="rx-status completed">Done</span>
+            </div>
+            <div class="rx-item">
+              <span class="rx-dot pending"></span>
+              <div class="rx-info">
+                <strong>Amlodipine 5mg</strong>
+                <span>Pending pharmacist review - Hypertension</span>
+              </div>
+              <span class="rx-status pending">Pending</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
   </div>
 </div>
 
 <script src="js/app.js"></script>
 </body>
 </html>
-

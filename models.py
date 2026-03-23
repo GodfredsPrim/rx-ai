@@ -92,6 +92,6 @@ class PrescriptionHistory(Base):
     drug_name = Column(String)
     details = Column(String)
     status = Column(String)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
 
     owner = relationship("User", back_populates="prescriptions")

@@ -85,5 +85,37 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
 
+class DrugMatch(BaseModel):
+    name: str
+    category: str
+    dosage_form: str
+    strength: str
+    indication: str
+    classification: str
+
 class ChatResponse(BaseModel):
     reply: str
+    drugs: Optional[List[DrugMatch]] = None
+    consulting: bool = False
+    error: Optional[str] = None
+
+
+class RedFlagItem(BaseModel):
+    condition: str
+    flags: List[str]
+
+
+class ConditionItem(BaseModel):
+    name: str
+    drug: str
+    category: Optional[str] = None
+    indication: Optional[str] = None
+    tags: Optional[List[dict]] = None
+    q: Optional[str] = None
+
+
+class ReferenceData(BaseModel):
+    conditions: List[ConditionItem]
+    red_flags: List[RedFlagItem]
+    total_medicines: int
+    total_conditions: int

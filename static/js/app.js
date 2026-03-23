@@ -1,14 +1,53 @@
 const API_URL = '/api';
 
+// Fallback data when API is unavailable
+window.FALLBACK_CONDITIONS = [
+  {name:'Malaria / Fever',drug:'Artemether + Lumefantrine',tags:[{t:'Coartem®',c:'g'},{t:'6 doses/3 days',c:'b'},{t:'With food',c:'a'}],q:'Tell me about malaria symptoms and Coartem treatment.'},
+  {name:'Headache',drug:'Paracetamol / Ibuprofen',tags:[{t:'Tension',c:'b'},{t:'Migraine',c:'b'},{t:'Refer if severe',c:'r'}],q:'Headache assessment and first-line treatment?'},
+  {name:'Diarrhea',drug:'ORS + Zinc 10–20mg',tags:[{t:'Rehydration',c:'g'},{t:'Zinc',c:'b'},{t:'Metronidazole if amoebic',c:'a'}],q:'Diarrhea management advice.'},
+  {name:'Cough / URTI',drug:'Steam / Guaifenesin',tags:[{t:'Fluids',c:'g'},{t:'Antibiotic if bacterial',c:'a'},{t:'Refer if SOB',c:'r'}],q:'Cough and cold management?'},
+  {name:'Abdominal Pain',drug:'Antacid / Omeprazole',tags:[{t:'Gastritis',c:'b'},{t:'NSAID for cramps',c:'g'},{t:'Refer if severe',c:'r'}],q:'Abdominal pain assessment?'},
+  {name:'Skin Rash',drug:'Hydrocortisone / Clotrimazole',tags:[{t:'Allergic',c:'a'},{t:'Fungal',c:'b'},{t:'Antihistamine',c:'g'}],q:'Skin rash first-line treatment?'},
+  {name:'Urinary Complaints',drug:'Nitrofurantoin / Ciprofloxacin',tags:[{t:'UTI',c:'b'},{t:'Refer if pregnant',c:'r'},{t:'Fluids',c:'g'}],q:'Urinary tract complaint management?'},
+  {name:'Hypertension',drug:'Amlodipine 5mg OD',tags:[{t:'BP monitoring',c:'b'},{t:'Adherence',c:'g'},{t:'Refer if uncontrolled',c:'r'}],q:'Hypertension counseling guidelines?'},
+  {name:'Diabetes',drug:'Metformin (first-line)',tags:[{t:'Type 2 DM',c:'b'},{t:'Monitor glucose',c:'g'},{t:'Refer if uncontrolled',c:'a'}],q:'Diabetes medication counseling?'},
+  {name:'Pain / Inflammation',drug:'Paracetamol / Diclofenac gel',tags:[{t:'NSAID',c:'b'},{t:'Topical option',c:'g'},{t:'Avoid overuse',c:'a'}],q:'Pain and inflammation management?'}
+];
+
+window.FALLBACK_REDFLAGS = [
+  {condition:'Malaria / Severe Fever',flags:['Cannot keep oral medication down','Confusion, convulsions, or severe weakness','Yellowing of eyes or dark urine','Fever lasting more than 3 days despite treatment','Pregnant or infant under 6 months']},
+  {condition:'Head / Neurological',flags:['Sudden severe thunderclap headache','Neck stiffness with fever','Vision changes or slurred speech','Headache after head injury']},
+  {condition:'Breathing / Chest',flags:['Difficulty breathing at rest','Coughing blood','Rapid breathing in children','Productive cough with fever over 3 days']},
+  {condition:'Stomach / Abdomen',flags:['Severe dehydration — sunken eyes, no urine','Blood or mucus in stool','Rigid board-like abdomen','Multiple household members ill']},
+  {condition:'General Danger Signs',flags:['Altered consciousness or unconsciousness','Uncontrolled bleeding','Pregnancy with acute serious illness','Patient cannot stand or self-care']}
+];
+
+// Mobile Menu Toggle
+function toggleMobileMenu() {
+  const sidebar = document.getElementById('sidebar');
+  sidebar.classList.toggle('open');
+}
+
+// Close sidebar when clicking outside on mobile
+document.addEventListener('click', function(e) {
+  const sidebar = document.getElementById('sidebar');
+  const mobileBtn = document.querySelector('.mobile-menu-btn');
+  if (sidebar && mobileBtn && sidebar.classList.contains('open')) {
+    if (!sidebar.contains(e.target) && !mobileBtn.contains(e.target)) {
+      sidebar.classList.remove('open');
+    }
+  }
+});
+
 let currentUser = null;
-let lang = 'en', history = [], ttsOn = true, isRecording = false, recognition = null;
+let lang = 'en', history = [], ttsOn = false, isRecording = false, recognition = null;
 const synth = window.speechSynthesis;
 
 const LANGS={
-  en:{greeting:"Akwaaba! I'm your AI Pharmacist. Describe your symptoms and I'll help assess and guide you.",chips:["I have fever and chills","My child has diarrhea","Headache for 2 days","Cough & sore throat","I think I have malaria","What is Coartem?"],placeholder:"Describe your symptoms...",disc:"Based on standard health guidelines. Does not replace a licensed pharmacist or physician.",discLabel:"Disclaimer:"},
-  tw:{greeting:"Akwaaba! Meyɛ wo AI Oduruyɛfo. Kyerɛ wo yareɛ nsɛnkyerɛnne na mɛboa wo.",chips:["Mewɔ atiridiinini na mepere piri","Me ba wɔ esiɛ yareɛ","Me ti yɛ me yaw mpɛn abien","Mewɔ ekoɔ na me kyiri yɛ me yaw","Mete sɛ mewɔ nsɛmmɔ","Coartem yɛ dɛn?"],placeholder:"Kyerɛ wo yareɛ nsɛnkyerɛnne...",disc:"Wɔ atwerɛ wɔ standard health guidelines so. Ɛnsesa oduruyɛfo anaasɛ ɔdɔkotaa.",discLabel:"Nkɔmmɔdie:"},
-  ha:{greeting:"Sannu! Ni ne AI Pharmacist ɗinku. Bayyana alamun cutarku in taimaka muku.",chips:["Ina da zazzabi da rawar jiki","Ɗana yana da gudawa","Ciwon kai na kwana biyu","Tari da ciwon makogwaro","Ina jin kamar ina da zazzabin cizon sauro","Coartem mene ne?"],placeholder:"Bayyana alamun cutarku...",disc:"Ya dogara ne akan standard health guidelines. Baya maye gurbin likita ko mai magani.",discLabel:"Gargaɗi:"},
-  fr:{greeting:"Bienvenue! Je suis votre Pharmacien IA. Décrivez vos symptômes.",chips:["J'ai de la fièvre et des frissons","Mon enfant a de la diarrhée","Maux de tête depuis 2 jours","Toux et maux de gorge","Je pense avoir le paludisme","Qu'est-ce que le Coartem?"],placeholder:"Décrivez vos symptômes...",disc:"Basé sur des directives de santé standards. Ne remplace pas un pharmacien agréé.",discLabel:"Avertissement:"}
+  en:{greeting:"Hello sweetheart! I'm here to help you feel better. How are you feeling today? Don't worry, we'll work through this together, one step at a time. Just tell me what's going on with you.",chips:["I have a headache","My stomach hurts","I feel feverish","I have a cough","My child is sick","I have a skin rash"],placeholder:"Tell me how you're feeling... I care about you",disc:"Based on standard health guidelines. Does not replace a licensed pharmacist or physician.",discLabel:"Disclaimer:"},
+  tw:{greeting:"Akwaaba, me panyin! Mewo hɔ na mebɛtumi akyɛ wo. Sɛn na ɛwo hɔ ɛnnɛ? Mɛfrɛ wo sɛ kɔ so, yɛbɛyɛ ne akatua. Ka me nkyɛn sɛdeɛ wo te wo ho.",chips:["Me ti yɛ me yaw","Me yafunu yɛ me yaw","Mewɔ atiridiinini","Mewɔ ekoɔ","Me ba yareɛ","Mewɔ honam yareɛ"],placeholder:"Ka me nkyɛn sɛdeɛ wo te wo ho...",disc:"Wɔ atwerɛ wɔ standard health guidelines so. Ɛnsesa oduruyɛfo anaasɛ ɔdɔkotaa.",discLabel:"Nkɔmmɔdie:"},
+  ha:{greeting:"Sannu! Na gode ina nan jira. Mene ne matsalar ku yau? Kada ku damu, za mu taimaka wa tare. Ku gaya mini yadda kuke ji.",chips:["Ina da ciwon kai","Ciki na yi mini ciwo","Ina da zazzabi","Ina da tari","Ɗana ba shi da lafiya","Ina da kuraje"],placeholder:"Gaya mini yadda kake ji... ina kula da kai",disc:"Ya dogara ne akan standard health guidelines. Baya maye gurbin likita ko mai magani.",discLabel:"Gargaɗi:"},
+  fr:{greeting:"Bonjour mon ami! Je suis là pour vous aider à vous sentir mieux. Comment vous sentez-vous aujourd'hui? Ne vous inquiétez pas, nous allons résoudre cela ensemble. Dites-moi ce qui se passe.",chips:["J'ai mal a la tete","J'ai mal au ventre","J'ai de la fievre","Je tousse","Mon enfant est malade","J'ai une eruption cutanee"],placeholder:"Dites-moi comment vous vous sentez... je me soucie de vous",disc:"Base sur des directives de sante standards. Ne remplace pas un pharmacien agree.",discLabel:"Avertissement:"}
 };
 
 const ZONES={head:{title:'Head & Brain',sub:'Headache, dizziness, fever, vision changes',q:'I have pain in my head. Please assess.'},throat:{title:'Throat & Neck',sub:'Sore throat, difficulty swallowing, neck stiffness',q:'I have throat or neck discomfort. Please assess.'},chest:{title:'Chest & Lungs',sub:'Cough, shortness of breath, chest pain',q:'I have chest pain or breathing difficulty. Please assess.'},abdomen:{title:'Abdomen',sub:'Stomach pain, nausea, vomiting, diarrhea',q:'I have abdominal pain or stomach discomfort. Please assess.'},arm:{title:'Arms & Joints',sub:'Arm pain, joint swelling, muscle aches',q:'I have pain in my arms or joints. Please assess.'},lower:{title:'Lower Abdomen',sub:'Lower cramps, urinary problems, menstrual pain',q:'I have lower abdominal or urinary symptoms. Please assess.'},leg:{title:'Legs',sub:'Leg pain, swelling, muscle weakness',q:'I have pain or swelling in my legs. Please assess.'},foot:{title:'Feet & Ankles',sub:'Foot pain, ankle swelling, wounds',q:'I have pain or wounds in my feet. Please assess.'}};
@@ -20,7 +59,7 @@ const REDFLAGS=[{condition:'Malaria / Severe Fever',flags:['Cannot keep oral med
 // AUTH helper
 function getToken() { return localStorage.getItem('token'); }
 
-async function callApi(endpoint, method='GET', body=null) {
+async function callApi(endpoint, method='GET', body=null, retries=2) {
   const headers = {};
   if(body && !(body instanceof URLSearchParams)) headers['Content-Type']='application/json';
   const token = getToken();
@@ -33,12 +72,24 @@ async function callApi(endpoint, method='GET', body=null) {
     if(body instanceof URLSearchParams) opts.headers['Content-Type']='application/x-www-form-urlencoded';
   }
   
-  const res = await fetch(API_URL+endpoint, opts);
-  if(!res.ok) {
-     const text = await res.text();
-     try{ const j=JSON.parse(text); throw new Error(j.detail || text); }catch(e){ throw new Error(text); }
+  let lastError;
+  for(let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(API_URL+endpoint, opts);
+      if(!res.ok) {
+        const text = await res.text();
+        try{ const j=JSON.parse(text); throw new Error(j.detail || text); }catch(e){ throw new Error(text); }
+      }
+      return await res.json();
+    } catch(e) {
+      lastError = e;
+      if(attempt < retries) {
+        // Wait before retry (exponential backoff)
+        await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 500));
+      }
+    }
   }
-  return await res.json();
+  throw lastError;
 }
 
 // UI AUTH
@@ -117,7 +168,20 @@ function consumeTokenFromUrl() {
 }
 
 async function initApp(prefetchedData=null){
-  buildLang();buildConditions();buildRedFlags();
+  buildLang();
+  
+  // Fetch conditions and red flags from the API (from dataset)
+  try {
+    const refData = await callApi('/reference');
+    buildConditions(refData.conditions);
+    buildRedFlags(refData.red_flags);
+  } catch(e) {
+    console.warn("Failed to load reference data, using defaults", e);
+    // Fallback to hardcoded data
+    buildConditions(window.FALLBACK_CONDITIONS || []);
+    buildRedFlags(window.FALLBACK_REDFLAGS || []);
+  }
+  
   try{
       const data = prefetchedData || await callApi('/profile');
       loadPersonalForm(data.profile);
@@ -167,23 +231,122 @@ function setLang(l,el){lang=l;document.querySelectorAll('.lang-btn').forEach(b=>
 
 function go(name,el){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
-  document.querySelectorAll('.nav').forEach(n=>n.classList.remove('on'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('on'));
   document.getElementById('panel-'+name).classList.add('on');
   if(el)el.classList.add('on');
+  // Close mobile sidebar after navigation
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar) sidebar.classList.remove('open');
 }
 
 // CHAT
-function addMsg(role,text,tags){
+function addMsg(role,text,tags,msgId=null){
   const c=document.getElementById('msgs'),d=document.createElement('div');
   d.className='msg'+(role==='user'?' u':'');
+  const messageId = msgId || 'msg_' + Date.now();
   const tagsHtml=tags?`<div class="tr">${tags.map(t=>`<span class="bt ${t.c}">${t.t}</span>`).join('')}</div>`:'';
-  d.innerHTML=`<div class="av ${role==='user'?'u':'ai'}">${role==='user'?'You':'Rx'}</div><div class="bub ${role==='user'?'u':'ai'}">${text.replace(/\n/g,'<br>')}${tagsHtml}</div>`;
+  const voiceBtnHtml = role==='ai'?`<button class="msg-voice-btn" onclick="speakMsg('${messageId}', this)" title="Listen to this message">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+      <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+    </svg>
+    <span>Listen</span>
+  </button>`:'';
+  
+  // Use marked for AI messages to support formatting
+  const formattedText = role === 'ai' && window.marked ? marked.parse(text) : text.replace(/\n/g,'<br>');
+  
+  d.innerHTML=`<div class="av ${role==='user'?'u':'ai'}">${role==='user'?'You':'Rx'}</div>
+  <div class="bub ${role==='user'?'u':'ai'}" id="${messageId}">
+    <div class="bub-text">${formattedText}${tagsHtml}</div>
+    ${voiceBtnHtml}
+  </div>`;
   c.appendChild(d);c.scrollTop=c.scrollHeight;
+  return messageId;
+}
+
+// Speak a specific message by ID
+function speakMsg(msgId, btn) {
+  const msgEl = document.getElementById(msgId);
+  if (!msgEl) return;
+  
+  const text = msgEl.querySelector('.bub-text').textContent;
+  
+  // Toggle between play and stop
+  if (btn.classList.contains('speaking')) {
+    if (synth) synth.cancel();
+    btn.classList.remove('speaking');
+    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+      <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+    </svg><span>Listen</span>`;
+  } else {
+    // Stop any current speech first
+    if (synth) synth.cancel();
+    
+    // Remove speaking class from all buttons
+    document.querySelectorAll('.msg-voice-btn.speaking').forEach(b => {
+      b.classList.remove('speaking');
+      b.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+      </svg><span>Listen</span>`;
+    });
+    
+    btn.classList.add('speaking');
+    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect x="6" y="4" width="4" height="16"/>
+      <rect x="14" y="4" width="4" height="16"/>
+    </svg><span>Stop</span>`;
+    
+    const utt = new SpeechSynthesisUtterance(text.replace(/<[^>]*>/g, ''));
+    utt.rate = 0.88;
+    utt.pitch = 1.0;
+    utt.lang = lang === 'fr' ? 'fr-FR' : lang === 'ha' ? 'ha-NG' : lang === 'tw' ? 'ak-GH' : 'en-GH';
+    utt.onend = () => {
+      btn.classList.remove('speaking');
+      btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+      </svg><span>Listen</span>`;
+    };
+    utt.onerror = () => {
+      btn.classList.remove('speaking');
+      btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+      </svg><span>Listen</span>`;
+    };
+    synth.speak(utt);
+  }
 }
 function showTyping(){const c=document.getElementById('msgs'),d=document.createElement('div');d.className='msg';d.id='typing';d.innerHTML=`<div class="av ai">Rx</div><div class="bub ai" style="padding:7px 13px"><div class="typing"><span></span><span></span><span></span></div></div>`;c.appendChild(d);c.scrollTop=c.scrollHeight;}
 function rmTyping(){const e=document.getElementById('typing');if(e)e.remove();}
 function autoR(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,100)+'px';}
 function handleKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}}
+
+function addDrugCards(drugs) {
+  const c = document.getElementById('msgs');
+  const wrapper = document.createElement('div');
+  wrapper.className = 'drug-cards-wrapper';
+  wrapper.innerHTML = `<div class="drug-cards-header"><span class="drug-cards-icon">&#128138;</span> Here are some medications that might help you feel better, sweetheart</div>`;
+  drugs.forEach(drug => {
+    const card = document.createElement('div');
+    card.className = 'drug-card';
+    const dosageInstructions = drug.dosage_instructions || 'Take as directed by your pharmacist or doctor';
+    card.innerHTML = `
+      <div class="drug-card-name">${drug.name}</div>
+      <div class="drug-card-row"><span class="drug-card-label">For:</span> ${drug.indication || drug.category}</div>
+      <div class="drug-card-row"><span class="drug-card-label">Form:</span> ${drug.dosage_form || 'As available'}</div>
+      <div class="drug-card-row"><span class="drug-card-label">Strength:</span> ${drug.strength || 'Standard'}</div>
+      <div class="drug-card-dosage"><span class="drug-card-label">How to take:</span> ${dosageInstructions}</div>
+      <div class="drug-card-row"><span class="drug-card-label">Type:</span> ${drug.classification || 'Over-the-counter'}</div>
+    `;
+    wrapper.appendChild(card);
+  });
+  c.appendChild(wrapper);
+  c.scrollTop = c.scrollHeight;
+}
 
 async function send(){
   const input=document.getElementById('tinput'),btn=document.getElementById('send-btn');
@@ -194,16 +357,46 @@ async function send(){
   try{
     const res = await callApi('/chat', 'POST', {messages: history});
     const reply=res.reply||'Sorry, please try again.';
-    rmTyping();addMsg('ai',reply);history.push({role:'assistant',content:reply});
+    rmTyping();
+
+    if(res.consulting && res.drugs && res.drugs.length > 0) {
+      // Show the caring "hold on" transition message
+      addMsg('ai', 'Oh sweetie, just give me a moment while I look up the best options for you... I want to make sure we find something that will help you feel better soon', [{t:'Consulting',c:'a'}]);
+      if(ttsOn) speak('Oh sweetie, just give me a moment while I look up the best options for you');
+
+      // Brief pause to make it feel real
+      await new Promise(r => setTimeout(r, 2000));
+
+      // Now show the pharmacist's summary
+      addMsg('ai', reply);
+      history.push({role:'assistant',content:reply});
+
+      // Show drug recommendation cards
+      addDrugCards(res.drugs);
+
+      addMsg('ai', 'I really hope one of these helps you feel better, darling. Please remember to consult with a licensed pharmacist or doctor before taking any medication, especially if you have any allergies. And please, take good care of yourself. Is there anything else I can help you with? I\'m here for you', [{t:'Drug Match',c:'g'},{t:'Consultation',c:'b'}]);
+    } else {
+      // Normal conversational exchange (still gathering info)
+      addMsg('ai', reply);
+      history.push({role:'assistant',content:reply});
+      if(ttsOn) speak(reply);
+    }
+
     document.getElementById('ai-summary').textContent=`Patient: "${text.substring(0,100)}..."\n\nAI: ${reply.substring(0,250)}...`;
-    if(ttsOn)speak(reply);
     showDynamicChips(reply);
     
     // Refresh history dynamically
     const data = await callApi('/profile');
     renderPrescriptionHistory(data.prescriptions);
 
-  }catch(e){rmTyping();addMsg('ai','Connection error.');}
+  }catch(e){
+    rmTyping();
+    // Friendly error message displayed in chat box with caring tags
+    const errorMsg = 'I\'m sorry sweetheart, something went wrong on my end. Please try again in a moment, and I\'ll be right here to help you. Take care!';
+    addMsg('ai', errorMsg, [{t:'Error',c:'r'},{t:'Try Again',c:'a'}]);
+    // Log error for debugging
+    console.error('Chat error:', e.message);
+  }
   btn.disabled=false;
 }
 
@@ -303,10 +496,38 @@ function selectZone(zone){
 function askZone(zone){go('chat',document.querySelector('.nav'));document.getElementById('tinput').value=ZONES[zone].q;send();}
 
 
-function buildConditions(){const g=document.getElementById('cgrid');CONDITIONS.forEach(c=>{const d=document.createElement('div');d.className='ccard';d.innerHTML=`<div class="cname">${c.name}</div><div class="cdrug">${c.drug}</div><div class="ctags">${c.tags.map(t=>`<span class="ctag ${t.c}">${t.t}</span>`).join('')}</div>`;d.onclick=()=>{go('chat',document.querySelector('.nav'));document.getElementById('tinput').value=c.q;send();};g.appendChild(d);});}
+function buildConditions(conditionsData){
+  const g=document.getElementById('cgrid');
+  g.innerHTML = ''; // Clear existing content
+  
+  // Use data from API if available, otherwise use fallback
+  const conditions = conditionsData && conditionsData.length > 0 ? conditionsData : CONDITIONS;
+  
+  conditions.forEach(c=>{
+    const d=document.createElement('div');
+    d.className='ccard';
+    d.innerHTML=`<div class="cname">${c.name}</div><div class="cdrug">${c.drug}</div><div class="ctags">${(c.tags || []).map(t=>`<span class="ctag ${t.c}">${t.t}</span>`).join('')}</div>`;
+    d.onclick=()=>{go('chat',document.querySelector('.nav'));document.getElementById('tinput').value=c.q || `Tell me about ${c.name}`;send();};
+    g.appendChild(d);
+  });
+}
 
 
-function buildRedFlags(){const b=document.getElementById('rfbody');b.innerHTML=`<div style="font-size:11px;color:var(--muted2);line-height:1.6;margin-bottom:14px">The following signs require <strong style="color:var(--red)">immediate referral</strong> to a hospital.</div>`;REDFLAGS.forEach(rf=>{const box=document.createElement('div');box.className='rfbox';box.innerHTML=`<div class="rftitle">&#9888; ${rf.condition}</div>${rf.flags.map(f=>`<div class="rfitem">${f}</div>`).join('')}`;b.appendChild(box);});}
+function buildRedFlags(redFlagsData){
+  const b=document.getElementById('rfbody');
+  
+  // Use data from API if available, otherwise use fallback
+  const redFlags = redFlagsData && redFlagsData.length > 0 ? redFlagsData : REDFLAGS;
+  
+  b.innerHTML=`<div style="font-size:11px;color:var(--muted2);line-height:1.6;margin-bottom:14px">The following signs require <strong style="color:var(--red)">immediate referral</strong> to a hospital.</div>`;
+  
+  redFlags.forEach(rf=>{
+    const box=document.createElement('div');
+    box.className='rfbox';
+    box.innerHTML=`<div class="rftitle">&#9888; ${rf.condition}</div>${(rf.flags || []).map(f=>`<div class="rfitem">${f}</div>`).join('')}`;
+    b.appendChild(box);
+  });
+}
 
 
 // PROFILE
