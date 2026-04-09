@@ -17,6 +17,28 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
+
+class PharmacistCreate(BaseModel):
+    username: str
+    email: EmailStr
+    password: str
+    full_name: str
+    license_number: str
+    location: str = ""
+
+
+class AssignCaseRequest(BaseModel):
+    pharmacist_id: int
+
+
+class PharmacistReviewRequest(BaseModel):
+    diagnosis: Optional[str] = None
+    advice: str
+    drug: Optional[str] = None
+    referral_advice: Optional[str] = None
+    follow_up_instructions: Optional[str] = None
+    status: str = "Reviewed"
+
 class ProfileBase(BaseModel):
     first_name: str
     last_name: str
@@ -75,6 +97,16 @@ class PrescriptionBase(BaseModel):
 class Prescription(PrescriptionBase):
     id: int
     created_at: datetime
+    patient_message: Optional[str] = None
+    case_summary: Optional[str] = None
+    ai_summary: Optional[str] = None
+    pharmacist_feedback: Optional[str] = None
+    referral_advice: Optional[str] = None
+    follow_up_instructions: Optional[str] = None
+    urgency_level: Optional[str] = None
+    follow_up_status: Optional[str] = None
+    symptom_area: Optional[str] = None
+    symptom_type: Optional[str] = None
     class Config:
         from_attributes = True
 

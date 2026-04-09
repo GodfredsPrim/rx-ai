@@ -18,13 +18,19 @@ from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
 import auth
+from auth import get_current_user, get_optional_user, get_current_pharmacist, get_current_admin
 import models
 import schemas
-from database import engine, get_db
+from database import SessionLocal, engine, get_db
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / '.env', override=True, verbose=True)
 STATIC_DIR = BASE_DIR / "static"
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", os.getenv("FRONTEND_URL", "http://127.0.0.1:8000")).split(",")
+    if origin.strip()
+]
 
 # Create DB tables
 models.Base.metadata.create_all(bind=engine)
@@ -38,7 +44,7 @@ app.add_middleware(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS or ["http://127.0.0.1:8000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -46,6 +52,8 @@ app.add_middleware(
 
 api_key = os.getenv("DEEPSEEK_API_KEY", os.getenv("OPENAI_API_KEY", "dummy_key"))
 configured_base_url = os.getenv("DEEPSEEK_BASE_URL", "").strip()
+LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS", "45"))
+LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "2"))
 
 if configured_base_url:
     base_url = configured_base_url
@@ -61,6 +69,8 @@ else:
 openai_client = OpenAI(
     api_key=api_key,
     base_url=base_url,
+    timeout=LLM_TIMEOUT_SECONDS,
+    max_retries=LLM_MAX_RETRIES,
 )
 
 # Model name: default to deepseek-chat for DeepSeek keys, gpt-4o-mini for OpenAI keys
@@ -228,26 +238,25 @@ def _translate_twi_to_english(text: str) -> str | None:
     return None
 
 
-SYSTEM_PROMPT = f"""You are RxAI, a warm, deeply empathetic pharmacist who genuinely cares about each person you speak with. You're like a compassionate friend who happens to know a lot about medicine. You speak from the heart, with kindness and understanding.
+SYSTEM_PROMPT = f"""You are RxAI, a warm and capable clinical conversation assistant for pharmacy triage.
 
-CONVERSATION STYLE:
-- Start with empathy: Acknowledge how the person feels. If they're suffering, let them know you genuinely care.
-- Be conversational and warm, like chatting with a trusted friend over tea.
-- Use emotionally supportive phrases: "Oh no, I'm so sorry you're going through this!" "That sounds really uncomfortable, let's figure this out together" "I completely understand how you feel" "Don't worry, we're going to get through this"
-- Never sound robotic or clinical. Your warmth should come through in every message.
+STYLE:
+- Sound natural, calm, and caring.
+- Use short, smooth replies, usually 2 to 4 sentences.
+- Refer to what the user just said so the conversation feels continuous.
+- Do not repeat the same empathy phrase every turn.
+- Avoid sounding robotic, dramatic, or overly scripted.
 
-CONVERSATION RULES (follow strictly):
-1. ASK ONE QUESTION AT A TIME: Like a doctor, you must only ask one caring follow-up question in each response. Never bundle multiple questions.
-2. WAIT FOR ANSWER: Do not move to the next topic until the patient has answered your previous question.
-3. EMPATHY FIRST: Every single response must begin with a reflection of the patient's feelings.
-4. GATHER VITAL INFO: Before recommending anything, you MUST know:
-   - Exactly how long they've had the symptoms.
-   - The severity (is it getting better or worse?).
-   - Any other symptoms they might have missed.
-5. TRANSITION: After you have gathered enough information (at least 3-4 distinct exchanges), include the exact marker [CONSULT_READY] at the very start of your response, followed by a warm, empathetic summary and transition to medication.
-6. NO SELF-PRESCRIBING: NEVER recommend specific drug names yourself. The drug lookup happens separately after [CONSULT_READY].
-7. LANGUAGE: Respond in the same language the patient writes in (English, Twi, Hausa, or French).
-8. RED FLAGS: ALWAYS flag danger signs (convulsions, confusion, jaundice, severe dehydration, difficulty breathing) with immediate hospital referral.
+CONVERSATION RULES:
+1. Ask only one follow-up question per reply.
+2. Wait for the user's answer before moving to the next question.
+3. Start with a brief human acknowledgment, then continue naturally.
+4. Gather this information before transitioning: duration, severity or progression, and other associated symptoms.
+5. After enough information has been gathered, begin the reply with the exact marker [CONSULT_READY], then give a short summary and explain that the case will be sent to a licensed pharmacist for diagnosis and treatment decisions.
+6. Do not prescribe and do not recommend specific drug names to the patient. The pharmacist makes the treatment decision.
+7. Respond in the same language the user writes in.
+8. If there are danger signs such as difficulty breathing, confusion, convulsions, jaundice, severe dehydration, or chest pain, clearly advise urgent hospital care.
+9. Never dump a long checklist unless the user asks. Keep the exchange conversational.
 
 BASE MEDICAL GUIDELINES CONTEXT:
 {pdf_context[:4000]}"""
@@ -457,6 +466,302 @@ def _get_relevant_pdf_context(messages: list[dict], limit: int = 3) -> str:
     )
 
 
+def _build_local_chat_fallback(
+    translated_messages: list[dict],
+    input_language: str,
+    relevant_pdf_context: str,
+) -> str:
+    analysis = _analyze_conversation_state(translated_messages)
+    user_messages = analysis["user_messages"]
+    latest_message = analysis["latest_message"]
+    lowered = analysis["lowered"]
+    combined_text = analysis["combined_text"]
+
+    urgent_keywords = {
+        "difficulty breathing",
+        "shortness of breath",
+        "chest pain",
+        "convulsion",
+        "seizure",
+        "confusion",
+        "unconscious",
+        "severe dehydration",
+        "yellow eyes",
+        "dark urine",
+        "blood in stool",
+        "coughing blood",
+    }
+    if any(keyword in lowered for keyword in urgent_keywords):
+        if input_language == "twi":
+            return (
+                "Ayoo, sorry paa sɛ woretwa mu saa. Saa nsɛnkyerɛnne yi betumi ayɛ asiane, enti kɔ ayaresabea anaa frɛ emergency ntɛm. "
+                "Wobɛtumi akɔ ayaresabea mprempren?"
+            )
+        return (
+            "I am really sorry you are dealing with this. Those symptoms can be dangerous, so please go to the nearest hospital or seek emergency care now. "
+            "Are you able to get urgent medical help right away?"
+        )
+
+    context_line = ""
+    if relevant_pdf_context:
+        context_line = " I can still guide you using the local clinical guideline notes I already have available."
+
+    has_duration = analysis["has_duration"]
+    has_severity = analysis["has_severity"]
+    has_multiple_symptoms = analysis["has_multiple_symptoms"]
+
+    if input_language == "twi":
+        if not has_duration:
+            return (
+                "Ayoo, sorry paa sɛ woretɛ saa."
+                f"{context_line} "
+                "Mepa wo kyɛw, bere bɛn na yareɛ no fii ase?"
+            )
+        if not has_severity:
+            return (
+                "Meda wo ase sɛ woka kyerɛ me."
+                f"{context_line} "
+                "Seesei, ɛreyɛ den anaa ɛretew?"
+            )
+        if not has_multiple_symptoms:
+            return (
+                "Me te ase."
+                f"{context_line} "
+                "Yareɛ yi akyi no, nsɛnkyerɛnne foforo bɛn na woahu bio?"
+            )
+        return (
+            "Mehu sɛ wei haw wo paa."
+            f"{context_line} "
+            "Mepa wo kyɛw, saa bere yi mu no, dɛn na ɛhaw wo paa sen biara?"
+        )
+
+    if not has_duration:
+        return (
+            f"I’m sorry you’re feeling this way.{context_line} "
+            "To guide you safely, when exactly did these symptoms start?"
+        )
+
+    if not has_severity:
+        return (
+            f"Thanks for telling me that.{context_line} "
+            "Has it been getting better, worse, or staying about the same?"
+        )
+
+    if not has_multiple_symptoms:
+        return (
+            f"I hear you.{context_line} "
+            "Besides that main symptom, what other symptoms have you noticed?"
+        )
+
+    if latest_message:
+        return (
+            f"That sounds really uncomfortable.{context_line} "
+            "What is bothering you the most right now?"
+        )
+
+    return (
+        "I’m sorry you’re feeling unwell."
+        f"{context_line} "
+        "Please tell me when the symptoms started so I can guide you step by step."
+    )
+
+
+def _analyze_conversation_state(translated_messages: list[dict]) -> dict:
+    user_messages = [
+        message["content"].strip()
+        for message in translated_messages
+        if message.get("role") == "user" and message.get("content", "").strip()
+    ]
+    latest_message = user_messages[-1] if user_messages else ""
+    combined_text = " ".join(user_messages).lower()
+
+    has_duration = bool(
+        re.search(
+            r"\b(\d+\s*(hour|hours|day|days|week|weeks|month|months)|today|yesterday|since|for\s+\d+|this morning|last night)\b",
+            combined_text,
+        )
+    )
+    has_severity = bool(
+        re.search(
+            r"\b(mild|moderate|severe|worse|worst|better|improving|same|constant|on and off|comes and goes)\b",
+            combined_text,
+        )
+    )
+    symptom_keywords = {
+        "fever", "cough", "headache", "vomiting", "nausea", "diarrhea", "stomach", "pain",
+        "rash", "sore throat", "weakness", "dizziness", "body pains", "runny nose",
+    }
+    observed_symptoms = {symptom for symptom in symptom_keywords if symptom in combined_text}
+    return {
+        "user_messages": user_messages,
+        "latest_message": latest_message,
+        "lowered": latest_message.lower(),
+        "combined_text": combined_text,
+        "has_duration": has_duration,
+        "has_severity": has_severity,
+        "has_multiple_symptoms": len(observed_symptoms) >= 2,
+    }
+
+
+def _build_fallback_consult_summary(translated_messages: list[dict], input_language: str) -> str:
+    analysis = _analyze_conversation_state(translated_messages)
+    summary_source = " ".join(analysis["user_messages"][-3:]).strip()
+    short_summary = summary_source[:220] if summary_source else "the reported symptoms"
+    if input_language == "twi":
+        return (
+            "Meda wo ase. Makaboa nsɛm a wode ama no nyinaa ano. "
+            f"Nsɛm titiriw a mede rekɔma oduruyɛfo no ne: {short_summary}. "
+            "Mede bɛkɔma oduruyɛfo a ɔwɔ tumi ahwɛ mu na ɔnyɛ ayaresa ho gyinae."
+        )
+    return (
+        "Thank you. I have gathered the key clinical details. "
+        f"The summary for the pharmacist is: {short_summary}. "
+        "I will send this to a licensed pharmacist to review and decide the appropriate treatment."
+    )
+
+
+def _build_pharmacist_case_details(
+    translated_messages: list[dict],
+    ai_summary: str,
+    matched_drugs: list[dict],
+) -> str:
+    user_points = [
+        message["content"].strip()
+        for message in translated_messages
+        if message.get("role") == "user" and message.get("content", "").strip()
+    ]
+    symptom_history = " | ".join(user_points[-4:])[:500]
+
+    pharmacist_guidance = []
+    for drug in matched_drugs[:3]:
+        name = drug.get("name") or "Unspecified option"
+        indication = drug.get("indication") or "General indication"
+        category = drug.get("category") or "General category"
+        pharmacist_guidance.append(f"{name} ({category}; {indication})")
+
+    guidance_text = ", ".join(pharmacist_guidance) if pharmacist_guidance else "No dataset guidance matched."
+    return (
+        f"AI intake summary: {ai_summary[:500]} || "
+        f"Recent patient statements: {symptom_history or 'Not captured'} || "
+        f"Dataset guidance for pharmacist review only: {guidance_text}"
+    )
+
+
+def _infer_urgency_level(text: str) -> str:
+    lowered = (text or "").lower()
+    urgent_terms = ["difficulty breathing", "shortness of breath", "chest pain", "confusion", "convulsion", "unconscious", "bleeding"]
+    priority_terms = ["worse", "severe", "high fever", "vomiting", "dehydration"]
+    if any(term in lowered for term in urgent_terms):
+        return "urgent"
+    if any(term in lowered for term in priority_terms):
+        return "priority"
+    return "routine"
+
+
+def _detect_symptom_metadata(user_messages: list[str]) -> tuple[str, str]:
+    text = " ".join(user_messages).lower()
+    area_map = {
+        "head": ["head", "headache", "dizziness", "brain"],
+        "throat": ["throat", "neck", "swallow"],
+        "chest": ["chest", "breathing", "cough", "lungs"],
+        "abdomen": ["stomach", "abdomen", "belly", "vomiting", "diarrhea"],
+        "lower": ["urine", "urinary", "pelvic", "lower abdomen", "menstrual"],
+        "arm": ["arm", "joint", "shoulder", "elbow", "wrist"],
+        "leg": ["leg", "knee", "swelling", "thigh"],
+        "foot": ["foot", "ankle", "toe", "heel"],
+    }
+    type_map = {
+        "pain": ["pain", "ache", "hurt", "cramp"],
+        "rash": ["rash", "itch", "skin"],
+        "breathing": ["breathing", "cough", "shortness of breath"],
+        "digestive": ["vomiting", "diarrhea", "nausea", "stomach"],
+        "fever": ["fever", "temperature", "feverish"],
+        "wound": ["wound", "cut", "burn", "bleeding"],
+    }
+    symptom_area = next((area for area, terms in area_map.items() if any(term in text for term in terms)), "")
+    symptom_type = next((kind for kind, terms in type_map.items() if any(term in text for term in terms)), "")
+    return symptom_area, symptom_type
+
+
+def _log_case_event(case: models.PrescriptionHistory, actor_role: str, actor_name: str, action: str, note: str = ""):
+    case.events.append(
+        models.CaseEvent(
+            actor_role=actor_role,
+            actor_name=actor_name,
+            action=action,
+            note=note,
+        )
+    )
+
+
+def _assign_random_pharmacist(db: Session) -> tuple[int | None, str]:
+    """Find a random verified pharmacist to assign the case to."""
+    import random
+    
+    # Get all verified pharmacists
+    pharmacists = db.query(models.Pharmacist).filter(
+        models.Pharmacist.is_verified == True
+    ).all()
+    
+    if not pharmacists:
+        return None, "No verified pharmacists available"
+    
+    # Randomly select one
+    selected = random.choice(pharmacists)
+    # Return the pharmacist object so we can access .id after commit
+    return selected, f"Auto-assigned to {selected.full_name or selected.username}"
+
+
+def _create_case_record(
+    db: Session,
+    user_id: int,
+    translated_messages: list[dict],
+    ai_summary: str,
+    matched_drugs: list[dict],
+    actor_note: str = "Case created from AI triage intake.",
+) -> models.PrescriptionHistory:
+    user_messages = [
+        message["content"].strip()
+        for message in translated_messages
+        if message.get("role") == "user" and message.get("content", "").strip()
+    ]
+    symptom_area, symptom_type = _detect_symptom_metadata(user_messages)
+    case_summary = " | ".join(user_messages[-4:])[:1000]
+    
+    # Auto-assign to a random verified pharmacist
+    pharmacist_obj, assignment_note = _assign_random_pharmacist(db)
+    assigned_pharmacist_id = pharmacist_obj.id if pharmacist_obj else None
+    
+    case = models.PrescriptionHistory(
+        user_id=user_id,
+        pharmacist_id=assigned_pharmacist_id,
+        drug_name="Pharmacist review required",
+        details=_build_pharmacist_case_details(
+            translated_messages=translated_messages,
+            ai_summary=ai_summary,
+            matched_drugs=matched_drugs,
+        ),
+        patient_message=user_messages[-1] if user_messages else "",
+        case_summary=case_summary,
+        ai_summary=ai_summary[:1000],
+        urgency_level=_infer_urgency_level(f"{case_summary} {ai_summary}"),
+        follow_up_status="awaiting_review",
+        symptom_area=symptom_area,
+        symptom_type=symptom_type,
+        status="In Review" if assigned_pharmacist_id else "Pending",
+    )
+    _log_case_event(case, "system", "RxAI", "case_created", actor_note)
+    
+    # Log auto-assignment if a pharmacist was assigned
+    if assigned_pharmacist_id:
+        _log_case_event(case, "system", "RxAI", "auto_assigned", assignment_note)
+    
+    db.add(case)
+    db.commit()
+    db.refresh(case)
+    return case
+
+
 def _ensure_db_migrations():
     inspector = inspect(engine)
     
@@ -476,6 +781,42 @@ def _ensure_db_migrations():
         if "phone_alt" not in columns and "phone2" in columns:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE emergencies RENAME COLUMN phone2 TO phone_alt"))
+
+    if inspector.has_table("pharmacists"):
+        columns = {column["name"] for column in inspector.get_columns("pharmacists")}
+        with engine.begin() as conn:
+            if "full_name" not in columns:
+                conn.execute(text("ALTER TABLE pharmacists ADD COLUMN full_name VARCHAR DEFAULT ''"))
+            if "location" not in columns:
+                conn.execute(text("ALTER TABLE pharmacists ADD COLUMN location VARCHAR DEFAULT ''"))
+            if "is_verified" not in columns:
+                conn.execute(text("ALTER TABLE pharmacists ADD COLUMN is_verified BOOLEAN DEFAULT 0"))
+
+    if inspector.has_table("prescription_history"):
+        columns = {column["name"] for column in inspector.get_columns("prescription_history")}
+        with engine.begin() as conn:
+            if "pharmacist_id" not in columns:
+                conn.execute(text("ALTER TABLE prescription_history ADD COLUMN pharmacist_id INTEGER"))
+            if "patient_message" not in columns:
+                conn.execute(text("ALTER TABLE prescription_history ADD COLUMN patient_message TEXT DEFAULT ''"))
+            if "case_summary" not in columns:
+                conn.execute(text("ALTER TABLE prescription_history ADD COLUMN case_summary TEXT DEFAULT ''"))
+            if "ai_summary" not in columns:
+                conn.execute(text("ALTER TABLE prescription_history ADD COLUMN ai_summary TEXT DEFAULT ''"))
+            if "pharmacist_feedback" not in columns:
+                conn.execute(text("ALTER TABLE prescription_history ADD COLUMN pharmacist_feedback TEXT DEFAULT ''"))
+            if "referral_advice" not in columns:
+                conn.execute(text("ALTER TABLE prescription_history ADD COLUMN referral_advice TEXT DEFAULT ''"))
+            if "follow_up_instructions" not in columns:
+                conn.execute(text("ALTER TABLE prescription_history ADD COLUMN follow_up_instructions TEXT DEFAULT ''"))
+            if "urgency_level" not in columns:
+                conn.execute(text("ALTER TABLE prescription_history ADD COLUMN urgency_level VARCHAR DEFAULT 'routine'"))
+            if "follow_up_status" not in columns:
+                conn.execute(text("ALTER TABLE prescription_history ADD COLUMN follow_up_status VARCHAR DEFAULT 'awaiting_review'"))
+            if "symptom_area" not in columns:
+                conn.execute(text("ALTER TABLE prescription_history ADD COLUMN symptom_area VARCHAR DEFAULT ''"))
+            if "symptom_type" not in columns:
+                conn.execute(text("ALTER TABLE prescription_history ADD COLUMN symptom_type VARCHAR DEFAULT ''"))
 
 
 def _normalize_username(value: str) -> str:
@@ -510,7 +851,108 @@ def _ensure_user_profile_records(db: Session, user_id: int, first_name: str = ""
         db.add(models.Medical(user_id=user_id))
     if not db.query(models.Emergency).filter(models.Emergency.user_id == user_id).first():
         db.add(models.Emergency(user_id=user_id))
-    db.commit()
+        db.commit()
+
+
+def _serialize_case(rx: models.PrescriptionHistory) -> dict:
+    patient = rx.owner
+    patient_profile = patient.profile if patient else None
+    pharmacist = rx.reviewer
+    return {
+        "id": rx.id,
+        "drug_name": rx.drug_name,
+        "details": rx.details,
+        "patient_message": rx.patient_message,
+        "case_summary": rx.case_summary,
+        "ai_summary": rx.ai_summary,
+        "pharmacist_feedback": rx.pharmacist_feedback,
+        "referral_advice": rx.referral_advice,
+        "follow_up_instructions": rx.follow_up_instructions,
+        "urgency_level": rx.urgency_level,
+        "follow_up_status": rx.follow_up_status,
+        "symptom_area": rx.symptom_area,
+        "symptom_type": rx.symptom_type,
+        "status": rx.status,
+        "created_at": rx.created_at.isoformat() if rx.created_at else None,
+        "patient": {
+            "id": patient.id if patient else None,
+            "username": patient.username if patient else "",
+            "email": patient.email if patient else "",
+            "full_name": (
+                f"{patient_profile.first_name} {patient_profile.last_name}".strip()
+                if patient_profile else ""
+            ),
+            "phone": patient_profile.phone if patient_profile else "",
+            "city": patient_profile.city if patient_profile else "",
+        },
+        "pharmacist": {
+            "id": pharmacist.id,
+            "name": pharmacist.full_name or pharmacist.username,
+            "email": pharmacist.email,
+            "location": pharmacist.location,
+        } if pharmacist else None,
+        "events": [
+            {
+                "id": event.id,
+                "actor_role": event.actor_role,
+                "actor_name": event.actor_name,
+                "action": event.action,
+                "note": event.note,
+                "created_at": event.created_at.isoformat() if event.created_at else None,
+            }
+            for event in sorted(rx.events, key=lambda item: item.created_at or item.id)
+        ],
+    }
+
+
+def _serialize_pharmacist(pharmacist: models.Pharmacist) -> dict:
+    return {
+        "id": pharmacist.id,
+        "username": pharmacist.username,
+        "email": pharmacist.email,
+        "full_name": pharmacist.full_name,
+        "license_number": pharmacist.license_number,
+        "location": pharmacist.location,
+        "is_verified": pharmacist.is_verified,
+    }
+
+
+def _ensure_admin_account(db: Session):
+    admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
+    admin_password = os.getenv("ADMIN_PASSWORD", "").strip()
+    if not admin_email or not admin_password:
+        return
+
+    admin = db.query(models.User).filter(models.User.email == admin_email).first()
+    if not admin:
+        admin = models.User(
+            username=_build_unique_username(db, admin_email.split("@")[0] or "admin"),
+            email=admin_email,
+            hashed_password=auth.get_password_hash(admin_password),
+            is_admin=True,
+        )
+        db.add(admin)
+        db.commit()
+        db.refresh(admin)
+        _ensure_user_profile_records(db, admin.id, "System", "Admin")
+        return
+
+    updated = False
+    if not admin.is_admin:
+        admin.is_admin = True
+        updated = True
+    if not auth.verify_password(admin_password, admin.hashed_password):
+        admin.hashed_password = auth.get_password_hash(admin_password)
+        updated = True
+    if updated:
+        db.commit()
+
+
+bootstrap_db = SessionLocal()
+try:
+    _ensure_admin_account(bootstrap_db)
+finally:
+    bootstrap_db.close()
 
 
 @app.get("/api/auth/google/login")
@@ -604,8 +1046,68 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     ).first()
     if not user or not auth.verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect username or password")
-    access_token = auth.create_access_token(data={"sub": user.email})
+    token_payload = {"sub": user.email}
+    if user.is_admin:
+        token_payload["role"] = "admin"
+    access_token = auth.create_access_token(data=token_payload)
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@app.post("/api/auth/pharmacist/login", response_model=schemas.Token)
+def pharmacist_login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    login_value = form_data.username.strip().lower()
+    pharmacist = db.query(models.Pharmacist).filter(
+        or_(models.Pharmacist.username == login_value, models.Pharmacist.email == login_value)
+    ).first()
+    if not pharmacist or not auth.verify_password(form_data.password, pharmacist.hashed_password):
+        raise HTTPException(status_code=400, detail="Incorrect clinician username or password")
+    if not pharmacist.is_verified:
+        raise HTTPException(status_code=403, detail="Clinician account is pending admin approval")
+    access_token = auth.create_access_token(data={"sub": pharmacist.email, "role": "pharmacist"})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@app.get("/api/session")
+def get_session(request: Request, db: Session = Depends(get_db)):
+    auth_header = request.headers.get("authorization", "")
+    if not auth_header.lower().startswith("bearer "):
+        return {"role": "guest", "display_name": ""}
+
+    token = auth_header.split(" ", 1)[1].strip()
+    if not token:
+        return {"role": "guest", "display_name": ""}
+
+    try:
+        payload = auth.jwt.decode(token, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
+    except auth.JWTError:
+        return {"role": "guest", "display_name": ""}
+
+    email = payload.get("sub")
+    role = payload.get("role") or "user"
+    if not email:
+        return {"role": "guest", "display_name": ""}
+
+    if role == "pharmacist":
+        pharmacist = db.query(models.Pharmacist).filter(models.Pharmacist.email == email).first()
+        if not pharmacist:
+            return {"role": "guest", "display_name": ""}
+        return {
+            "role": "pharmacist",
+            "display_name": pharmacist.full_name or pharmacist.username or pharmacist.email,
+        }
+
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if not user:
+        return {"role": "guest", "display_name": ""}
+
+    resolved_role = "admin" if user.is_admin or role == "admin" else "user"
+    display_name = user.username or user.email
+    if user.profile:
+        full_name = f"{user.profile.first_name} {user.profile.last_name}".strip()
+        if full_name:
+            display_name = full_name
+
+    return {"role": resolved_role, "display_name": display_name}
 
 
 @app.get("/api/profile")
@@ -624,7 +1126,13 @@ def get_profile(current_user: models.User = Depends(auth.get_current_user), db: 
 
 
 @app.post("/api/chat", response_model=schemas.ChatResponse)
-def chat(request: schemas.ChatRequest, current_user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
+def chat(request: schemas.ChatRequest, current_user: models.User = Depends(get_optional_user), db: Session = Depends(get_db)):
+    # If user is not logged in, they can still use chat (guest mode)
+    # If logged in, current_user will be the authenticated user
+    
+    # Store the user_id for prescription history (if logged in)
+    user_id = current_user.id if current_user else None
+    
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
 
     # Detect Twi using exact dataset mapping and translate to English for model prompt context
@@ -676,49 +1184,416 @@ def chat(request: schemas.ChatRequest, current_user: models.User = Depends(auth.
             )
             reply = translation_response.choices[0].message.content
 
-        # Check if the AI is ready to consult (has gathered enough info)
+        # Check if the AI is ready to hand off to a pharmacist
         is_consulting = "[CONSULT_READY]" in reply
         matched_drugs = []
 
         if is_consulting:
-            # Strip the marker from the reply
             reply = reply.replace("[CONSULT_READY]", "").strip()
 
-            # Gather all user messages to build symptom context
             all_user_text = " ".join(
                 m["content"] for m in translated_messages if m["role"] == "user"
             )
-
-            # Also use the AI's summary (the reply after CONSULT_READY)
             search_text = all_user_text + " " + reply
             matched_drugs = _search_medicine_dataset(search_text, limit=4)
 
-            # Save matched drugs to prescription history
-            for drug in matched_drugs:
-                rx = models.PrescriptionHistory(
-                    user_id=current_user.id,
-                    drug_name=drug["name"],
-                    details=f"{drug['indication']} - {drug['category']}",
-                    status="Pending",
+            if user_id:
+                _create_case_record(
+                    db=db,
+                    user_id=user_id,
+                    translated_messages=translated_messages,
+                    ai_summary=reply,
+                    matched_drugs=matched_drugs,
+                    actor_note="Case created from model-driven triage handoff.",
                 )
-                db.add(rx)
-            db.commit()
+                reply = (
+                    f"{reply}\n\n"
+                    "I have prepared your case summary and sent it for licensed pharmacist review. "
+                    "The pharmacist will assess the information and decide the appropriate treatment."
+                )
+            else:
+                reply = (
+                    f"{reply}\n\n"
+                    "Your case summary is ready for pharmacist review. Please sign in so it can be submitted to a licensed pharmacist for diagnosis and treatment decisions."
+                )
 
         return {
             "reply": reply,
-            "drugs": matched_drugs if matched_drugs else None,
+            "drugs": None,
             "consulting": is_consulting,
             "error": None,
         }
     except Exception as e:
-        if "dummy_key" in os.getenv("DEEPSEEK_API_KEY", "dummy_key"):
-            return {
-                "reply": "(Demo fallback) I can answer from the uploaded guideline PDF once your AI API key is configured.",
-                "drugs": None,
-                "consulting": False,
-                "error": None,
-            }
-        raise HTTPException(status_code=500, detail=str(e))
+        analysis = _analyze_conversation_state(translated_messages)
+        should_handoff = (
+            analysis["has_duration"] and
+            analysis["has_severity"] and
+            analysis["has_multiple_symptoms"]
+        )
+        if should_handoff:
+            fallback_reply = _build_fallback_consult_summary(
+                translated_messages=translated_messages,
+                input_language=input_language,
+            )
+            search_text = " ".join(
+                m["content"] for m in translated_messages if m["role"] == "user"
+            ) + " " + fallback_reply
+            matched_drugs = _search_medicine_dataset(search_text, limit=4)
+            if user_id:
+                _create_case_record(
+                    db=db,
+                    user_id=user_id,
+                    translated_messages=translated_messages,
+                    ai_summary=fallback_reply,
+                    matched_drugs=matched_drugs,
+                    actor_note="Case created from fallback triage handoff.",
+                )
+                fallback_reply = (
+                    f"{fallback_reply}\n\n"
+                    "Your case has been submitted for licensed pharmacist review."
+                )
+            else:
+                fallback_reply = (
+                    f"{fallback_reply}\n\n"
+                    "Please sign in so this case can be submitted to a licensed pharmacist."
+                )
+        else:
+            fallback_reply = _build_local_chat_fallback(
+                translated_messages=translated_messages,
+                input_language=input_language,
+                relevant_pdf_context=relevant_pdf_context,
+            )
+        return {
+            "reply": fallback_reply,
+            "drugs": None,
+            "consulting": should_handoff,
+            "error": str(e),
+        }
+
+
+@app.get("/api/pharmacist/dashboard")
+def pharmacist_dashboard(
+    current_pharmacist: models.Pharmacist = Depends(get_current_pharmacist),
+    db: Session = Depends(get_db),
+):
+    # Only show cases assigned to this pharmacist by admin
+    # Pharmacists can no longer claim cases on their own - admin assigns them
+    assigned_cases = db.query(models.PrescriptionHistory).filter(
+        models.PrescriptionHistory.pharmacist_id == current_pharmacist.id,
+    ).order_by(models.PrescriptionHistory.created_at.desc()).all()
+
+    # Separate by status
+    in_review_cases = [c for c in assigned_cases if c.status == "In Review"]
+    pending_cases = [c for c in assigned_cases if c.status == "Pending"]
+    completed_cases = [c for c in assigned_cases if c.status in {"Reviewed", "Ordered", "Delivered"}]
+
+    return {
+        "pharmacist": _serialize_pharmacist(current_pharmacist),
+        "stats": {
+            "assigned_cases": len(assigned_cases),
+            "in_review_cases": len(in_review_cases),
+            "completed_cases": len(completed_cases),
+            "pending_cases": len(pending_cases),  # Cases assigned but not yet started
+        },
+        "assigned_cases": [_serialize_case(case) for case in assigned_cases],
+        "in_review_cases": [_serialize_case(case) for case in in_review_cases],
+        "completed_cases": [_serialize_case(case) for case in completed_cases],
+    }
+
+
+@app.get("/api/clinicians/available")
+def available_clinicians(db: Session = Depends(get_db)):
+    pharmacists = db.query(models.Pharmacist).filter(models.Pharmacist.is_verified == True).order_by(
+        models.Pharmacist.full_name.asc(), models.Pharmacist.username.asc()
+    ).all()
+    return {"clinicians": [_serialize_pharmacist(pharmacist) for pharmacist in pharmacists]}
+
+
+# Claim endpoint removed - admin assigns cases to pharmacists now
+# Pharmacists only work on cases assigned to them by admin
+
+@app.post("/api/pharmacist/review/{case_id}")
+def pharmacist_review_case(
+    case_id: int,
+    review: schemas.PharmacistReviewRequest,
+    current_pharmacist: models.Pharmacist = Depends(get_current_pharmacist),
+    db: Session = Depends(get_db),
+):
+    case = db.query(models.PrescriptionHistory).filter(models.PrescriptionHistory.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    # Pharmacist can only review cases assigned to them
+    if case.pharmacist_id != current_pharmacist.id:
+        raise HTTPException(status_code=403, detail="This case is not assigned to you")
+
+    case.pharmacist_id = current_pharmacist.id
+    case.drug_name = (review.drug or case.drug_name or "Clinician review completed").strip()
+    diagnosis = (review.diagnosis or "").strip()
+    advice = review.advice.strip()
+    referral_advice = (review.referral_advice or "").strip()
+    follow_up = (review.follow_up_instructions or "").strip()
+    case.pharmacist_feedback = advice
+    case.referral_advice = referral_advice
+    case.follow_up_instructions = follow_up
+    case.follow_up_status = "feedback_sent"
+    case.details = (
+        f"{case.details}\n\n"
+        f"Diagnosis note: {diagnosis or 'Not specified'}\n"
+        f"Clinician advice: {advice}\n"
+        f"Referral advice: {referral_advice or 'None'}\n"
+        f"Follow-up instructions: {follow_up or 'Monitor and return if symptoms worsen'}"
+    )
+    case.status = review.status
+    _log_case_event(
+        case,
+        "pharmacist",
+        current_pharmacist.full_name or current_pharmacist.username,
+        "review_submitted",
+        advice,
+    )
+    db.commit()
+    db.refresh(case)
+    return {"status": "success", "case": _serialize_case(case)}
+
+
+@app.get("/api/admin/dashboard")
+def admin_dashboard(
+    current_admin: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    pharmacists = db.query(models.Pharmacist).order_by(models.Pharmacist.full_name.asc(), models.Pharmacist.username.asc()).all()
+    cases = db.query(models.PrescriptionHistory).order_by(models.PrescriptionHistory.created_at.desc()).limit(50).all()
+    users = db.query(models.User).order_by(models.User.id.desc()).limit(20).all()
+    
+    # Calculate detailed stats
+    total_cases = db.query(models.PrescriptionHistory).count()
+    pending_cases = db.query(models.PrescriptionHistory).filter(models.PrescriptionHistory.status == "Pending").count()
+    in_review_cases = db.query(models.PrescriptionHistory).filter(models.PrescriptionHistory.status == "In Review").count()
+    reviewed_cases = db.query(models.PrescriptionHistory).filter(models.PrescriptionHistory.status.in_(["Reviewed", "Ordered", "Delivered"])).count()
+    
+    # Users with profiles
+    users_with_profiles = db.query(models.User).join(models.Profile).count()
+    
+    return {
+        "stats": {
+            "total_users": db.query(models.User).count(),
+            "total_pharmacists": len(pharmacists),
+            "pending_cases": pending_cases,
+            "in_review_cases": in_review_cases,
+            "reviewed_cases": reviewed_cases,
+            "total_cases": total_cases,
+            "verified_pharmacists": len([p for p in pharmacists if p.is_verified]),
+            "users_with_profiles": users_with_profiles,
+        },
+        "pharmacists": [_serialize_pharmacist(pharmacist) for pharmacist in pharmacists],
+        "cases": [_serialize_case(case) for case in cases],
+        "recent_users": [_serialize_user(u) for u in users],
+    }
+
+
+def _serialize_user(user: models.User) -> dict:
+    profile = user.profile or {}
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "is_admin": user.is_admin,
+        "first_name": profile.first_name if profile else "",
+        "last_name": profile.last_name if profile else "",
+        "phone": profile.phone if profile else "",
+        "city": profile.city if profile else "",
+    }
+
+
+@app.get("/api/admin/users")
+def admin_list_users(
+    current_admin: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    users = db.query(models.User).order_by(models.User.id.desc()).all()
+    return {"users": [_serialize_user(u) for u in users]}
+
+
+@app.delete("/api/admin/users/{user_id}")
+def admin_delete_user(
+    user_id: int,
+    current_admin: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    if user_id == current_admin.id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own admin account")
+    
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Delete related records
+    db.query(models.Profile).filter(models.Profile.user_id == user_id).delete()
+    db.query(models.Medical).filter(models.Medical.user_id == user_id).delete()
+    db.query(models.Emergency).filter(models.Emergency.user_id == user_id).delete()
+    db.query(models.Condition).filter(models.Condition.user_id == user_id).delete()
+    db.query(models.Allergy).filter(models.Allergy.user_id == user_id).delete()
+    db.query(models.Medication).filter(models.Medication.user_id == user_id).delete()
+    db.query(models.PrescriptionHistory).filter(models.PrescriptionHistory.user_id == user_id).delete()
+    
+    db.delete(user)
+    db.commit()
+    return {"status": "success"}
+
+
+@app.get("/api/admin/stats")
+def admin_system_stats(
+    current_admin: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """Get detailed system statistics"""
+    total_users = db.query(models.User).count()
+    total_pharmacists = db.query(models.Pharmacist).count()
+    verified_pharmacists = db.query(models.Pharmacist).filter(models.Pharmacist.is_verified == True).count()
+    
+    # Case stats
+    total_cases = db.query(models.PrescriptionHistory).count()
+    pending_cases = db.query(models.PrescriptionHistory).filter(models.PrescriptionHistory.status == "Pending").count()
+    in_review_cases = db.query(models.PrescriptionHistory).filter(models.PrescriptionHistory.status == "In Review").count()
+    completed_cases = db.query(models.PrescriptionHistory).filter(
+        models.PrescriptionHistory.status.in_(["Reviewed", "Ordered", "Delivered"])
+    ).count()
+    
+    # Cases per pharmacist
+    cases_per_pharmacist = []
+    pharmacists = db.query(models.Pharmacist).all()
+    for p in pharmacists:
+        assigned = db.query(models.PrescriptionHistory).filter(
+            models.PrescriptionHistory.pharmacist_id == p.id
+        ).count()
+        completed = db.query(models.PrescriptionHistory).filter(
+            models.PrescriptionHistory.pharmacist_id == p.id,
+            models.PrescriptionHistory.status.in_(["Reviewed", "Ordered", "Delivered"])
+        ).count()
+        cases_per_pharmacist.append({
+            "id": p.id,
+            "name": p.full_name or p.username,
+            "assigned": assigned,
+            "completed": completed,
+        })
+    
+    return {
+        "users": {
+            "total": total_users,
+            "admins": db.query(models.User).filter(models.User.is_admin == True).count(),
+        },
+        "pharmacists": {
+            "total": total_pharmacists,
+            "verified": verified_pharmacists,
+            "pending": total_pharmacists - verified_pharmacists,
+        },
+        "cases": {
+            "total": total_cases,
+            "pending": pending_cases,
+            "in_review": in_review_cases,
+            "completed": completed_cases,
+        },
+        "cases_per_pharmacist": cases_per_pharmacist,
+    }
+
+
+@app.post("/api/admin/pharmacists")
+def admin_create_pharmacist(
+    pharmacist_in: schemas.PharmacistCreate,
+    current_admin: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    username = _normalize_username(pharmacist_in.username)
+    email = pharmacist_in.email.lower()
+    license_number = pharmacist_in.license_number.strip()
+
+    if db.query(models.Pharmacist).filter(models.Pharmacist.username == username).first():
+        raise HTTPException(status_code=400, detail="Clinician username already exists")
+    if db.query(models.Pharmacist).filter(models.Pharmacist.email == email).first():
+        raise HTTPException(status_code=400, detail="Clinician email already exists")
+    if db.query(models.Pharmacist).filter(models.Pharmacist.license_number == license_number).first():
+        raise HTTPException(status_code=400, detail="License number already exists")
+
+    pharmacist = models.Pharmacist(
+        username=username,
+        email=email,
+        hashed_password=auth.get_password_hash(pharmacist_in.password),
+        full_name=pharmacist_in.full_name.strip(),
+        license_number=license_number,
+        location=pharmacist_in.location.strip(),
+        is_verified=True,
+    )
+    db.add(pharmacist)
+    db.commit()
+    db.refresh(pharmacist)
+    return {"status": "success", "pharmacist": _serialize_pharmacist(pharmacist)}
+
+
+@app.post("/api/admin/pharmacists/{pharmacist_id}/verify")
+def admin_verify_pharmacist(
+    pharmacist_id: int,
+    current_admin: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    pharmacist = db.query(models.Pharmacist).filter(models.Pharmacist.id == pharmacist_id).first()
+    if not pharmacist:
+        raise HTTPException(status_code=404, detail="Clinician not found")
+    pharmacist.is_verified = True
+    db.commit()
+    return {"status": "success", "pharmacist": _serialize_pharmacist(pharmacist)}
+
+
+@app.delete("/api/admin/pharmacists/{pharmacist_id}")
+def admin_delete_pharmacist(
+    pharmacist_id: int,
+    current_admin: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    pharmacist = db.query(models.Pharmacist).filter(models.Pharmacist.id == pharmacist_id).first()
+    if not pharmacist:
+        raise HTTPException(status_code=404, detail="Clinician not found")
+    open_cases = db.query(models.PrescriptionHistory).filter(
+        models.PrescriptionHistory.pharmacist_id == pharmacist_id,
+        models.PrescriptionHistory.status.in_(["In Review", "Pending"]),
+    ).count()
+    if open_cases:
+        raise HTTPException(status_code=400, detail="Reassign or close active cases before deleting this clinician")
+    db.delete(pharmacist)
+    db.commit()
+    return {"status": "success"}
+
+
+@app.post("/api/admin/cases/{case_id}/assign")
+def admin_assign_case(
+    case_id: int,
+    assignment: schemas.AssignCaseRequest,
+    current_admin: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    case = db.query(models.PrescriptionHistory).filter(models.PrescriptionHistory.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    pharmacist = db.query(models.Pharmacist).filter(models.Pharmacist.id == assignment.pharmacist_id).first()
+    if not pharmacist:
+        raise HTTPException(status_code=404, detail="Clinician not found")
+    if not pharmacist.is_verified:
+        raise HTTPException(status_code=400, detail="Clinician must be verified before assignment")
+
+    case.pharmacist_id = pharmacist.id
+    if case.status == "Pending":
+        case.status = "In Review"
+    case.follow_up_status = "under_review"
+    _log_case_event(
+        case,
+        "admin",
+        current_admin.username or current_admin.email,
+        "case_assigned",
+        f"Assigned to {pharmacist.full_name or pharmacist.username}",
+    )
+    db.commit()
+    db.refresh(case)
+    return {"status": "success", "case": _serialize_case(case)}
 
 
 # Red flag symptoms derived from medical guidelines
@@ -1008,4 +1883,6 @@ if STATIC_DIR.exists():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8000")))
+    host = os.getenv("APP_HOST", "0.0.0.0")
+    port = int(os.getenv("APP_PORT", os.getenv("PORT", "8000")))
+    uvicorn.run(app, host=host, port=port)
