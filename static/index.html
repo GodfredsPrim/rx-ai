@@ -38,17 +38,19 @@
 
     <!-- Login Form -->
     <form id="form-login" onsubmit="event.preventDefault(); doLogin();">
+      <div class="auth-role-switch" role="radiogroup" aria-label="Select sign in role">
+        <button type="button" class="auth-role-btn on" id="login-role-user" data-role="user" onclick="setLoginMode('user', this)">Patient</button>
+        <button type="button" class="auth-role-btn" id="login-role-pharmacist" data-role="pharmacist" onclick="setLoginMode('pharmacist', this)">Clinician</button>
+        <button type="button" class="auth-role-btn" id="login-role-admin" data-role="admin" onclick="setLoginMode('admin', this)">Admin</button>
+      </div>
+      <p class="auth-mode-help" id="login-mode-help">Patients and admins can sign in with username or email.</p>
       <div class="form-group">
-        <label for="login-username">Username</label>
-        <input type="text" id="login-username" placeholder="Enter username" autocomplete="username" required>
+        <label for="login-username" id="login-username-label">Username or Email</label>
+        <input type="text" id="login-username" placeholder="Enter username or email" autocomplete="username" required>
       </div>
       <div class="form-group">
         <label for="login-pass">Password</label>
         <input type="password" id="login-pass" placeholder="Enter password" autocomplete="current-password" required>
-      </div>
-      <div class="input-group" style="flex-direction:row;align-items:center;gap:8px;margin-bottom:14px;">
-        <input type="checkbox" id="login-is-pharma" style="width:auto;min-height:auto;padding:0;">
-        <label for="login-is-pharma" style="margin-bottom:0;font-size:.84rem;">Sign in as Clinician</label>
       </div>
       <div id="login-err" role="alert"></div>
       <button type="submit" class="btn btn-primary btn-full" id="btn-do-login">Sign In</button>

@@ -215,6 +215,7 @@ function openLoginModal() {
   document.getElementById('login-modal').style.display='flex';
   document.getElementById('login-err').innerHTML='';
   document.getElementById('reg-err').innerHTML='';
+  setLoginMode(document.getElementById('login-username')?.dataset.loginMode || 'user');
 }
 function closeLoginModal() {
   document.getElementById('login-modal').style.display='none';
@@ -230,6 +231,41 @@ function switchAuthTab(t){
   document.getElementById('tab-reg').classList.toggle('on',t==='register');
   document.getElementById('form-login').style.display=t==='login'?'block':'none';
   document.getElementById('form-register').style.display=t==='register'?'block':'none';
+  const googleBtn = document.getElementById('btn-google-login');
+  if (googleBtn) googleBtn.style.display = t === 'login' ? 'inline-flex' : 'none';
+}
+
+function setLoginMode(mode = 'user', trigger = null) {
+  document.querySelectorAll('.auth-role-btn').forEach(btn => {
+    const isActive = btn.dataset.role === mode;
+    btn.classList.toggle('on', isActive);
+    btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  });
+  const label = document.getElementById('login-username-label');
+  const input = document.getElementById('login-username');
+  const help = document.getElementById('login-mode-help');
+  const submit = document.getElementById('btn-do-login');
+  if (!label || !input || !help || !submit) return;
+
+  if (mode === 'pharmacist') {
+    label.textContent = 'Clinician Username or Email';
+    input.placeholder = 'Enter clinician username or email';
+    help.textContent = 'Clinicians use the clinician account created and verified by an admin.';
+    submit.textContent = 'Sign In as Clinician';
+  } else if (mode === 'admin') {
+    label.textContent = 'Admin Username or Email';
+    input.placeholder = 'Enter admin username or email';
+    help.textContent = 'Admins use the seeded admin credentials from environment setup or local bootstrap.';
+    submit.textContent = 'Sign In as Admin';
+  } else {
+    label.textContent = 'Username or Email';
+    input.placeholder = 'Enter username or email';
+    help.textContent = 'Patients and admins can sign in with username or email.';
+    submit.textContent = 'Sign In';
+  }
+
+  input.dataset.loginMode = mode;
+  if (trigger) trigger.blur();
 }
 
 function checkStrength(pw){
@@ -244,16 +280,16 @@ function checkStrength(pw){
 async function doLogin(){
   const username=document.getElementById('login-username').value.trim().toLowerCase();
   const pass=document.getElementById('login-pass').value;
-  const isPharma=document.getElementById('login-is-pharma').checked;
+  const loginMode=document.getElementById('login-username').dataset.loginMode || 'user';
   const err=document.getElementById('login-err');
   const btn=document.getElementById('btn-do-login');
   if(!username||!pass){err.innerHTML='<div class="err">Enter username and password.</div>';return;}
   try{
     btn.disabled=true;
-    btn.innerHTML='Signing in...';
+    btn.innerHTML = loginMode === 'admin' ? 'Signing in as Admin...' : loginMode === 'pharmacist' ? 'Signing in as Clinician...' : 'Signing in...';
     const body=new URLSearchParams();body.append('username',username);body.append('password',pass);
     let endpoint = '/auth/login';
-    if(isPharma) endpoint = '/auth/pharmacist/login';
+    if(loginMode === 'pharmacist') endpoint = '/auth/pharmacist/login';
     
     const data=await callApi(endpoint,'POST',body);
     localStorage.setItem('token',data.access_token);
@@ -262,7 +298,7 @@ async function doLogin(){
     showToast('Welcome back!', 'success');
     initApp();
   }catch(e){err.innerHTML=`<div class="err">${e.message}</div>`;}
-  finally{btn.disabled=false;btn.innerHTML='Sign In';}
+  finally{btn.disabled=false;setLoginMode(loginMode);}
 }
 
 function doGoogleLogin(){window.location.href='/api/auth/google/login';}

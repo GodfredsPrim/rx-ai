@@ -843,6 +843,38 @@ img,svg { max-width:100%; height:auto; }
 .btn.danger { color:var(--white); background:linear-gradient(135deg,#ef6b6b,#d94848); box-shadow:0 8px 20px rgba(229,62,62,.22); }
 .btn.danger:hover { box-shadow:0 10px 28px rgba(229,62,62,.32); }
 
+.auth-role-switch {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+  margin-bottom:10px;
+}
+.auth-role-btn {
+  min-height:40px;
+  padding:0 10px;
+  border-radius:12px;
+  border:1px solid rgba(203,213,224,.9);
+  background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(236,242,247,.88));
+  color:var(--mist-600);
+  font-size:.8rem;
+  font-weight:700;
+  box-shadow:var(--sh-xs),var(--sh-in);
+  transition:var(--t);
+}
+.auth-role-btn:hover { transform:translateY(-1px); }
+.auth-role-btn.on {
+  color:var(--white);
+  background:linear-gradient(135deg,var(--primary-light),var(--primary));
+  border-color:rgba(20,39,31,.3);
+  box-shadow:var(--sh-grn);
+}
+.auth-mode-help {
+  margin-bottom:12px;
+  color:var(--mist-500);
+  font-size:.78rem;
+  line-height:1.5;
+}
+
 .btn-review {
   padding:8px 14px;
   border-radius:10px;
@@ -1224,6 +1256,9 @@ input:focus,textarea:focus,select:focus {
 }
 .med-name,.rxdrug,.case-user { font-weight:800; color:var(--mist-900); font-size:.9rem; }
 .med-dose,.rxdet,.case-time,.pharmacist-info span,.pharmacist-info p,.case-details { color:var(--mist-500); font-size:.83rem; }
+.med-name,.rxdrug,.case-user,.med-dose,.rxdet,.case-time,.case-details,.pharmacist-info h5,.pharmacist-info span,.pharmacist-info p {
+  overflow-wrap:anywhere;
+}
 
 /* connect layout */
 .connect-layout {
@@ -1269,6 +1304,11 @@ input:focus,textarea:focus,select:focus {
 .case-header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:7px; }
 .case-card { display:block; }
 .case-card+.case-card,.pharmacist-card+.pharmacist-card { margin-top:10px; }
+.case-actions .btn,
+.pharmacist-actions .btn,
+.dashboard-form-actions .btn {
+  max-width:100%;
+}
 
 /* drug cards */
 .drug-cards-wrapper { display:grid; gap:10px; margin:6px 0 16px 48px; }
@@ -1349,6 +1389,7 @@ input:focus,textarea:focus,select:focus {
 .admin-list {
   display:grid;
   gap:10px;
+  min-width:0;
 }
 .admin-list::-webkit-scrollbar { width:4px; }
 .admin-list::-webkit-scrollbar-thumb { background:var(--mist-300); border-radius:99px; }
@@ -1374,6 +1415,7 @@ input:focus,textarea:focus,select:focus {
   gap:10px;
   overflow-y:auto;
   -webkit-overflow-scrolling:touch;
+  min-width:0;
 }
 .users-list::-webkit-scrollbar { width:6px; }
 .users-list::-webkit-scrollbar-track { background:rgba(226,232,240,.3); border-radius:99px; }
@@ -1546,6 +1588,7 @@ input:focus,textarea:focus,select:focus {
   .msg { max-width:100%; }
   .tab-container,.profile-tabs,.form-row,.add-field { flex-direction:column; display:flex; }
   .stats-grid,.conditions-grid,.info-cards { grid-template-columns:1fr; }
+  .auth-role-switch { grid-template-columns:1fr; }
   .drug-cards-wrapper { margin-left:0; }
   .blood-grid { grid-template-columns:repeat(3,1fr); }
   .panel-info h2 { font-size:1.25rem; }
@@ -1650,12 +1693,25 @@ input:focus,textarea:focus,select:focus {
     width:100%;
     align-items:stretch;
   }
+  .dashboard-toolbar,
+  .dashboard-form-actions,
+  .dashboard-inline,
+  .case-actions > * {
+    min-width:0;
+  }
   .case-list-item,
   .med-item,
   .rxitem,
   .pharmacist-card,
   .case-card {
     padding:12px;
+  }
+  .case-actions .btn,
+  .pharmacist-actions .btn,
+  .dashboard-form-actions .btn,
+  .dashboard-inline select,
+  .dashboard-inline input {
+    width:100%;
   }
 }
 
@@ -1691,6 +1747,9 @@ input:focus,textarea:focus,select:focus {
   }
   .tab,
   .profile-tab { min-height:40px; }
+  .auth-role-btn {
+    min-height:42px;
+  }
   .chat-input-container {
     grid-template-columns:1fr 1fr;
   }

@@ -917,16 +917,39 @@ def _serialize_pharmacist(pharmacist: models.Pharmacist) -> dict:
     }
 
 
-def _ensure_admin_account(db: Session):
+def _get_admin_seed_config(db: Session) -> tuple[str, str, str] | None:
     admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
+    raw_admin_username = os.getenv("ADMIN_USERNAME", "").strip()
+    admin_username = _normalize_username(raw_admin_username) if raw_admin_username else ""
     admin_password = os.getenv("ADMIN_PASSWORD", "").strip()
-    if not admin_email or not admin_password:
+
+    if admin_password:
+        if not admin_email and admin_username:
+            admin_email = f"{admin_username}@bisarx.local"
+        if not admin_username and admin_email:
+            admin_username = _build_unique_username(db, admin_email.split("@")[0] or "admin")
+        if admin_email and admin_username:
+            return admin_email, admin_username, admin_password
+
+    # Local fallback so the app always has a predictable admin login in development.
+    env_name = os.getenv("ENV", os.getenv("APP_ENV", "development")).strip().lower()
+    is_production = env_name in {"prod", "production"}
+    if is_production:
+        return None
+
+    return ("admin@bisarx.local", "admin", "admin12345")
+
+
+def _ensure_admin_account(db: Session):
+    seed_config = _get_admin_seed_config(db)
+    if not seed_config:
         return
+    admin_email, admin_username, admin_password = seed_config
 
     admin = db.query(models.User).filter(models.User.email == admin_email).first()
     if not admin:
         admin = models.User(
-            username=_build_unique_username(db, admin_email.split("@")[0] or "admin"),
+            username=_build_unique_username(db, admin_username or admin_email.split("@")[0] or "admin"),
             email=admin_email,
             hashed_password=auth.get_password_hash(admin_password),
             is_admin=True,
@@ -938,6 +961,9 @@ def _ensure_admin_account(db: Session):
         return
 
     updated = False
+    if not admin.username:
+        admin.username = _build_unique_username(db, admin_username or "admin", exclude_user_id=admin.id)
+        updated = True
     if not admin.is_admin:
         admin.is_admin = True
         updated = True
