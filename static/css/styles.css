@@ -1574,6 +1574,7 @@ input:focus,textarea:focus,select:focus {
     overflow-y:auto;
     -webkit-overflow-scrolling:touch;
   }
+  #panel-chat { max-width:100%; }
   .main-content > * { min-height:auto; }
   .panel { 
     padding:16px; 
@@ -1591,6 +1592,20 @@ input:focus,textarea:focus,select:focus {
   .auth-role-switch { grid-template-columns:1fr; }
   .drug-cards-wrapper { margin-left:0; }
   .blood-grid { grid-template-columns:repeat(3,1fr); }
+  .chat-hero,
+  .dashboard-banner,
+  .bodymap-wrapper,
+  .bodymap-intro,
+  .connect-layout {
+    gap:12px;
+  }
+  .chat-hero,
+  .dashboard-banner {
+    padding:18px;
+  }
+  .hero-grid {
+    grid-template-columns:1fr;
+  }
   .panel-info h2 { font-size:1.25rem; }
   .panel-info p { font-size:.85rem; }
   .chat-input-container { 
@@ -1620,7 +1635,7 @@ input:focus,textarea:focus,select:focus {
   .brand-name { font-size:1.1rem; }
   .mobile-header { 
     height:var(--mobile-header-h); 
-    padding:0 12px;
+    padding:0 max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
     display:flex !important;
   }
   .mobile-header .brand-name { font-size:1rem; }
@@ -1648,6 +1663,7 @@ input:focus,textarea:focus,select:focus {
   .bodymap-intro { grid-template-columns:1fr; }
   .bodymap-quick-grid { grid-template-columns:repeat(2,1fr); }
   .bodymap-svg { width:min(100%,180px); }
+  .visual-icons-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .connect-layout { grid-template-columns:1fr; }
   .disclaimer-banner { 
     flex-direction:column; 
@@ -1670,7 +1686,12 @@ input:focus,textarea:focus,select:focus {
   .messages-container {
     -webkit-overflow-scrolling:touch;
     touch-action:pan-y;
-    padding-inline:6px;
+    padding:12px 6px;
+    gap:12px;
+  }
+  .msg,
+  .msg.u {
+    width:100%;
   }
   .sidebar-nav {
     -webkit-overflow-scrolling:touch;
@@ -1706,6 +1727,11 @@ input:focus,textarea:focus,select:focus {
   .case-card {
     padding:12px;
   }
+  .case-list-meta {
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 10px;
+  }
   .case-actions .btn,
   .pharmacist-actions .btn,
   .dashboard-form-actions .btn,
@@ -1727,8 +1753,29 @@ input:focus,textarea:focus,select:focus {
   .panel-header { margin-bottom:16px; padding-bottom:16px; }
   .panel-info h2 { font-size:1.1rem; }
   .panel-badges { width:100%; flex-wrap:wrap; }
+  .chat-hero,
+  .dashboard-banner,
+  .bodymap-wrapper,
+  .modal-box,
+  .profile-inner,
+  .summary-card,
+  .history-content {
+    padding:14px;
+  }
+  .chat-hero h3,
+  .dashboard-banner h3 {
+    font-size:1.1rem;
+  }
+  .chat-hero p,
+  .dashboard-banner p {
+    font-size:.82rem;
+  }
   .quick-symptoms { grid-template-columns:1fr; }
   .qs-btn { flex:1 1 100%; }
+  .visual-icons-grid,
+  .bodymap-quick-grid {
+    grid-template-columns:1fr;
+  }
   .bodymap-quick { min-height:80px; }
   .bodymap-quick span { font-size:1.5rem; }
   .blood-grid { grid-template-columns:repeat(3,1fr); gap:6px; }
@@ -1752,9 +1799,40 @@ input:focus,textarea:focus,select:focus {
   }
   .chat-input-container {
     grid-template-columns:1fr 1fr;
+    padding:10px;
+    border-radius:14px;
   }
   .icon-btn {
     width:100%;
+  }
+  .msg {
+    gap:10px;
+  }
+  .av {
+    width:34px;
+    height:34px;
+  }
+  .dashboard-toolbar {
+    gap:8px;
+  }
+  .dashboard-toolbar input,
+  .dashboard-toolbar select,
+  .dashboard-inline select,
+  .dashboard-inline input {
+    min-height:42px;
+  }
+  .case-list-actions,
+  .case-actions,
+  .pharmacist-actions,
+  .dashboard-form-actions {
+    gap:10px;
+  }
+  .lang-buttons {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:6px;
+  }
+  .lang-btn {
+    min-height:36px;
   }
   .chat-input,
   .send-btn {
@@ -1763,6 +1841,33 @@ input:focus,textarea:focus,select:focus {
   .modal-box {
     padding:18px 14px;
     border-radius:22px 22px 16px 16px;
+  }
+}
+
+@media (max-width:360px) {
+  .main-content {
+    padding:8px;
+    padding-top:calc(var(--mobile-header-h) + 8px);
+  }
+  .panel {
+    padding:12px;
+    min-height:calc(100dvh - var(--mobile-header-h) - 16px);
+  }
+  .mobile-header {
+    padding-inline:10px;
+  }
+  .chat-input-container {
+    grid-template-columns:1fr;
+  }
+  .quick-symptoms-bar,
+  .disclaimer-banner,
+  .bodymap-wrapper,
+  .chat-hero,
+  .dashboard-banner {
+    padding:12px;
+  }
+  .blood-grid {
+    grid-template-columns:repeat(2,minmax(0,1fr));
   }
 }
 
