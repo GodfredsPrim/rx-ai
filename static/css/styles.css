@@ -1577,6 +1577,78 @@ input:focus,textarea:focus,select:focus {
     -webkit-overflow-scrolling:touch;
   }
   #panel-chat { max-width:100%; }
+  #panel-chat {
+    gap:10px;
+    padding:10px 0 0;
+    background:linear-gradient(180deg,rgba(255,255,255,.88),rgba(245,248,250,.82));
+  }
+  #panel-chat .panel-header {
+    margin-bottom:0;
+    padding:0 14px;
+    border-bottom:none;
+    gap:8px;
+  }
+  #panel-chat .panel-info h2 {
+    font-size:1.02rem;
+    line-height:1.15;
+  }
+  #panel-chat .panel-info p,
+  #panel-chat .panel-badges .badge-success {
+    display:none;
+  }
+  #panel-chat .panel-badges {
+    width:auto;
+    margin-top:0;
+  }
+  #panel-chat .disclaimer-banner {
+    margin:0 14px;
+    padding:10px 12px;
+    border-radius:14px;
+    font-size:.74rem;
+  }
+  #panel-chat .quick-symptoms-bar {
+    display:none;
+  }
+  #panel-chat .voice-indicator {
+    margin:0 14px;
+  }
+  #panel-chat .messages-container {
+    margin:0;
+    padding:6px 14px 0;
+    border:none;
+    border-radius:0;
+    background:transparent;
+    box-shadow:none;
+  }
+  #panel-chat .quick-actions {
+    margin:0;
+    padding:0 14px;
+    flex-wrap:nowrap;
+    overflow-x:auto;
+    overflow-y:hidden;
+    scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;
+  }
+  #panel-chat .quick-actions::-webkit-scrollbar {
+    display:none;
+  }
+  #panel-chat .chip {
+    flex:0 0 auto;
+    white-space:nowrap;
+  }
+  #panel-chat .chat-input-container {
+    position:sticky;
+    bottom:0;
+    z-index:4;
+    margin-top:auto;
+    padding:12px 14px calc(12px + env(safe-area-inset-bottom));
+    border-radius:20px 20px 0 0;
+    border-left:none;
+    border-right:none;
+    border-bottom:none;
+    box-shadow:0 -10px 30px rgba(15,23,42,.08), 0 -2px 10px rgba(15,23,42,.04);
+    background:rgba(255,255,255,.98);
+  }
   .main-content > * { min-height:auto; }
   .panel { 
     padding:16px; 
@@ -1759,6 +1831,27 @@ input:focus,textarea:focus,select:focus {
   .panel-header { margin-bottom:16px; padding-bottom:16px; }
   .panel-info h2 { font-size:1.1rem; }
   .panel-badges { width:100%; flex-wrap:wrap; }
+  #panel-chat {
+    padding-top:8px;
+  }
+  #panel-chat .panel-header,
+  #panel-chat .disclaimer-banner,
+  #panel-chat .quick-actions,
+  #panel-chat .voice-indicator,
+  #panel-chat .messages-container {
+    padding-left:12px;
+    padding-right:12px;
+  }
+  #panel-chat .messages-container {
+    padding-top:4px;
+  }
+  #panel-chat .disclaimer-banner {
+    margin:0 12px;
+  }
+  #panel-chat .chat-input-container {
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+    border-radius:18px 18px 0 0;
+  }
   .chat-hero,
   .dashboard-banner,
   .bodymap-wrapper,
@@ -1864,6 +1957,9 @@ input:focus,textarea:focus,select:focus {
   }
   .chat-input-container {
     grid-template-columns:1fr;
+  }
+  #panel-chat .chat-input-container {
+    padding-inline:10px;
   }
   .quick-symptoms-bar,
   .disclaimer-banner,
