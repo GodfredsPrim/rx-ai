@@ -95,8 +95,18 @@ window.FALLBACK_REDFLAGS = [
 function toggleMobileMenu() {
   const sidebar = document.getElementById('sidebar');
   const overlay = document.getElementById('sidebar-overlay');
-  sidebar.classList.toggle('open');
-  overlay.classList.toggle('open');
+  if (!sidebar || !overlay) return;
+  const isOpen = sidebar.classList.toggle('open');
+  overlay.classList.toggle('open', isOpen);
+  document.body.classList.toggle('menu-open', isOpen && window.innerWidth <= 768);
+}
+
+function closeMobileMenu() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  if (sidebar) sidebar.classList.remove('open');
+  if (overlay) overlay.classList.remove('open');
+  document.body.classList.remove('menu-open');
 }
 
 document.addEventListener('click', function(e) {
@@ -105,10 +115,13 @@ document.addEventListener('click', function(e) {
   const overlay = document.getElementById('sidebar-overlay');
   if (sidebar && mobileBtn && sidebar.classList.contains('open')) {
     if (!sidebar.contains(e.target) && !mobileBtn.contains(e.target)) {
-      sidebar.classList.remove('open');
-      overlay.classList.remove('open');
+      closeMobileMenu();
     }
   }
+});
+
+window.addEventListener('resize', () => {
+  if (window.innerWidth > 768) closeMobileMenu();
 });
 
 let currentUser = null;
@@ -394,8 +407,7 @@ function go(name,el){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('on'));
   document.getElementById('panel-'+name).classList.add('on');
   if(el)el.classList.add('on');
-  const sidebar=document.getElementById('sidebar');
-  if(sidebar)sidebar.classList.remove('open');
+  closeMobileMenu();
 }
 
 function goProfile(el){
@@ -967,23 +979,6 @@ function renderPrescriptionHistory(rxArray) {
 
 document.getElementById('cond-input').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addCondition();}});
 document.getElementById('allergy-input').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addAllergy();}});
-
-function newChat() {
-  history = [];
-  const chatContent = document.getElementById('chat-content');
-  if (chatContent) {
-    chatContent.innerHTML = '';
-    // Add initial greeting
-    addMsg('ai', LANGS[lang].greeting);
-  }
-  // Close mobile sidebar if open
-  const sidebar = document.getElementById('sidebar');
-  if (sidebar) sidebar.classList.remove('open');
-  
-  // Switch to chat view if not already there
-  const chatNavItem = document.querySelector('.nav-item[onclick*="chat"]');
-  if (chatNavItem) go('chat', chatNavItem);
-}
 
 let currentSession = { role: 'guest', display_name: '' };
 const openReviewForms = new Set();
@@ -1822,8 +1817,7 @@ function newChat() {
   const msgs = document.getElementById('msgs');
   if (msgs) msgs.innerHTML = '';
   addMsg('ai', LANGS[lang].greeting, [{ t: 'BisaRx', c: 'g' }, { t: 'Clinical AI', c: 'b' }, { t: 'Multilingual', c: 'a' }]);
-  const sidebar = document.getElementById('sidebar');
-  if (sidebar) sidebar.classList.remove('open');
+  closeMobileMenu();
   const nav = document.getElementById('nav-chat');
   if (nav) go('chat', nav);
 }

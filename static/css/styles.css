@@ -48,6 +48,7 @@
 
   /* Sidebar */
   --sidebar-w: 275px;
+  --mobile-header-h: 64px;
 
   /* Radii */
   --r-xs: 6px;
@@ -78,6 +79,7 @@
 html { height:100%; font-size:16px; scroll-behavior:smooth; }
 body {
   min-height:100vh;
+  min-height:100dvh;
   font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   color:var(--mist-800);
   line-height:1.55;
@@ -89,6 +91,7 @@ body {
     radial-gradient(ellipse 45% 35% at 5%  92%, rgba(183,121,31,.10) 0%, transparent 100%),
     linear-gradient(170deg,#f0f5f2 0%,#e8eef3 55%,#edf1f7 100%);
 }
+body.menu-open { overflow:hidden; }
 
 /* decorative blobs */
 body::before,body::after {
@@ -106,12 +109,15 @@ body::after {
 button,input,textarea,select { font:inherit; }
 button { cursor:pointer; }
 a { color:inherit; text-decoration:none; }
+img,svg { max-width:100%; height:auto; }
 
 /* ── App shell ── */
 #main-app,
 .app-container,
 .modal-overlay,
 .sidebar-overlay { position:relative; z-index:1; }
+
+#main-app { min-height:100vh; min-height:100dvh; }
 
 .sidebar-overlay {
   position:fixed;
@@ -127,8 +133,10 @@ a { color:inherit; text-decoration:none; }
 .app-container {
   display:flex;
   width:100%;
-  height:100vh;
+  min-height:100vh;
+  min-height:100dvh;
   overflow:hidden;
+  align-items:stretch;
 }
 
 /* ════════════════════════════════════════════════
@@ -139,7 +147,8 @@ a { color:inherit; text-decoration:none; }
   flex-shrink:0;
   display:flex;
   flex-direction:column;
-  height:100vh;
+  min-height:100vh;
+  min-height:100dvh;
   background:linear-gradient(180deg,rgba(255,255,255,.96) 0%,rgba(240,246,242,.90) 100%);
   backdrop-filter:blur(24px);
   border-right:1px solid rgba(226,232,240,.85);
@@ -329,10 +338,12 @@ a { color:inherit; text-decoration:none; }
    ════════════════════════════════════════════════ */
 .main-content {
   flex:1; min-width:0;
-  height:100vh;
-  padding:20px;
+  min-height:100vh;
+  min-height:100dvh;
+  padding:clamp(14px,2vw,20px);
   display:flex;
   flex-direction:column;
+  overflow:hidden;
 }
 
 /* ── Panel ── */
@@ -340,7 +351,8 @@ a { color:inherit; text-decoration:none; }
   display:none;
   flex:1;
   min-height:0;
-  padding:24px;
+  min-width:0;
+  padding:clamp(16px,2vw,24px);
   border-radius:var(--r-xl);
   background:linear-gradient(160deg,rgba(255,255,255,.80),rgba(247,250,252,.65));
   border:1px solid rgba(255,255,255,.62);
@@ -592,7 +604,7 @@ a { color:inherit; text-decoration:none; }
 .messages-container {
   flex:1 1 auto;
   min-height:120px;
-  max-height:calc(100vh - 320px);
+  max-height:none;
   margin-bottom:14px;
   padding:16px 10px;
   overflow-y:auto;
@@ -1109,7 +1121,12 @@ a { color:inherit; text-decoration:none; }
 .login-header p { margin-top:5px; color:var(--mist-500); font-size:.875rem; }
 
 /* tabs */
-.tab-container,.profile-tabs { display:flex; gap:8px; margin-bottom:14px; }
+.tab-container,.profile-tabs {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-bottom:14px;
+}
 .tab,.profile-tab {
   flex:1;
   min-height:38px;
@@ -1169,7 +1186,7 @@ input:focus,textarea:focus,select:focus {
 .auth-prompt-box p { color:var(--mist-500); font-size:.875rem; }
 
 /* profile inner */
-.profile-inner,.summary-card,.history-content { padding:18px; }
+.profile-inner,.summary-card,.history-content { padding:clamp(14px,2vw,18px); }
 .profile-tabs { margin-bottom:14px; }
 
 /* blood type */
@@ -1209,7 +1226,13 @@ input:focus,textarea:focus,select:focus {
 .med-dose,.rxdet,.case-time,.pharmacist-info span,.pharmacist-info p,.case-details { color:var(--mist-500); font-size:.83rem; }
 
 /* connect layout */
-.connect-layout { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(260px,.9fr); gap:18px; overflow-y:auto; }
+.connect-layout {
+  display:grid;
+  grid-template-columns:minmax(0,1.35fr) minmax(260px,.9fr);
+  gap:18px;
+  overflow-y:auto;
+  align-items:start;
+}
 .pharmacists-section,.summary-section { display:grid; gap:12px; }
 .summary-section h4,.pharmacists-section h4 { display:flex; align-items:center; justify-content:space-between; }
 
@@ -1267,7 +1290,7 @@ input:focus,textarea:focus,select:focus {
   min-height:0;
   overflow-y:auto;
   -webkit-overflow-scrolling:touch;
-  max-height:calc(100vh - 250px);
+  max-height:calc(100dvh - 250px);
 }
 .pharmacist-queue {
   display:grid;
@@ -1295,7 +1318,7 @@ input:focus,textarea:focus,select:focus {
   flex-direction:column;
   gap:20px;
   overflow-y:auto;
-  max-height:calc(100vh - 220px);
+  max-height:calc(100dvh - 220px);
   padding-right:4px;
 }
 .admin-section {
@@ -1335,7 +1358,7 @@ input:focus,textarea:focus,select:focus {
   display:flex;
   flex-direction:column;
   overflow-y:auto;
-  max-height:calc(100vh - 220px);
+  max-height:calc(100dvh - 220px);
 }
 .admin-users-wrapper h4 {
   flex-shrink:0;
@@ -1399,7 +1422,20 @@ input:focus,textarea:focus,select:focus {
 
 /* mobile header */
 .mobile-header {
+  display:none;
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  height:var(--mobile-header-h);
+  padding:0 18px;
+  align-items:center;
+  justify-content:space-between;
+  background:var(--glass);
+  backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--mist-200);
   box-shadow:0 12px 28px rgba(15,23,42,.08);
+  z-index:101;
 }
 
 /* ════════════════════════════════════════════════
@@ -1461,40 +1497,53 @@ input:focus,textarea:focus,select:focus {
   .visual-icons-grid { grid-template-columns:repeat(2,1fr); }
   .panel-header { flex-direction:column; align-items:flex-start; gap:12px; }
   .panel-header .panel-badges { margin-top:8px; }
-  .messages-container { max-height:calc(100vh - 360px); }
+  .panel {
+    border-radius:24px;
+  }
+  .bodymap-wrapper {
+    grid-template-columns:minmax(0,1fr);
+    padding:18px;
+  }
+  .bodymap-stage {
+    width:100%;
+  }
 }
 
 @media (max-width:768px) {
   :root { --sidebar-w: 100%; }
   html { font-size:15px; }
-  .app-container { flex-direction:column; }
+  body::before,
+  body::after { opacity:.65; }
+  .app-container { flex-direction:column; overflow:visible; }
   .sidebar {
     position:fixed; top:0; bottom:0; left:-100%;
     width:min(85vw,300px);
     max-width:320px;
+    min-height:100dvh;
     transition:left .32s cubic-bezier(.4,0,.2,1);
     box-shadow:20px 0 48px rgba(15,23,42,.15);
     z-index:100;
   }
   .sidebar.open { left:0; }
   .main-content { 
-    height:calc(100vh - 60px); 
+    min-height:100dvh;
     padding:12px; 
-    padding-top:72px; 
+    padding-top:calc(var(--mobile-header-h) + 12px); 
     overflow-y:auto;
     -webkit-overflow-scrolling:touch;
   }
-  .main-content > * { min-height:calc(100vh - 84px); }
+  .main-content > * { min-height:auto; }
   .panel { 
     padding:16px; 
     border-radius:20px; 
+    min-height:calc(100dvh - var(--mobile-header-h) - 24px);
     overflow-y:auto;
     -webkit-overflow-scrolling:touch;
   }
-  .panel.on { display:flex; flex-direction:column; overflow:hidden; }
+  .panel.on { display:flex; flex-direction:column; overflow-y:auto; }
   .panel-header,.case-header,.med-item,.pharmacist-card { flex-direction:column; align-items:stretch; }
   .dashboard-toolbar,.dashboard-inline { grid-template-columns:1fr; }
-  .msg { max-width:90%; }
+  .msg { max-width:100%; }
   .tab-container,.profile-tabs,.form-row,.add-field { flex-direction:column; display:flex; }
   .stats-grid,.conditions-grid,.info-cards { grid-template-columns:1fr; }
   .drug-cards-wrapper { margin-left:0; }
@@ -1502,31 +1551,32 @@ input:focus,textarea:focus,select:focus {
   .panel-info h2 { font-size:1.25rem; }
   .panel-info p { font-size:.85rem; }
   .chat-input-container { 
-    flex-wrap:wrap; 
+    display:grid;
+    grid-template-columns:auto auto minmax(0,1fr);
     gap:8px;
     padding:10px 12px;
     border-radius:16px;
+    align-items:center;
   }
   .chat-input { 
-    width:100%; 
-    order:1; 
+    width:100%;
+    grid-column:1 / -1;
     min-height:40px;
-    max-height:80px;
+    max-height:96px;
   }
   .send-btn { 
-    width:100%; 
-    order:3; 
+    width:100%;
+    grid-column:1 / -1;
     padding:12px 16px;
   }
   .icon-btn { 
-    order:2; 
     min-width:44px;
     min-height:44px;
   }
   .sidebar-logo img, .modal-logo { width:36px; height:36px; border-radius:10px; }
   .brand-name { font-size:1.1rem; }
   .mobile-header { 
-    height:60px; 
+    height:var(--mobile-header-h); 
     padding:0 12px;
     display:flex !important;
   }
@@ -1539,12 +1589,12 @@ input:focus,textarea:focus,select:focus {
   }
   .quick-symptoms { 
     width:100%; 
-    display:flex;
-    flex-wrap:wrap;
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
     gap:6px;
   }
   .qs-btn { 
-    flex:1 1 calc(50% - 3px); 
+    width:100%;
     min-width:unset;
     text-align:center;
     padding:8px 10px;
@@ -1554,7 +1604,7 @@ input:focus,textarea:focus,select:focus {
   .bodymap-wrapper { grid-template-columns:1fr; }
   .bodymap-intro { grid-template-columns:1fr; }
   .bodymap-quick-grid { grid-template-columns:repeat(2,1fr); }
-  .bodymap-svg { max-width:180px; }
+  .bodymap-svg { width:min(100%,180px); }
   .connect-layout { grid-template-columns:1fr; }
   .disclaimer-banner { 
     flex-direction:column; 
@@ -1565,6 +1615,7 @@ input:focus,textarea:focus,select:focus {
   }
   .disclaimer-banner::before { font-size:1rem; }
   .profile-inner { padding:12px; }
+  .summary-card,.history-content,.info-card,.stat-card,.form-card,.list-card { padding:14px; }
   .stat-card { padding:12px; }
   .stat-value { font-size:1.5rem; }
   .form-group, .input-group { margin-bottom:10px; }
@@ -1576,25 +1627,84 @@ input:focus,textarea:focus,select:focus {
   .messages-container {
     -webkit-overflow-scrolling:touch;
     touch-action:pan-y;
+    padding-inline:6px;
   }
   .sidebar-nav {
     -webkit-overflow-scrolling:touch;
     touch-action:pan-y;
   }
   .quick-symptoms-bar { -webkit-overflow-scrolling:touch; }
+  .modal-overlay {
+    align-items:flex-end;
+    padding:12px;
+  }
+  .modal-box {
+    width:100%;
+    max-height:min(88dvh,720px);
+    padding:20px 16px;
+    border-radius:24px 24px 18px 18px;
+  }
+  .pharmacist-actions,
+  .case-actions,
+  .case-list-actions {
+    width:100%;
+    align-items:stretch;
+  }
+  .case-list-item,
+  .med-item,
+  .rxitem,
+  .pharmacist-card,
+  .case-card {
+    padding:12px;
+  }
 }
 
 /* Extra small screens */
 @media (max-width:480px) {
-  .main-content { padding:10px; padding-top:70px; }
-  .panel { padding:14px; border-radius:16px; }
+  :root { --mobile-header-h: 60px; }
+  .main-content { padding:10px; padding-top:calc(var(--mobile-header-h) + 10px); }
+  .panel {
+    padding:14px;
+    border-radius:16px;
+    min-height:calc(100dvh - var(--mobile-header-h) - 20px);
+  }
+  .panel-header { margin-bottom:16px; padding-bottom:16px; }
   .panel-info h2 { font-size:1.1rem; }
+  .panel-badges { width:100%; flex-wrap:wrap; }
+  .quick-symptoms { grid-template-columns:1fr; }
   .qs-btn { flex:1 1 100%; }
   .bodymap-quick { min-height:80px; }
   .bodymap-quick span { font-size:1.5rem; }
   .blood-grid { grid-template-columns:repeat(3,1fr); gap:6px; }
-  .profile-tabs { overflow-x:auto; }
-  .profile-tab { min-width:70px; font-size:.7rem; padding:0 8px; }
+  .profile-tabs {
+    flex-wrap:nowrap;
+    overflow-x:auto;
+    padding-bottom:4px;
+    scrollbar-width:none;
+  }
+  .profile-tabs::-webkit-scrollbar { display:none; }
+  .profile-tab {
+    flex:0 0 auto;
+    min-width:88px;
+    font-size:.7rem;
+    padding:0 8px;
+  }
+  .tab,
+  .profile-tab { min-height:40px; }
+  .chat-input-container {
+    grid-template-columns:1fr 1fr;
+  }
+  .icon-btn {
+    width:100%;
+  }
+  .chat-input,
+  .send-btn {
+    grid-column:1 / -1;
+  }
+  .modal-box {
+    padding:18px 14px;
+    border-radius:22px 22px 16px 16px;
+  }
 }
 
 @media (prefers-reduced-motion:reduce) {
@@ -1609,7 +1719,7 @@ input:focus,textarea:focus,select:focus {
 /* Admin sections responsive */
 @media (max-width:768px) {
   .admin-clinicians-wrapper {
-    max-height:calc(100vh - 200px);
+    max-height:calc(100dvh - 200px);
     gap:16px;
   }
   .admin-section h4 {
@@ -1683,7 +1793,7 @@ input:focus,textarea:focus,select:focus {
   
   /* Pharmacist queue mobile */
   .pharmacist-queue-wrapper {
-    max-height:calc(100vh - 240px);
+    max-height:calc(100dvh - 240px);
   }
   .pharmacist-queue {
     max-height:100%;
@@ -1691,7 +1801,7 @@ input:focus,textarea:focus,select:focus {
   
   /* Admin users mobile */
   .admin-users-wrapper {
-    max-height:calc(100vh - 200px);
+    max-height:calc(100dvh - 200px);
   }
 }
 
