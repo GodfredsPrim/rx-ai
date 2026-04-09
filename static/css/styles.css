@@ -113,7 +113,6 @@ img,svg { max-width:100%; height:auto; }
 
 /* ── App shell ── */
 #main-app,
-.app-container,
 .modal-overlay,
 .sidebar-overlay { position:relative; z-index:1; }
 
@@ -131,6 +130,7 @@ img,svg { max-width:100%; height:auto; }
 .sidebar-overlay.open { display:block; opacity:1; }
 
 .app-container {
+  position:relative;
   display:flex;
   width:100%;
   min-height:100vh;
@@ -1564,7 +1564,9 @@ input:focus,textarea:focus,select:focus {
     min-height:100dvh;
     transition:left .32s cubic-bezier(.4,0,.2,1);
     box-shadow:20px 0 48px rgba(15,23,42,.15);
-    z-index:100;
+    z-index:110;
+    background:linear-gradient(180deg,rgba(255,255,255,.99) 0%,rgba(241,246,243,.98) 100%);
+    backdrop-filter:none;
   }
   .sidebar.open { left:0; }
   .main-content { 
@@ -1701,6 +1703,10 @@ input:focus,textarea:focus,select:focus {
   .modal-overlay {
     align-items:flex-end;
     padding:12px;
+  }
+  .sidebar-overlay {
+    background:rgba(15,23,42,.28);
+    backdrop-filter:blur(1px);
   }
   .modal-box {
     width:100%;
