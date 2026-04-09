@@ -32,8 +32,20 @@ CORS_ORIGINS = [
     if origin.strip()
 ]
 
+
+def _ensure_legacy_schema_updates():
+    inspector = inspect(engine)
+
+    if "users" in inspector.get_table_names():
+        user_columns = {column["name"] for column in inspector.get_columns("users")}
+        if "is_admin" not in user_columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0"))
+
+
 # Create DB tables
 models.Base.metadata.create_all(bind=engine)
+_ensure_legacy_schema_updates()
 
 app = FastAPI(title="RxAI Ghana API")
 
