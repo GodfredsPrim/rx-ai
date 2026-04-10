@@ -1,4 +1,15 @@
 const API_URL = '/api';
+const PORTAL_MODE = window.BISARX_PORTAL || document.body?.dataset?.portal || 'patient';
+
+function isPortalMode(mode) {
+  return PORTAL_MODE === mode;
+}
+
+function getPortalHome() {
+  if (isPortalMode('pharmacist')) return '/pharmacist';
+  if (isPortalMode('admin')) return '/admin';
+  return '/';
+}
 
 // Smooth scroll helper
 function smoothScrollTo(elementId) {
@@ -69,6 +80,42 @@ function showToast(message, type = 'info', duration = 3000) {
   }, duration);
 }
 
+function setPatientAuthPrompt(message = '') {
+  if (!isPortalMode('patient')) return;
+  const loginHelp = document.getElementById('login-mode-help');
+  const loginErr = document.getElementById('login-err');
+  const regErr = document.getElementById('reg-err');
+  if (loginHelp) loginHelp.textContent = message || 'Use your patient account to continue.';
+  if (loginErr) loginErr.innerHTML = message ? `<div class="ok">${message}</div>` : '';
+  if (regErr) regErr.innerHTML = message ? `<div class="ok">${message}</div>` : '';
+}
+
+function continueWithSelectedCondition() {
+  if (!pendingConditionSelection || currentSession.role !== 'user') return;
+  const selected = pendingConditionSelection;
+  pendingConditionSelection = null;
+  const nav = document.getElementById('nav-chat');
+  if (nav) go('chat', nav);
+  const input = document.getElementById('tinput');
+  if (input) input.value = selected.q || `Tell me about ${selected.name}`;
+  showToast(`Continuing with ${selected.name}. Your saved profile can help the pharmacist review faster.`, 'success');
+  send();
+}
+
+function handleConditionSelection(condition) {
+  if (currentSession.role === 'user') {
+    const nav = document.getElementById('nav-chat');
+    if (nav) go('chat', nav);
+    document.getElementById('tinput').value = condition.q || `Tell me about ${condition.name}`;
+    send();
+    return;
+  }
+  pendingConditionSelection = condition;
+  openLoginModal();
+  switchAuthTab('register');
+  setPatientAuthPrompt('Create an account or sign in to save your clinical information for future diagnosis. This helps the pharmacist review your case faster.');
+}
+
 // Fallback data when API is unavailable
 window.FALLBACK_CONDITIONS = [
   {name:'Malaria / Fever',drug:'Artemether + Lumefantrine',tags:[{t:'Coartem®',c:'g'},{t:'6 doses/3 days',c:'b'},{t:'With food',c:'a'}],q:'Tell me about malaria symptoms and Coartem treatment.'},
@@ -127,6 +174,7 @@ window.addEventListener('resize', () => {
 let currentUser = null;
 let lang = 'en', history = [], ttsOn = false, isRecording = false, recognition = null;
 const synth = window.speechSynthesis;
+let pendingConditionSelection = null;
 
 const LANGS = {
   en:{
@@ -215,7 +263,20 @@ function openLoginModal() {
   document.getElementById('login-modal').style.display='flex';
   document.getElementById('login-err').innerHTML='';
   document.getElementById('reg-err').innerHTML='';
-  setLoginMode(document.getElementById('login-username')?.dataset.loginMode || 'user');
+  const roleSwitch = document.querySelector('.auth-role-switch');
+  const registerTab = document.getElementById('tab-reg');
+  const googleBtn = document.getElementById('btn-google-login');
+  if (roleSwitch) roleSwitch.style.display = 'none';
+  if (registerTab) registerTab.style.display = isPortalMode('patient') ? 'inline-flex' : 'none';
+  if (googleBtn) googleBtn.style.display = isPortalMode('patient') ? 'inline-flex' : 'none';
+  const preferredMode = isPortalMode('pharmacist')
+    ? 'pharmacist'
+    : isPortalMode('admin')
+      ? 'admin'
+      : (document.getElementById('login-username')?.dataset.loginMode || 'user');
+  setLoginMode(preferredMode);
+  if (!isPortalMode('patient')) switchAuthTab('login');
+  else if (!pendingConditionSelection) setPatientAuthPrompt('');
 }
 function closeLoginModal() {
   document.getElementById('login-modal').style.display='none';
@@ -248,10 +309,10 @@ function setLoginMode(mode = 'user', trigger = null) {
   if (!label || !input || !help || !submit) return;
 
   if (mode === 'pharmacist') {
-    label.textContent = 'Clinician Username or Email';
-    input.placeholder = 'Enter clinician username or email';
-    help.textContent = 'Clinicians use the clinician account created and verified by an admin.';
-    submit.textContent = 'Sign In as Clinician';
+    label.textContent = 'Pharmacist Username or Email';
+    input.placeholder = 'Enter pharmacist username or email';
+    help.textContent = 'Pharmacists use the pharmacist account created and verified by an admin.';
+    submit.textContent = 'Sign In as Pharmacist';
   } else if (mode === 'admin') {
     label.textContent = 'Admin Username or Email';
     input.placeholder = 'Enter admin username or email';
@@ -260,7 +321,7 @@ function setLoginMode(mode = 'user', trigger = null) {
   } else {
     label.textContent = 'Username or Email';
     input.placeholder = 'Enter username or email';
-    help.textContent = 'Patients and admins can sign in with username or email.';
+    help.textContent = 'Use your patient account to continue.';
     submit.textContent = 'Sign In';
   }
 
@@ -286,7 +347,7 @@ async function doLogin(){
   if(!username||!pass){err.innerHTML='<div class="err">Enter username and password.</div>';return;}
   try{
     btn.disabled=true;
-    btn.innerHTML = loginMode === 'admin' ? 'Signing in as Admin...' : loginMode === 'pharmacist' ? 'Signing in as Clinician...' : 'Signing in...';
+    btn.innerHTML = loginMode === 'admin' ? 'Signing in as Admin...' : loginMode === 'pharmacist' ? 'Signing in as Pharmacist...' : 'Signing in...';
     const body=new URLSearchParams();body.append('username',username);body.append('password',pass);
     let endpoint = '/auth/login';
     if(loginMode === 'pharmacist') endpoint = '/auth/pharmacist/login';
@@ -328,7 +389,33 @@ async function doRegister(){
   finally{btn.disabled=false;btn.innerHTML='Create Account';}
 }
 
-function signOut(){localStorage.removeItem('token');currentUser=null;window.location.reload();}
+async function doPharmacistRegister(){
+  const username=document.getElementById('reg-username').value.trim().toLowerCase();
+  const email=document.getElementById('reg-email').value.trim();
+  const fullName=document.getElementById('reg-fname').value.trim();
+  const licenseNumber=document.getElementById('reg-license').value.trim();
+  const location=document.getElementById('reg-location').value.trim();
+  const pass=document.getElementById('reg-pass').value;
+  const err=document.getElementById('reg-err');
+  const btn=document.getElementById('btn-do-register');
+  
+  if(!username||!email||!fullName||!licenseNumber||!pass){err.innerHTML='<div class="err">Fill all required fields.</div>';return;}
+
+  try{
+    btn.disabled=true;
+    btn.innerHTML='Creating pharmacist account...';
+    const payload={username,email,full_name:fullName,license_number:licenseNumber,location:location||'',password:pass};
+    const data=await callApi('/auth/pharmacist/register','POST',payload);
+    localStorage.setItem('token',data.access_token);
+    currentUser=username;
+    closeLoginModal();
+    showToast('Pharmacist account created! You can now receive cases.', 'success');
+    initApp();
+  }catch(e){err.innerHTML=`<div class="err">${e.message}</div>`;}
+  finally{btn.disabled=false;btn.innerHTML='Create Pharmacist Account';}
+}
+
+function signOut(){localStorage.removeItem('token');currentUser=null;window.location.href=getPortalHome();}
 
 function updateAuthUI(){
   const loggedIn = isLoggedIn();
@@ -708,7 +795,7 @@ function buildConditions(conditionsData){
     const d=document.createElement('div');
     d.className='ccard';
     d.innerHTML=`<div class="cname">${c.name}</div><div class="cdrug">${c.drug}</div><div class="ctags">${(c.tags||[]).map(t=>`<span class="ctag ${t.c}">${t.t}</span>`).join('')}</div>`;
-    d.onclick=()=>{go('chat',document.querySelector('.nav-item'));document.getElementById('tinput').value=c.q||`Tell me about ${c.name}`;send();};
+    d.onclick=()=>handleConditionSelection(c);
     g.appendChild(d);
   });
 }
@@ -812,7 +899,7 @@ LANGS.en = {
   greeting: "What are your symptoms? Describe what you're experiencing and how long it has been going on.",
   chips: ["I have a headache", "Stomach pain", "I feel feverish", "I have a cough", "My child is sick", "Skin rash"],
   placeholder: "Describe your symptoms...",
-  disc: "For general guidance only. Consult a licensed clinician for diagnosis, treatment, or medication decisions.",
+  disc: "For general guidance only. Consult a licensed pharmacist for diagnosis, treatment, or medication decisions.",
   discLabel: "Clinical Note:"
 };
 
@@ -1049,16 +1136,16 @@ function updateAuthUI() {
   if (loggedIn) {
     const label = document.getElementById('user-label');
     if (label) {
-      const roleLabel = currentSession.role === 'admin' ? 'Admin' : currentSession.role === 'pharmacist' ? 'Clinician' : 'Patient';
+      const roleLabel = currentSession.role === 'admin' ? 'Admin' : currentSession.role === 'pharmacist' ? 'Pharmacist' : 'Patient';
       label.textContent = `${currentSession.display_name || currentUser || 'User'} · ${roleLabel}`;
     }
   }
 
-  if (navProfile) navProfile.style.display = currentSession.role === 'user' ? 'flex' : 'none';
-  if (navHistory) navHistory.style.display = currentSession.role === 'user' ? 'flex' : 'none';
-  if (navConnect) navConnect.style.display = isPatientView ? 'flex' : 'none';
-  if (navPharmacist) navPharmacist.style.display = currentSession.role === 'pharmacist' ? 'flex' : 'none';
-  if (navAdmin) navAdmin.style.display = currentSession.role === 'admin' ? 'flex' : 'none';
+  if (navProfile) navProfile.style.display = currentSession.role === 'user' && !isPharmacistPortal && !isAdminPortal ? 'flex' : 'none';
+  if (navHistory) navHistory.style.display = currentSession.role === 'user' && !isPharmacistPortal && !isAdminPortal ? 'flex' : 'none';
+  if (navConnect) navConnect.style.display = isPatientView && !isPharmacistPortal && !isAdminPortal ? 'flex' : 'none';
+  if (navPharmacist) navPharmacist.style.display = currentSession.role === 'pharmacist' || isPharmacistPortal ? 'flex' : 'none';
+  if (navAdmin) navAdmin.style.display = currentSession.role === 'admin' || isAdminPortal ? 'flex' : 'none';
 }
 
 function updatePharmacistUI() {
@@ -1069,23 +1156,31 @@ async function refreshPharmacistDashboard() {
   if (currentSession.role !== 'pharmacist') return;
   try {
     const data = await callApi('/pharmacist/dashboard');
+    document.getElementById('ph-stat-pending').textContent = data.stats.pending_cases;
     document.getElementById('ph-stat-assigned').textContent = data.stats.assigned_cases;
-    document.getElementById('ph-stat-inreview').textContent = data.stats.in_review_cases;
     document.getElementById('ph-stat-completed').textContent = data.stats.completed_cases;
     document.getElementById('ph-stat-verified').textContent = data.pharmacist.is_verified ? 'Yes' : 'No';
-    renderPharmacistDashboard(data.assigned_cases, data.completed_cases);
+    renderPharmacistDashboard(data.pending_cases, data.assigned_cases, data.completed_cases);
   } catch (e) {
     console.error(e);
   }
 }
 
-function renderPharmacistDashboard(assignedCases = [], completedCases = []) {
+function renderPharmacistDashboard(pendingCases = [], assignedCases = [], completedCases = []) {
+  // Pending queue - all unassigned cases
+  const p = document.getElementById('pharmacist-pending-queue');
+  if (p) {
+    p.innerHTML = pendingCases.length 
+      ? pendingCases.map(renderPendingCaseCard).join('') 
+      : '<div class="empty">No pending cases in queue. Waiting for new cases...</div>';
+  }
+  
   // Assigned cases (in review)
   const q = document.getElementById('pharmacist-queue');
   if (q) {
     q.innerHTML = assignedCases.length 
       ? assignedCases.map(renderPharmacistCaseCard).join('') 
-      : '<div class="empty">No cases assigned to you yet. Admin will assign cases to you.</div>';
+      : '<div class="empty">No cases assigned to you yet.</div>';
   }
   
   // Completed cases
@@ -1100,6 +1195,7 @@ function renderPharmacistDashboard(assignedCases = [], completedCases = []) {
 function renderCaseCard(c) {
   const patientName = c.patient?.full_name || c.patient?.username || 'Patient';
   const assignedName = c.pharmacist?.name ? `<div class="case-details">Assigned to: ${c.pharmacist.name}</div>` : '';
+  const canAccept = !c.pharmacist && c.status === 'Pending';
   const reviewOpen = openReviewForms.has(c.id);
   const reviewForm = reviewOpen ? `
     <div class="dashboard-form">
@@ -1145,7 +1241,7 @@ function renderCaseCard(c) {
 
 // Admin tabs
 function showAdminTab(tab, el) {
-  ['overview', 'users', 'clinicians', 'cases'].forEach(t => {
+  ['overview', 'users', 'pharmacists', 'cases'].forEach(t => {
     const el = document.getElementById('admin-tab-' + t);
     if (el) el.style.display = t === tab ? 'block' : 'none';
   });
@@ -1155,12 +1251,58 @@ function showAdminTab(tab, el) {
 
 // Pharmacist tabs
 function showPharmaTab(tab, el) {
-  ['assigned', 'completed'].forEach(t => {
+  ['pending', 'assigned', 'completed'].forEach(t => {
     const el = document.getElementById('pharma-tab-' + t);
     if (el) el.style.display = t === tab ? 'block' : 'none';
   });
   document.querySelectorAll('#panel-pharmacist .ntab').forEach(n => n.classList.remove('on'));
   if (el) el.classList.add('on');
+}
+
+// Render pending case card with Accept button
+function renderPendingCaseCard(c) {
+  const patientName = c.patient?.full_name || c.patient?.username || 'Guest Patient';
+  const urgencyBadge = c.urgency_level === 'urgent' ? '<span class="badge badge-danger">URGENT</span>' : c.urgency_level === 'priority' ? '<span class="badge badge-warning">PRIORITY</span>' : '';
+  const reviewOpen = openReviewForms.has(c.id);
+  const reviewForm = reviewOpen ? `
+    <div class="dashboard-form">
+      <textarea id="review-advice-${c.id}" placeholder="Write clinical advice, counseling notes, and next steps."></textarea>
+      <div class="dashboard-inline">
+        <input id="review-drug-${c.id}" type="text" placeholder="Recommended medication (optional)" value="${c.drug_name || ''}">
+        <select id="review-status-${c.id}">
+          <option value="Reviewed" ${c.status === 'Reviewed' ? 'selected' : ''}>Reviewed</option>
+          <option value="Ordered" ${c.status === 'Ordered' ? 'selected' : ''}>Ordered</option>
+          <option value="Delivered" ${c.status === 'Delivered' ? 'selected' : ''}>Delivered</option>
+        </select>
+      </div>
+      <div class="dashboard-form-actions">
+        <button class="btn btn-primary btn-sm" onclick="submitCaseReview(${c.id})">Save Review</button>
+        <button class="btn btn-secondary btn-sm" onclick="toggleReviewForm(${c.id})">Cancel</button>
+      </div>
+    </div>
+  ` : '';
+  return `
+    <div class="case-card">
+      <div class="case-header">
+        <span class="case-user">${patientName}</span>
+        <span class="case-time">${new Date(c.created_at).toLocaleString()}</span>
+        ${urgencyBadge}
+      </div>
+      <div class="case-details"><strong>Status:</strong> ${c.status}</div>
+      <div class="case-details"><strong>Case Summary:</strong> ${c.case_summary || c.patient_message || 'No summary'}</div>
+      <div class="dashboard-meta">
+        <div class="case-details"><strong>Patient Email:</strong> ${c.patient?.email || 'Not available'}</div>
+        <div class="case-details"><strong>Phone:</strong> ${c.patient?.phone || 'Not provided'}</div>
+        <div class="case-details"><strong>Location:</strong> ${c.patient?.city || 'Not provided'}</div>
+      </div>
+      <div class="case-details">${c.details}</div>
+      <div class="case-actions">
+        <button class="btn btn-primary btn-sm" onclick="acceptCase(${c.id})">Accept Case</button>
+        <button class="btn-review" onclick="toggleReviewForm(${c.id})">${reviewOpen ? 'Hide Review Form' : 'Quick Review'}</button>
+      </div>
+      ${reviewForm}
+    </div>
+  `;
 }
 
 // Render case card for pharmacist (no claim button)
@@ -1231,6 +1373,19 @@ async function submitCaseReview(id) {
   }
 }
 
+async function acceptCase(caseId) {
+  if (!confirm('Are you sure you want to accept this case? You will be responsible for reviewing it.')) {
+    return;
+  }
+  try {
+    await callApi(`/pharmacist/cases/${caseId}/accept`, 'POST');
+    showToast('Case accepted successfully!', 'success');
+    refreshPharmacistDashboard();
+  } catch (e) {
+    alert(`Error accepting case: ${e.message}`);
+  }
+}
+
 async function refreshAdminDashboard() {
   if (currentSession.role !== 'admin') return;
   try {
@@ -1248,6 +1403,89 @@ async function refreshAdminDashboard() {
     renderAdminUsers(data.recent_users);
   } catch (e) {
     console.error(e);
+  }
+}
+
+// Guest case submission
+function openGuestCaseModal() {
+  document.getElementById('guest-case-modal').style.display = 'flex';
+}
+
+function closeGuestCaseModal() {
+  document.getElementById('guest-case-modal').style.display = 'none';
+  document.getElementById('form-guest-case').reset();
+  document.getElementById('guest-case-msg').innerHTML = '';
+}
+
+async function submitGuestCase() {
+  const firstName = document.getElementById('guest-fname').value.trim();
+  const lastName = document.getElementById('guest-lname').value.trim();
+  const phone = document.getElementById('guest-phone').value.trim();
+  const email = document.getElementById('guest-email').value.trim();
+  const symptoms = document.getElementById('guest-symptoms').value.trim();
+  const message = document.getElementById('guest-message').value.trim();
+  
+  if (!firstName || !lastName || !phone || !symptoms) {
+    document.getElementById('guest-case-msg').innerHTML = '<p style="color:red;">Please fill in all required fields.</p>';
+    return;
+  }
+  
+  const btn = document.querySelector('#form-guest-case button[type="submit"]');
+  const originalText = btn.textContent;
+  btn.textContent = 'Submitting...';
+  btn.disabled = true;
+  
+  try {
+    const data = await callApi('/cases/guest', 'POST', {
+      first_name: firstName,
+      last_name: lastName,
+      phone: phone,
+      email: email || undefined,
+      message: message || symptoms,
+      symptoms: symptoms
+    });
+    
+    closeGuestCaseModal();
+    alert(`Case submitted successfully! Your Case ID is: ${data.case_id}\n\nKeep this ID to check your case status.`);
+  } catch (e) {
+    document.getElementById('guest-case-msg').innerHTML = `<p style="color:red;">Error: ${e.message}</p>`;
+  } finally {
+    btn.textContent = originalText;
+    btn.disabled = false;
+  }
+}
+
+function closeGuestStatusModal() {
+  document.getElementById('guest-status-modal').style.display = 'none';
+  document.getElementById('form-guest-status').reset();
+  document.getElementById('guest-status-msg').innerHTML = '';
+  document.getElementById('guest-status-result').style.display = 'none';
+}
+
+async function checkGuestCaseStatus() {
+  const caseId = document.getElementById('guest-case-id').value.trim();
+  if (!caseId) {
+    document.getElementById('guest-status-msg').innerHTML = '<p style="color:red;">Please enter a case ID.</p>';
+    return;
+  }
+  
+  try {
+    const data = await callApi(`/cases/guest/${caseId}`);
+    
+    document.getElementById('gsr-case-id').textContent = data.case_id;
+    document.getElementById('gsr-created-at').textContent = data.created_at ? new Date(data.created_at).toLocaleString() : 'N/A';
+    document.getElementById('gsr-status').textContent = data.status;
+    document.getElementById('gsr-follow-up').textContent = data.follow_up_status || 'N/A';
+    document.getElementById('gsr-drug').textContent = data.drug_name || 'Pending pharmacist review';
+    document.getElementById('gsr-advice').textContent = data.pharmacist_feedback || 'Awaiting review';
+    document.getElementById('gsr-referral').textContent = data.referral_advice || 'None';
+    document.getElementById('gsr-followup').textContent = data.follow_up_instructions || 'None';
+    
+    document.getElementById('guest-status-result').style.display = 'block';
+    document.getElementById('guest-status-msg').innerHTML = '';
+  } catch (e) {
+    document.getElementById('guest-status-msg').innerHTML = `<p style="color:red;">Error: ${e.message}</p>`;
+    document.getElementById('guest-status-result').style.display = 'none';
   }
 }
 
@@ -1288,7 +1526,7 @@ function renderAdminPharmacists(pharmacists = []) {
         <button class="btn danger btn-sm" onclick="deletePharmacist(${p.id})">Delete</button>
       </div>
     </div>
-  `).join('') : '<div class="empty">No clinicians found.</div>';
+  `).join('') : '<div class="empty">No pharmacists found.</div>';
 }
 
 async function createPharmacist() {
@@ -1302,14 +1540,14 @@ async function createPharmacist() {
   };
   const msg = document.getElementById('admin-ph-msg');
   if (!payload.full_name || !payload.username || !payload.email || !payload.license_number || !payload.password) {
-    msg.innerHTML = '<div class="err">Fill all clinician fields first.</div>';
+    msg.innerHTML = '<div class="err">Fill all pharmacist fields first.</div>';
     return;
   }
   try {
     await callApi('/admin/pharmacists', 'POST', payload);
     ['admin-ph-name', 'admin-ph-username', 'admin-ph-email', 'admin-ph-license', 'admin-ph-location', 'admin-ph-password']
       .forEach(id => { document.getElementById(id).value = ''; });
-    msg.innerHTML = '<div class="ok">Clinician account created.</div>';
+    msg.innerHTML = '<div class="ok">Pharmacist account created.</div>';
     refreshAdminDashboard();
   } catch (e) {
     msg.innerHTML = `<div class="err">${e.message}</div>`;
@@ -1349,7 +1587,7 @@ async function verifyPharmacist(id) {
     await callApi(`/admin/pharmacists/${id}/verify`, 'POST', {});
     refreshAdminDashboard();
   } catch (e) {
-    alert(`Unable to verify clinician: ${e.message}`);
+    alert(`Unable to verify pharmacist: ${e.message}`);
   }
 }
 
@@ -1357,7 +1595,7 @@ async function assignCase(id) {
   const select = document.getElementById(`assign-case-${id}`);
   const pharmacistId = Number(select?.value || 0);
   if (!pharmacistId) {
-    alert('Select a clinician first.');
+    alert('Select a pharmacist first.');
     return;
   }
   try {
@@ -1370,21 +1608,21 @@ async function assignCase(id) {
 }
 
 async function deletePharmacist(id) {
-  if (!confirm('Delete this clinician account?')) return;
+  if (!confirm('Delete this pharmacist account?')) return;
   try {
     await callApi(`/admin/pharmacists/${id}`, 'DELETE');
     refreshAdminDashboard();
   } catch (e) {
-    alert(`Unable to delete clinician: ${e.message}`);
+    alert(`Unable to delete pharmacist: ${e.message}`);
   }
 }
 
 function formatPrescriptionDetails(details = '') {
   const clean = String(details || '').replace(/\s*\|\|\s*/g, ' | ');
-  const adviceMarker = 'Clinician advice:';
+  const adviceMarker = 'Pharmacist advice:';
   if (!clean.includes(adviceMarker)) return clean;
   const [summary, advice] = clean.split(adviceMarker);
-  return `${summary.trim()} | Feedback from clinician: ${advice.trim()}`;
+  return `${summary.trim()} | Feedback from pharmacist: ${advice.trim()}`;
 }
 
 function renderPrescriptionHistory(rxArray) {
@@ -1396,7 +1634,7 @@ function renderPrescriptionHistory(rxArray) {
   }
   const sorted = [...rxArray].reverse();
   container.innerHTML = `
-    <div class="slabel">Patient Cases And Clinician Feedback</div>
+    <div class="slabel">Patient Cases And Pharmacist Feedback</div>
     <div class="rxlist">
       ${sorted.map(rx => `
         <div class="rxitem">
@@ -1457,7 +1695,7 @@ async function initApp() {
   }
 }
 
-let pharmacistDashboardState = { pending: [], assigned: [] };
+let pharmacistDashboardState = { pending: [], assigned: [], completed: [] };
 let adminDashboardState = { cases: [], pharmacists: [] };
 
 function getZoneOptions(zone) {
@@ -1545,37 +1783,37 @@ function speakBodyMapHelp() {
   synth.speak(utt);
 }
 
-function renderCareTeam(clinicians = []) {
+function renderCareTeam(pharmacists = []) {
   const section = document.querySelector('.pharmacists-section');
   if (!section) return;
-  const body = clinicians.length ? clinicians.map(c => `
+  const body = pharmacists.length ? pharmacists.map(c => `
     <div class="pharmacist-card">
       <div class="pharmacist-avatar" style="background:#edf2f7;color:#1e3a30;">${(c.full_name || c.username || 'CL').split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase()}</div>
       <div class="pharmacist-info">
         <h5>${c.full_name || c.username}</h5>
-        <span>${c.location || 'Licensed clinician'}</span>
-        <p>License: ${c.license_number || 'Verified clinician'}.</p>
+        <span>${c.location || 'Licensed pharmacist'}</span>
+        <p>License: ${c.license_number || 'Verified pharmacist'}.</p>
       </div>
       <div class="pharmacist-actions">
         <span class="online"><span class="dot"></span>${c.is_verified ? 'Available' : 'Pending'}</span>
-        <button class="btn btn-primary btn-sm" onclick="focusChatForClinician('${(c.full_name || c.username).replace(/'/g, "\\'")}')">Send Summary</button>
+        <button class="btn btn-primary btn-sm" onclick="focusChatForPharmacist('${(c.full_name || c.username).replace(/'/g, "\\'")}')">Send Summary</button>
       </div>
     </div>
-  `).join('') : '<div class="empty">No clinicians are available right now.</div>';
-  section.innerHTML = `<h4>Available Clinicians</h4>${body}`;
+  `).join('') : '<div class="empty">No pharmacists are available right now.</div>';
+  section.innerHTML = `<h4>Available Pharmacists</h4>${body}`;
 }
 
-function focusChatForClinician(name) {
+function focusChatForPharmacist(name) {
   go('chat', document.getElementById('nav-chat'));
-  document.getElementById('tinput').value = `I want my case reviewed by clinician ${name}.`;
+  document.getElementById('tinput').value = `I want my case reviewed by pharmacist ${name}.`;
 }
 
 async function loadCareTeam() {
   try {
-    const data = await callApi('/clinicians/available');
-    renderCareTeam(data.clinicians || []);
+    const data = await callApi('/pharmacists/available');
+    renderCareTeam(data.pharmacists || []);
   } catch (e) {
-    console.warn('Failed to load clinicians', e);
+    console.warn('Failed to load pharmacists', e);
   }
 }
 
@@ -1593,8 +1831,8 @@ function renderPrescriptionHistory(rxArray) {
   const sorted = [...rxArray].reverse();
   const feedbackCount = sorted.filter(rx => rx.pharmacist_feedback).length;
   container.innerHTML = `
-    ${feedbackCount ? `<div class="disclaimer-banner"><strong>Update:</strong> You have ${feedbackCount} case update(s) with clinician feedback.</div>` : ''}
-    <div class="slabel">Patient Cases And Clinician Feedback</div>
+    ${feedbackCount ? `<div class="disclaimer-banner"><strong>Update:</strong> You have ${feedbackCount} case update(s) with pharmacist feedback.</div>` : ''}
+    <div class="slabel">Patient Cases And Pharmacist Feedback</div>
     <div class="rxlist">
       ${sorted.map(rx => `
         <div class="rxitem" style="display:block;">
@@ -1606,7 +1844,7 @@ function renderPrescriptionHistory(rxArray) {
                 <span class="rxst ${rx.status === 'Reviewed' || rx.status === 'Delivered' ? 'ac' : 'pe'}">${rx.status}</span>
               </div>
               <div class="rxdet">Summary: ${rx.case_summary || formatPrescriptionDetails(rx.details)}</div>
-              ${rx.pharmacist_feedback ? `<div class="rxdet"><strong>Clinician Feedback:</strong> ${rx.pharmacist_feedback}</div>` : ''}
+              ${rx.pharmacist_feedback ? `<div class="rxdet"><strong>Pharmacist Feedback:</strong> ${rx.pharmacist_feedback}</div>` : ''}
               ${rx.referral_advice ? `<div class="rxdet"><strong>Referral:</strong> ${rx.referral_advice}</div>` : ''}
               ${rx.follow_up_instructions ? `<div class="rxdet"><strong>Follow-up:</strong> ${rx.follow_up_instructions}</div>` : ''}
               <div class="rxdet">Urgency: ${rx.urgency_level || 'routine'} | Follow-up: ${rx.follow_up_status || 'awaiting_review'} | ${new Date(rx.created_at).toLocaleDateString()}</div>
@@ -1621,7 +1859,7 @@ function renderPrescriptionHistory(rxArray) {
 function ensureDashboardToolbar(containerId, type) {
   const container = document.getElementById(containerId);
   if (!container || container.querySelector('.dashboard-toolbar')) return;
-  const placeholder = type === 'admin' ? 'Search patient, clinician, area...' : 'Search patient, symptom, area...';
+  const placeholder = type === 'admin' ? 'Search patient, pharmacist, area...' : 'Search patient, symptom, area...';
   container.insertAdjacentHTML('afterbegin', `
     <div class="dashboard-toolbar">
       <input id="${type}-search" type="text" placeholder="${placeholder}">
@@ -1643,7 +1881,7 @@ function ensureDashboardToolbar(containerId, type) {
   `);
   container.querySelectorAll('input,select').forEach(el => el.addEventListener('input', () => {
     if (type === 'admin') renderAdminCases(adminDashboardState.cases, adminDashboardState.pharmacists);
-    else renderPharmacistDashboard(pharmacistDashboardState.pending, pharmacistDashboardState.assigned);
+    else renderPharmacistDashboard(pharmacistDashboardState.pending, pharmacistDashboardState.assigned, pharmacistDashboardState.completed);
   }));
 }
 
@@ -1663,6 +1901,18 @@ function filterCases(cases = [], type) {
 function renderCaseCard(c) {
   const patientName = c.patient?.full_name || c.patient?.username || 'Patient';
   const assignedName = c.pharmacist?.name ? `<div class="case-details">Assigned to: ${c.pharmacist.name}</div>` : '';
+  const canAccept = !c.pharmacist && c.status === 'Pending';
+  const support = c.pharmacist_support || {};
+  const supportCard = `
+    <div class="info-card" style="margin-top:12px;">
+      <h4>AI Fast Review Support</h4>
+      <div class="case-details"><strong>AI Intake Summary:</strong> ${support.ai_intake_summary || c.ai_summary || 'No AI summary recorded'}</div>
+      <div class="case-details"><strong>Recent Patient Statements:</strong> ${support.recent_patient_statements || c.case_summary || c.patient_message || 'No recent patient statements captured'}</div>
+      <div class="case-details"><strong>Data File Guidance:</strong> ${support.dataset_guidance || 'No dataset guidance matched for this case yet.'}</div>
+      <div class="case-details"><strong>PDF Guidance:</strong> ${support.pdf_guidance || 'No PDF guidance matched for this case yet.'}</div>
+      <div class="case-details"><strong>Fast Delivery Hint:</strong> ${support.fast_delivery_note || 'Review and deliver according to pharmacist judgment.'}</div>
+    </div>
+  `;
   const reviewOpen = openReviewForms.has(c.id);
   const reviewForm = reviewOpen ? `
     <div class="dashboard-form">
@@ -1699,29 +1949,45 @@ function renderCaseCard(c) {
       </div>
       <div class="case-details"><strong>Patient Summary:</strong> ${c.case_summary || c.patient_message || 'No summary provided'}</div>
       <div class="case-details"><strong>AI Intake:</strong> ${c.ai_summary || 'No AI summary recorded'}</div>
+      ${supportCard}
       ${c.pharmacist_feedback ? `<div class="case-details"><strong>Latest Feedback:</strong> ${c.pharmacist_feedback}</div>` : ''}
       ${assignedName}
       ${eventList}
       <div class="case-actions">
-        <button class="btn-review" onclick="toggleReviewForm(${c.id})">${reviewOpen ? 'Hide Feedback Form' : 'Open Feedback Form'}</button>
+        ${canAccept ? `<button class="btn btn-primary btn-sm" onclick="acceptCase(${c.id})">Accept Case</button>` : `<button class="btn-review" onclick="toggleReviewForm(${c.id})">${reviewOpen ? 'Hide Feedback Form' : 'Open Feedback Form'}</button>`}
       </div>
       ${reviewForm}
     </div>
   `;
 }
 
-function renderPharmacistDashboard(pendingCases = [], assignedCases = []) {
-  pharmacistDashboardState = { pending: pendingCases, assigned: assignedCases };
-  const q = document.getElementById('pharmacist-queue');
-  if (!q) return;
-  ensureDashboardToolbar('pharmacist-queue', 'pharmacist');
+function renderPharmacistDashboard(pendingCases = [], assignedCases = [], completedCases = []) {
+  pharmacistDashboardState = { pending: pendingCases, assigned: assignedCases, completed: completedCases };
+
+  const pendingQueue = document.getElementById('pharmacist-pending-queue');
+  const assignedQueue = document.getElementById('pharmacist-queue');
+  const completedContainer = document.getElementById('pharmacist-completed');
+  if (!pendingQueue || !assignedQueue || !completedContainer) return;
+
+  ensureDashboardToolbar('pharmacist-pending-queue', 'pharmacist');
   const pendingFiltered = filterCases(pendingCases, 'pharmacist');
   const assignedFiltered = filterCases(assignedCases, 'pharmacist');
-  const sections = [];
-  if (pendingFiltered.length) sections.push(`<div class="info-card"><h4>Waiting Patients</h4>${pendingFiltered.map(renderCaseCard).join('')}</div>`);
-  if (assignedFiltered.length) sections.push(`<div class="info-card"><h4>My Reviews</h4>${assignedFiltered.map(renderCaseCard).join('')}</div>`);
-  const toolbar = q.querySelector('.dashboard-toolbar')?.outerHTML || '';
-  q.innerHTML = toolbar + (sections.length ? sections.join('') : '<div class="empty">No cases match this filter.</div>');
+
+  const toolbar = pendingQueue.querySelector('.dashboard-toolbar')?.outerHTML || '';
+  pendingQueue.innerHTML = toolbar + (
+    pendingFiltered.length
+      ? pendingFiltered.map(renderCaseCard).join('')
+      : '<div class="empty">No pending cases in queue. Waiting for new cases...</div>'
+  );
+
+  assignedQueue.innerHTML = assignedFiltered.length
+    ? assignedFiltered.map(renderCaseCard).join('')
+    : '<div class="empty">No cases assigned to you yet.</div>';
+
+  const completedFiltered = filterCases(completedCases, 'pharmacist');
+  completedContainer.innerHTML = completedFiltered.length
+    ? completedFiltered.map(renderCaseCard).join('')
+    : '<div class="empty">No completed cases yet.</div>';
 }
 
 async function submitCaseReview(id) {
@@ -1764,13 +2030,13 @@ function renderAdminCases(cases = [], pharmacists = []) {
           <div class="case-details"><strong>Status:</strong> ${c.status}</div>
           <div class="case-details"><strong>Urgency:</strong> ${c.urgency_level || 'routine'}</div>
           <div class="case-details"><strong>Area:</strong> ${c.symptom_area || 'General'}</div>
-          <div class="case-details"><strong>Assigned Clinician:</strong> ${c.pharmacist?.name || 'Unassigned'}</div>
+          <div class="case-details"><strong>Assigned Pharmacist:</strong> ${c.pharmacist?.name || 'Unassigned'}</div>
         </div>
         <div class="case-details"><strong>Case Summary:</strong> ${c.case_summary || c.patient_message || 'No summary provided'}</div>
         <div class="case-actions" style="align-items:stretch;">
           <div class="dashboard-inline">
             <select id="assign-case-${c.id}">
-              <option value="">Assign clinician</option>
+              <option value="">Assign pharmacist</option>
               ${options}
             </select>
             <button class="btn btn-secondary btn-sm" onclick="assignCase(${c.id})">Assign</button>
@@ -1786,14 +2052,28 @@ async function refreshPharmacistDashboard() {
   if (currentSession.role !== 'pharmacist') return;
   try {
     const data = await callApi('/pharmacist/dashboard');
-    document.getElementById('pending-count').textContent = `${data.stats.pending_cases} Pending`;
-    document.getElementById('ph-stat-pending').textContent = data.stats.pending_cases;
-    document.getElementById('ph-stat-assigned').textContent = data.stats.assigned_cases;
-    document.getElementById('ph-stat-reviewed').textContent = data.stats.reviewed_cases;
-    document.getElementById('ph-stat-verified').textContent = data.pharmacist.is_verified ? 'Yes' : 'No';
-    renderPharmacistDashboard(data.pending_cases, data.assigned_cases);
+    const pendingStat = document.getElementById('ph-stat-pending');
+    const assignedStat = document.getElementById('ph-stat-assigned');
+    const completedStat = document.getElementById('ph-stat-completed');
+    const verifiedStat = document.getElementById('ph-stat-verified');
+    if (pendingStat) pendingStat.textContent = data.stats.pending_cases;
+    if (assignedStat) assignedStat.textContent = data.stats.assigned_cases;
+    if (completedStat) completedStat.textContent = data.stats.completed_cases;
+    if (verifiedStat) verifiedStat.textContent = data.pharmacist.is_verified ? 'Yes' : 'No';
+    renderPharmacistDashboard(data.pending_cases || [], data.assigned_cases || [], data.completed_cases || []);
   } catch (e) {
     console.error(e);
+  }
+}
+
+async function acceptCase(id) {
+  try {
+    await callApi(`/pharmacist/cases/${id}/accept`, 'POST', {});
+    showToast('Case accepted successfully.', 'success');
+    refreshPharmacistDashboard();
+  } catch (e) {
+    alert(`Error: ${e.message}`);
+    refreshPharmacistDashboard();
   }
 }
 
@@ -1827,25 +2107,27 @@ function updateAuthUI() {
   const navAdmin = document.getElementById('nav-admin');
   const isPatientView = currentSession.role === 'guest' || currentSession.role === 'user';
   const isAdminView = currentSession.role === 'admin';
-  const isClinicianView = currentSession.role === 'pharmacist';
+  const isPharmacistView = currentSession.role === 'pharmacist';
+  const isPharmacistPortal = isPortalMode('pharmacist');
+  const isAdminPortal = isPortalMode('admin');
   if (authFooter) authFooter.style.display = loggedIn ? 'none' : 'block';
   if (userFooter) userFooter.style.display = loggedIn ? 'block' : 'none';
   if (loggedIn) {
     const label = document.getElementById('user-label');
     if (label) {
-      const roleLabel = currentSession.role === 'admin' ? 'Admin' : currentSession.role === 'pharmacist' ? 'Clinician' : 'Patient';
+      const roleLabel = currentSession.role === 'admin' ? 'Admin' : currentSession.role === 'pharmacist' ? 'Pharmacist' : 'Patient';
       label.textContent = `${currentSession.display_name || currentUser || 'User'} · ${roleLabel}`;
     }
   }
-  if (navChat) navChat.style.display = isAdminView || isClinicianView ? 'none' : 'flex';
-  if (navBodymap) navBodymap.style.display = isAdminView || isClinicianView ? 'none' : 'flex';
-  if (navConditions) navConditions.style.display = isAdminView || isClinicianView ? 'none' : 'flex';
-  if (navRedflag) navRedflag.style.display = isAdminView || isClinicianView ? 'none' : 'flex';
-  if (navProfile) navProfile.style.display = currentSession.role === 'user' ? 'flex' : 'none';
-  if (navHistory) navHistory.style.display = currentSession.role === 'user' ? 'flex' : 'none';
-  if (navConnect) navConnect.style.display = isPatientView ? 'flex' : 'none';
-  if (navPharmacist) navPharmacist.style.display = currentSession.role === 'pharmacist' ? 'flex' : 'none';
-  if (navAdmin) navAdmin.style.display = currentSession.role === 'admin' ? 'flex' : 'none';
+  if (navChat) navChat.style.display = isAdminView || isPharmacistView || isPharmacistPortal || isAdminPortal ? 'none' : 'flex';
+  if (navBodymap) navBodymap.style.display = isAdminView || isPharmacistView || isPharmacistPortal || isAdminPortal ? 'none' : 'flex';
+  if (navConditions) navConditions.style.display = isAdminView || isPharmacistView || isPharmacistPortal || isAdminPortal ? 'none' : 'flex';
+  if (navRedflag) navRedflag.style.display = isAdminView || isPharmacistView || isPharmacistPortal || isAdminPortal ? 'none' : 'flex';
+  if (navProfile) navProfile.style.display = currentSession.role === 'user' && !isPharmacistPortal && !isAdminPortal ? 'flex' : 'none';
+  if (navHistory) navHistory.style.display = currentSession.role === 'user' && !isPharmacistPortal && !isAdminPortal ? 'flex' : 'none';
+  if (navConnect) navConnect.style.display = isPatientView && !isPharmacistPortal && !isAdminPortal ? 'flex' : 'none';
+  if (navPharmacist) navPharmacist.style.display = currentSession.role === 'pharmacist' || isPharmacistPortal ? 'flex' : 'none';
+  if (navAdmin) navAdmin.style.display = currentSession.role === 'admin' || isAdminPortal ? 'flex' : 'none';
 }
 
 function newChat() {
@@ -1865,6 +2147,23 @@ async function initApp() {
   renderBodyMapLanding();
   await loadCareTeam();
 
+  if (isPortalMode('pharmacist') && currentSession.role === 'admin') {
+    window.location.href = '/admin';
+    return;
+  }
+  if (isPortalMode('admin') && currentSession.role === 'pharmacist') {
+    window.location.href = '/pharmacist';
+    return;
+  }
+  if (isPortalMode('pharmacist') && currentSession.role === 'user') {
+    signOut();
+    return;
+  }
+  if (isPortalMode('admin') && currentSession.role === 'user') {
+    signOut();
+    return;
+  }
+
   try {
     const refData = await callApi('/reference');
     buildConditions(refData.conditions);
@@ -1877,6 +2176,7 @@ async function initApp() {
 
   if (currentSession.role === 'user') {
     await loadProfileData();
+    continueWithSelectedCondition();
   } else {
     const pc = document.getElementById('profile-content');
     const pp = document.getElementById('profile-auth-prompt');
@@ -1898,6 +2198,21 @@ async function initApp() {
     const nav = document.getElementById('nav-admin');
     if (nav) go('admin', nav);
     refreshAdminDashboard();
+    return;
+  }
+
+  if (isPortalMode('pharmacist')) {
+    const nav = document.getElementById('nav-pharmacist');
+    if (nav) go('pharmacist', nav);
+    switchAuthTab('login');
+    openLoginModal();
+    return;
+  }
+  if (isPortalMode('admin')) {
+    const nav = document.getElementById('nav-admin');
+    if (nav) go('admin', nav);
+    switchAuthTab('login');
+    openLoginModal();
     return;
   }
 

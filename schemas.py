@@ -151,3 +151,18 @@ class ReferenceData(BaseModel):
     red_flags: List[RedFlagItem]
     total_medicines: int
     total_conditions: int
+
+
+class GuestCaseSubmit(BaseModel):
+    first_name: str
+    last_name: str
+    phone: str
+    email: Optional[EmailStr] = None
+    message: str
+    symptoms: Optional[str] = None
+
+
+class GuestCaseResponse(BaseModel):
+    case_id: int
+    message: str
+    case_summary: str
