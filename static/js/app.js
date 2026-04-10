@@ -288,10 +288,14 @@ document.addEventListener('click', function(e) {
 });
 
 function switchAuthTab(t){
-  document.getElementById('tab-login').classList.toggle('on',t==='login');
-  document.getElementById('tab-reg').classList.toggle('on',t==='register');
-  document.getElementById('form-login').style.display=t==='login'?'block':'none';
-  document.getElementById('form-register').style.display=t==='register'?'block':'none';
+  const loginTab = document.getElementById('tab-login');
+  const registerTab = document.getElementById('tab-reg');
+  const loginForm = document.getElementById('form-login');
+  const registerForm = document.getElementById('form-register');
+  if (loginTab) loginTab.classList.toggle('on',t==='login');
+  if (registerTab) registerTab.classList.toggle('on',t==='register');
+  if (loginForm) loginForm.style.display=t==='login'?'block':'none';
+  if (registerForm) registerForm.style.display=t==='register' && !!registerTab ? 'block':'none';
   const googleBtn = document.getElementById('btn-google-login');
   if (googleBtn) googleBtn.style.display = t === 'login' ? 'inline-flex' : 'none';
 }
@@ -390,29 +394,9 @@ async function doRegister(){
 }
 
 async function doPharmacistRegister(){
-  const username=document.getElementById('reg-username').value.trim().toLowerCase();
-  const email=document.getElementById('reg-email').value.trim();
-  const fullName=document.getElementById('reg-fname').value.trim();
-  const licenseNumber=document.getElementById('reg-license').value.trim();
-  const location=document.getElementById('reg-location').value.trim();
-  const pass=document.getElementById('reg-pass').value;
   const err=document.getElementById('reg-err');
-  const btn=document.getElementById('btn-do-register');
-  
-  if(!username||!email||!fullName||!licenseNumber||!pass){err.innerHTML='<div class="err">Fill all required fields.</div>';return;}
-
-  try{
-    btn.disabled=true;
-    btn.innerHTML='Creating pharmacist account...';
-    const payload={username,email,full_name:fullName,license_number:licenseNumber,location:location||'',password:pass};
-    const data=await callApi('/auth/pharmacist/register','POST',payload);
-    localStorage.setItem('token',data.access_token);
-    currentUser=username;
-    closeLoginModal();
-    showToast('Pharmacist account created! You can now receive cases.', 'success');
-    initApp();
-  }catch(e){err.innerHTML=`<div class="err">${e.message}</div>`;}
-  finally{btn.disabled=false;btn.innerHTML='Create Pharmacist Account';}
+  if(err) err.innerHTML='<div class="err">Pharmacist accounts are created by admins only.</div>';
+  showToast('Pharmacist accounts must be created by an admin.', 'warning');
 }
 
 function signOut(){localStorage.removeItem('token');currentUser=null;window.location.href=getPortalHome();}
@@ -2140,8 +2124,17 @@ function newChat() {
   if (nav) go('chat', nav);
 }
 
+function cleanupPatientPortalDuplicates() {
+  if (!isPortalMode('patient')) return;
+  ['nav-pharmacist', 'nav-admin', 'panel-pharmacist', 'panel-admin'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+  });
+}
+
 async function initApp() {
   await fetchSessionContext();
+  cleanupPatientPortalDuplicates();
   updateAuthUI();
   buildLang();
   renderBodyMapLanding();

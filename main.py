@@ -1190,33 +1190,10 @@ def pharmacist_login(form_data: OAuth2PasswordRequestForm = Depends(), db: Sessi
 
 @app.post("/api/auth/pharmacist/register", response_model=schemas.Token)
 def pharmacist_register(pharmacist_in: schemas.PharmacistCreate, db: Session = Depends(get_db)):
-    """Self-service pharmacist registration - no admin approval required."""
-    username = _normalize_username(pharmacist_in.username)
-    email = pharmacist_in.email.lower()
-    license_number = pharmacist_in.license_number.strip()
-
-    if db.query(models.Pharmacist).filter(models.Pharmacist.username == username).first():
-        raise HTTPException(status_code=400, detail="Pharmacist username already exists")
-    if db.query(models.Pharmacist).filter(models.Pharmacist.email == email).first():
-        raise HTTPException(status_code=400, detail="Pharmacist email already exists")
-    if db.query(models.Pharmacist).filter(models.Pharmacist.license_number == license_number).first():
-        raise HTTPException(status_code=400, detail="License number already exists")
-
-    pharmacist = models.Pharmacist(
-        username=username,
-        email=email,
-        hashed_password=auth.get_password_hash(pharmacist_in.password),
-        full_name=pharmacist_in.full_name.strip(),
-        license_number=license_number,
-        location=pharmacist_in.location.strip(),
-        is_verified=True,
+    raise HTTPException(
+        status_code=403,
+        detail="Pharmacist accounts can only be created by an admin.",
     )
-    db.add(pharmacist)
-    db.commit()
-    db.refresh(pharmacist)
-    
-    access_token = auth.create_access_token(data={"sub": pharmacist.email, "role": "pharmacist"})
-    return {"access_token": access_token, "token_type": "bearer"}
 
 
 @app.get("/api/session")
