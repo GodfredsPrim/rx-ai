@@ -547,8 +547,8 @@ def _build_local_chat_fallback(
     if any(keyword in lowered for keyword in urgent_keywords):
         if input_language == "twi":
             return (
-                "Ayoo, sorry paa sÃ‰â€º woretwa mu saa. Saa nsÃ‰â€ºnkyerÃ‰â€ºnne yi betumi ayÃ‰â€º asiane, enti kÃ‰â€ ayaresabea anaa frÃ‰â€º emergency ntÃ‰â€ºm. "
-                "WobÃ‰â€ºtumi akÃ‰â€ ayaresabea mprempren?"
+                "Ayoo, sorry paa sÃƒâ€°Ã¢â‚¬Âº woretwa mu saa. Saa nsÃƒâ€°Ã¢â‚¬ÂºnkyerÃƒâ€°Ã¢â‚¬Âºnne yi betumi ayÃƒâ€°Ã¢â‚¬Âº asiane, enti kÃƒâ€°Ã¢â‚¬Â ayaresabea anaa frÃƒâ€°Ã¢â‚¬Âº emergency ntÃƒâ€°Ã¢â‚¬Âºm. "
+                "WobÃƒâ€°Ã¢â‚¬Âºtumi akÃƒâ€°Ã¢â‚¬Â ayaresabea mprempren?"
             )
         return (
             "I am really sorry you are dealing with this. Those symptoms can be dangerous, so please go to the nearest hospital or seek emergency care now. "
@@ -566,31 +566,31 @@ def _build_local_chat_fallback(
     if input_language == "twi":
         if not has_duration:
             return (
-                "Ayoo, sorry paa sÃ‰â€º woretÃ‰â€º saa."
+                "Ayoo, sorry paa sÃƒâ€°Ã¢â‚¬Âº woretÃƒâ€°Ã¢â‚¬Âº saa."
                 f"{context_line} "
-                "Mepa wo kyÃ‰â€ºw, bere bÃ‰â€ºn na yareÃ‰â€º no fii ase?"
+                "Mepa wo kyÃƒâ€°Ã¢â‚¬Âºw, bere bÃƒâ€°Ã¢â‚¬Âºn na yareÃƒâ€°Ã¢â‚¬Âº no fii ase?"
             )
         if not has_severity:
             return (
-                "Meda wo ase sÃ‰â€º woka kyerÃ‰â€º me."
+                "Meda wo ase sÃƒâ€°Ã¢â‚¬Âº woka kyerÃƒâ€°Ã¢â‚¬Âº me."
                 f"{context_line} "
-                "Seesei, Ã‰â€ºreyÃ‰â€º den anaa Ã‰â€ºretew?"
+                "Seesei, Ãƒâ€°Ã¢â‚¬ÂºreyÃƒâ€°Ã¢â‚¬Âº den anaa Ãƒâ€°Ã¢â‚¬Âºretew?"
             )
         if not has_multiple_symptoms:
             return (
                 "Me te ase."
                 f"{context_line} "
-                "YareÃ‰â€º yi akyi no, nsÃ‰â€ºnkyerÃ‰â€ºnne foforo bÃ‰â€ºn na woahu bio?"
+                "YareÃƒâ€°Ã¢â‚¬Âº yi akyi no, nsÃƒâ€°Ã¢â‚¬ÂºnkyerÃƒâ€°Ã¢â‚¬Âºnne foforo bÃƒâ€°Ã¢â‚¬Âºn na woahu bio?"
             )
         return (
-            "Mehu sÃ‰â€º wei haw wo paa."
+            "Mehu sÃƒâ€°Ã¢â‚¬Âº wei haw wo paa."
             f"{context_line} "
-            "Mepa wo kyÃ‰â€ºw, saa bere yi mu no, dÃ‰â€ºn na Ã‰â€ºhaw wo paa sen biara?"
+            "Mepa wo kyÃƒâ€°Ã¢â‚¬Âºw, saa bere yi mu no, dÃƒâ€°Ã¢â‚¬Âºn na Ãƒâ€°Ã¢â‚¬Âºhaw wo paa sen biara?"
         )
 
     if not has_duration:
         return (
-            f"IÃ¢â‚¬â„¢m sorry youÃ¢â‚¬â„¢re feeling this way.{context_line} "
+            f"IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢m sorry youÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢re feeling this way.{context_line} "
             "To guide you safely, when exactly did these symptoms start?"
         )
 
@@ -613,7 +613,7 @@ def _build_local_chat_fallback(
         )
 
     return (
-        "IÃ¢â‚¬â„¢m sorry youÃ¢â‚¬â„¢re feeling unwell."
+        "IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢m sorry youÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢re feeling unwell."
         f"{context_line} "
         "Please tell me when the symptoms started so I can guide you step by step."
     )
@@ -662,9 +662,9 @@ def _build_fallback_consult_summary(translated_messages: list[dict], input_langu
     short_summary = summary_source[:220] if summary_source else "the reported symptoms"
     if input_language == "twi":
         return (
-            "Meda wo ase. Makaboa nsÃ‰â€ºm a wode ama no nyinaa ano. "
-            f"NsÃ‰â€ºm titiriw a mede rekÃ‰â€ma oduruyÃ‰â€ºfo no ne: {short_summary}. "
-            "Mede bÃ‰â€ºkÃ‰â€ma oduruyÃ‰â€ºfo a Ã‰â€wÃ‰â€ tumi ahwÃ‰â€º mu na Ã‰â€nyÃ‰â€º ayaresa ho gyinae."
+            "Meda wo ase. Makaboa nsÃƒâ€°Ã¢â‚¬Âºm a wode ama no nyinaa ano. "
+            f"NsÃƒâ€°Ã¢â‚¬Âºm titiriw a mede rekÃƒâ€°Ã¢â‚¬Âma oduruyÃƒâ€°Ã¢â‚¬Âºfo no ne: {short_summary}. "
+            "Mede bÃƒâ€°Ã¢â‚¬ÂºkÃƒâ€°Ã¢â‚¬Âma oduruyÃƒâ€°Ã¢â‚¬Âºfo a Ãƒâ€°Ã¢â‚¬ÂwÃƒâ€°Ã¢â‚¬Â tumi ahwÃƒâ€°Ã¢â‚¬Âº mu na Ãƒâ€°Ã¢â‚¬ÂnyÃƒâ€°Ã¢â‚¬Âº ayaresa ho gyinae."
         )
     return (
         "Thank you. I have gathered the key clinical details. "
@@ -802,6 +802,57 @@ def _get_default_ai_medication(rx: models.PrescriptionHistory) -> str:
     return suggestions[0]["medication"] if suggestions else ""
 
 
+def _build_patient_clinical_profile_snapshot(db: Session, user_id: int | None) -> str:
+    if not user_id:
+        return "No patient clinical profile was shared."
+
+    patient = db.query(models.User).filter(models.User.id == user_id).first()
+    if not patient:
+        return "No patient clinical profile was shared."
+
+    profile = patient.profile
+    medical = patient.medical
+    emergency = patient.emergency
+    active_medications = [
+        med for med in patient.medications
+        if (med.status or "").lower() in {"active", "ongoing", "current"}
+    ]
+    medication_source = active_medications if active_medications else list(patient.medications)
+    medications = ", ".join(
+        filter(
+            None,
+            [
+                f"{med.name} {med.dose}".strip() + (f" ({med.freq})" if med.freq else "")
+                for med in medication_source
+                if med.name
+            ],
+        )
+    ) or "None reported"
+    conditions = ", ".join(condition.name for condition in patient.conditions if condition.name) or "None reported"
+    allergies = ", ".join(allergy.name for allergy in patient.allergies if allergy.name) or "None reported"
+    full_name = " ".join(
+        part for part in [profile.first_name if profile else "", profile.last_name if profile else ""] if part
+    ).strip() or patient.username or patient.email or "Not provided"
+
+    sections = [
+        f"Patient: {full_name}",
+        f"DOB: {profile.dob if profile and profile.dob else 'Not provided'}",
+        f"Gender: {profile.gender if profile and profile.gender else 'Not provided'}",
+        f"Blood type: {profile.blood_type if profile and profile.blood_type else 'Not provided'}",
+        f"Phone: {profile.phone if profile and profile.phone else 'Not provided'}",
+        f"City: {profile.city if profile and profile.city else 'Not provided'}",
+        f"Address: {profile.address if profile and profile.address else 'Not provided'}",
+        f"Conditions: {conditions}",
+        f"Allergies: {allergies}",
+        f"Current medications: {medications}",
+        f"Smoking: {medical.smoking if medical and medical.smoking else 'Not reported'}",
+        f"Alcohol: {medical.alcohol if medical and medical.alcohol else 'Not reported'}",
+        f"Clinical notes: {medical.notes if medical and medical.notes else 'None'}",
+        f"Emergency alert: {emergency.alert if emergency and emergency.alert else 'None'}",
+    ]
+    return " | ".join(sections)
+
+
 def _infer_urgency_level(text: str) -> str:
     lowered = (text or "").lower()
     urgent_terms = ["difficulty breathing", "shortness of breath", "chest pain", "confusion", "convulsion", "unconscious", "bleeding"]
@@ -870,17 +921,23 @@ def _create_case_record(
     case_status = "Pending"
     follow_up_status = "awaiting_acceptance"
 
-    case = models.PrescriptionHistory(
-        user_id=user_id,
-        pharmacist_id=None,
-        drug_name="Pharmacist review required",
-        details=_build_pharmacist_case_details(
+    patient_clinical_profile = _build_patient_clinical_profile_snapshot(db, user_id)
+    case_details = (
+        _build_pharmacist_case_details(
             translated_messages=translated_messages,
             ai_summary=ai_summary,
             matched_drugs=matched_drugs,
             final_matches=final_matches,
             relevant_pdf_context=relevant_pdf_context,
-        ),
+        )
+        + f" || Patient clinical profile for pharmacist review: {patient_clinical_profile}"
+    )
+
+    case = models.PrescriptionHistory(
+        user_id=user_id,
+        pharmacist_id=None,
+        drug_name="Pharmacist review required",
+        details=case_details,
         patient_message=user_messages[-1] if user_messages else "",
         case_summary=case_summary,
         ai_summary=ai_summary[:1000],
@@ -999,6 +1056,7 @@ def _serialize_case(rx: models.PrescriptionHistory) -> dict:
         "recent_patient_statements": "",
         "dataset_guidance": "",
         "pdf_guidance": "",
+        "clinical_profile": "",
         "fast_delivery_note": "",
     }
     for chunk in (rx.details or "").split(" || "):
@@ -1012,6 +1070,8 @@ def _serialize_case(rx: models.PrescriptionHistory) -> dict:
             support_sections["dataset_guidance"] = section.split(":", 1)[1].strip()
         elif lowered.startswith("pdf guidance for pharmacist review only:"):
             support_sections["pdf_guidance"] = section.split(":", 1)[1].strip()
+        elif lowered.startswith("patient clinical profile for pharmacist review:"):
+            support_sections["clinical_profile"] = section.split(":", 1)[1].strip()
 
     urgency_hint = {
         "urgent": "Prioritize immediate pharmacist action and rapid delivery or referral review.",
@@ -1930,7 +1990,7 @@ RED_FLAGS = [
     {
         "condition": "Stomach / Abdomen",
         "flags": [
-            "Severe dehydration Ã¢â‚¬â€ sunken eyes, no urine",
+            "Severe dehydration ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â sunken eyes, no urine",
             "Blood or mucus in stool",
             "Rigid board-like abdomen",
             "Multiple household members ill",
@@ -1983,7 +2043,7 @@ def get_reference_data():
             "category": "Antimalarial",
             "indication": "Malaria",
             "tags": [
-                {"t": "CoartemÃ‚Â®", "c": "g"},
+                {"t": "CoartemÃƒâ€šÃ‚Â®", "c": "g"},
                 {"t": "6 doses/3 days", "c": "b"},
                 {"t": "With food", "c": "a"},
             ],

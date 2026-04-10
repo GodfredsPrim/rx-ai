@@ -196,9 +196,9 @@ function handleConditionSelection(condition) {
 
 // Fallback data when API is unavailable
 window.FALLBACK_CONDITIONS = [
-  {name:'Malaria / Fever',drug:'Artemether + Lumefantrine',tags:[{t:'CoartemÃƒâ€šÃ‚Â®',c:'g'},{t:'6 doses/3 days',c:'b'},{t:'With food',c:'a'}],q:'Tell me about malaria symptoms and Coartem treatment.'},
+  {name:'Malaria / Fever',drug:'Artemether + Lumefantrine',tags:[{t:'CoartemÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â®',c:'g'},{t:'6 doses/3 days',c:'b'},{t:'With food',c:'a'}],q:'Tell me about malaria symptoms and Coartem treatment.'},
   {name:'Headache',drug:'Paracetamol / Ibuprofen',tags:[{t:'Tension',c:'b'},{t:'Migraine',c:'b'},{t:'Refer if severe',c:'r'}],q:'Headache assessment and first-line treatment?'},
-  {name:'Diarrhea',drug:'ORS + Zinc 10ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“20mg',tags:[{t:'Rehydration',c:'g'},{t:'Zinc',c:'b'},{t:'Metronidazole if amoebic',c:'a'}],q:'Diarrhea management advice.'},
+  {name:'Diarrhea',drug:'ORS + Zinc 10ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ20mg',tags:[{t:'Rehydration',c:'g'},{t:'Zinc',c:'b'},{t:'Metronidazole if amoebic',c:'a'}],q:'Diarrhea management advice.'},
   {name:'Cough / URTI',drug:'Steam / Guaifenesin',tags:[{t:'Fluids',c:'g'},{t:'Antibiotic if bacterial',c:'a'},{t:'Refer if SOB',c:'r'}],q:'Cough and cold management?'},
   {name:'Abdominal Pain',drug:'Antacid / Omeprazole',tags:[{t:'Gastritis',c:'b'},{t:'NSAID for cramps',c:'g'},{t:'Refer if severe',c:'r'}],q:'Abdominal pain assessment?'},
   {name:'Skin Rash',drug:'Hydrocortisone / Clotrimazole',tags:[{t:'Allergic',c:'a'},{t:'Fungal',c:'b'},{t:'Antihistamine',c:'g'}],q:'Skin rash first-line treatment?'},
@@ -212,7 +212,7 @@ window.FALLBACK_REDFLAGS = [
   {condition:'Malaria / Severe Fever',flags:['Cannot keep oral medication down','Confusion, convulsions, or severe weakness','Yellowing of eyes or dark urine','Fever lasting more than 3 days despite treatment','Pregnant or infant under 6 months']},
   {condition:'Head / Neurological',flags:['Sudden severe thunderclap headache','Neck stiffness with fever','Vision changes or slurred speech','Headache after head injury']},
   {condition:'Breathing / Chest',flags:['Difficulty breathing at rest','Coughing blood','Rapid breathing in children','Productive cough with fever over 3 days']},
-  {condition:'Stomach / Abdomen',flags:['Severe dehydration ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â sunken eyes, no urine','Blood or mucus in stool','Rigid board-like abdomen','Multiple household members ill']},
+  {condition:'Stomach / Abdomen',flags:['Severe dehydration ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â sunken eyes, no urine','Blood or mucus in stool','Rigid board-like abdomen','Multiple household members ill']},
   {condition:'General Danger Signs',flags:['Altered consciousness or unconsciousness','Uncontrolled bleeding','Pregnancy with acute serious illness','Patient cannot stand or self-care']}
 ];
 
@@ -263,24 +263,24 @@ const LANGS = {
     discLabel:"Note:"
   },
   tw:{
-    greeting:"Wo yareÃƒâ€°Ã¢â‚¬Âº bÃƒâ€°Ã¢â‚¬Âºn na Ãƒâ€°Ã¢â‚¬ÂºwÃƒâ€°Ã¢â‚¬Â wo? Ka kyerÃƒâ€°Ã¢â‚¬Âº me sÃƒâ€°Ã¢â‚¬ÂºdeÃƒâ€°Ã¢â‚¬Âº wo te wo ho ne bere a Ãƒâ€°Ã¢â‚¬Âºdii so.",
-    chips:["Me ti yÃƒâ€°Ã¢â‚¬Âº me yaw","Me yafunu yÃƒâ€°Ã¢â‚¬Âº me yaw","MewÃƒâ€°Ã¢â‚¬Â atiridiinini","MewÃƒâ€°Ã¢â‚¬Â ekoÃƒâ€°Ã¢â‚¬Â","Me ba yareÃƒâ€°Ã¢â‚¬Âº","Honam yareÃƒâ€°Ã¢â‚¬Âº"],
-    placeholder:"Ka me nkyÃƒâ€°Ã¢â‚¬Âºn sÃƒâ€°Ã¢â‚¬ÂºdeÃƒâ€°Ã¢â‚¬Âº wo te wo ho...",
-    disc:"WÃƒâ€°Ã¢â‚¬Â atwerÃƒâ€°Ã¢â‚¬Âº wÃƒâ€°Ã¢â‚¬Â standard health guidelines so. Ãƒâ€ Ã‚Ânsesa oduruyÃƒâ€°Ã¢â‚¬Âºfo anaasÃƒâ€°Ã¢â‚¬Âº Ãƒâ€°Ã¢â‚¬ÂdÃƒâ€°Ã¢â‚¬Âkotaa.",
-    discLabel:"NkÃƒâ€°Ã¢â‚¬ÂmmÃƒâ€°Ã¢â‚¬Âdie:"
+    greeting:"Wo yareÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº bÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âºn na ÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂºwÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â wo? Ka kyerÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº me sÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂºdeÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº wo te wo ho ne bere a ÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âºdii so.",
+    chips:["Me ti yÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº me yaw","Me yafunu yÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº me yaw","MewÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â atiridiinini","MewÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ekoÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â","Me ba yareÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº","Honam yareÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº"],
+    placeholder:"Ka me nkyÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âºn sÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂºdeÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº wo te wo ho...",
+    disc:"WÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â atwerÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº wÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â standard health guidelines so. ÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Ânsesa oduruyÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âºfo anaasÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº ÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂdÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âkotaa.",
+    discLabel:"NkÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂmmÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âdie:"
   },
   ha:{
     greeting:"Mene ne alamu ku? Bayyana yadda kuke ji da tsawon lokaci.",
-    chips:["Ina da ciwon kai","Ciki na yi mini ciwo","Ina da zazzabi","Ina da tari","Ãƒâ€ Ã…Â ana ba shi da lafiya","Ina da kuraje"],
+    chips:["Ina da ciwon kai","Ciki na yi mini ciwo","Ina da zazzabi","Ina da tari","ÃƒÆ’Ã¢â‚¬Â Ãƒâ€¦Ã‚Â ana ba shi da lafiya","Ina da kuraje"],
     placeholder:"Bayyana alamun ku...",
-    disc:"Jagora ne kawai. TuntuÃƒâ€°Ã¢â‚¬Å“i likitan magani ko likita.",
-    discLabel:"GargaÃƒâ€°Ã¢â‚¬â€i:"
+    disc:"Jagora ne kawai. TuntuÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œi likitan magani ko likita.",
+    discLabel:"GargaÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Âi:"
   },
   fr:{
-    greeting:"Quels sont vos symptÃƒÆ’Ã‚Â´mes? DÃƒÆ’Ã‚Â©crivez ce que vous ressentez et depuis combien de temps.",
-    chips:["J'ai mal ÃƒÆ’Ã‚Â  la tÃƒÆ’Ã‚Âªte","Douleur abdominale","J'ai de la fiÃƒÆ’Ã‚Â¨vre","Je tousse","Mon enfant est malade","ÃƒÆ’Ã¢â‚¬Â°ruption cutanÃƒÆ’Ã‚Â©e"],
-    placeholder:"DÃƒÆ’Ã‚Â©crivez vos symptÃƒÆ’Ã‚Â´mes...",
-    disc:"Conseils gÃƒÆ’Ã‚Â©nÃƒÆ’Ã‚Â©raux seulement. Consultez un pharmacien ou mÃƒÆ’Ã‚Â©decin agrÃƒÆ’Ã‚Â©ÃƒÆ’Ã‚Â©.",
+    greeting:"Quels sont vos symptÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´mes? DÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©crivez ce que vous ressentez et depuis combien de temps.",
+    chips:["J'ai mal ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  la tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªte","Douleur abdominale","J'ai de la fiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨vre","Je tousse","Mon enfant est malade","ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°ruption cutanÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e"],
+    placeholder:"DÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©crivez vos symptÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´mes...",
+    disc:"Conseils gÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©nÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©raux seulement. Consultez un pharmacien ou mÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©decin agrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©.",
     discLabel:"Note:"
   }
 };
@@ -293,14 +293,14 @@ function getSpeechLang() {
 }
 
 const ZONES={
-  head:{title:'Head & Brain',icon:'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã¢â‚¬Â¢',sub:'Headache, dizziness, fever, vision changes',simple:'Head pain or dizziness',q:'I have pain in my head. Please assess.'},
-  throat:{title:'Throat & Neck',icon:'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â£',sub:'Sore throat, difficulty swallowing, neck stiffness',simple:'Throat or neck problem',q:'I have throat or neck discomfort. Please assess.'},
-  chest:{title:'Chest & Lungs',icon:'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â®ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ°Ã…Â¸Ã¢â‚¬â„¢Ã‚Â¨',sub:'Cough, shortness of breath, chest pain',simple:'Chest pain or breathing problem',q:'I have chest pain or breathing difficulty. Please assess.'},
-  abdomen:{title:'Stomach',icon:'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã‚Â¢',sub:'Stomach pain, nausea, vomiting, diarrhea',simple:'Stomach or belly pain',q:'I have abdominal pain or stomach discomfort. Please assess.'},
-  arm:{title:'Arms & Joints',icon:'ÃƒÂ°Ã…Â¸Ã¢â‚¬â„¢Ã‚Âª',sub:'Arm pain, joint swelling, muscle aches',simple:'Arm or joint pain',q:'I have pain in my arms or joints. Please assess.'},
-  lower:{title:'Lower Abdomen',icon:'ÃƒÂ°Ã…Â¸Ã…Â¡Ã‚Â»',sub:'Lower cramps, urinary problems, menstrual pain',simple:'Lower belly or urine problem',q:'I have lower abdominal or urinary symptoms. Please assess.'},
-  leg:{title:'Legs',icon:'ÃƒÂ°Ã…Â¸Ã‚Â¦Ã‚Âµ',sub:'Leg pain, swelling, muscle weakness',simple:'Leg pain or swelling',q:'I have pain or swelling in my legs. Please assess.'},
-  foot:{title:'Feet & Ankles',icon:'ÃƒÂ°Ã…Â¸Ã‚Â¦Ã‚Â¶',sub:'Foot pain, ankle swelling, wounds',simple:'Foot pain or wound',q:'I have pain or wounds in my feet. Please assess.'}
+  head:{title:'Head & Brain',icon:'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â¤ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢',sub:'Headache, dizziness, fever, vision changes',simple:'Head pain or dizziness',q:'I have pain in my head. Please assess.'},
+  throat:{title:'Throat & Neck',icon:'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¹Ã…â€œÃƒâ€šÃ‚Â£',sub:'Sore throat, difficulty swallowing, neck stiffness',simple:'Throat or neck problem',q:'I have throat or neck discomfort. Please assess.'},
+  chest:{title:'Chest & Lungs',icon:'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¹Ã…â€œÃƒâ€šÃ‚Â®ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢Ãƒâ€šÃ‚Â¨',sub:'Cough, shortness of breath, chest pain',simple:'Chest pain or breathing problem',q:'I have chest pain or breathing difficulty. Please assess.'},
+  abdomen:{title:'Stomach',icon:'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â¤Ãƒâ€šÃ‚Â¢',sub:'Stomach pain, nausea, vomiting, diarrhea',simple:'Stomach or belly pain',q:'I have abdominal pain or stomach discomfort. Please assess.'},
+  arm:{title:'Arms & Joints',icon:'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢Ãƒâ€šÃ‚Âª',sub:'Arm pain, joint swelling, muscle aches',simple:'Arm or joint pain',q:'I have pain in my arms or joints. Please assess.'},
+  lower:{title:'Lower Abdomen',icon:'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â»',sub:'Lower cramps, urinary problems, menstrual pain',simple:'Lower belly or urine problem',q:'I have lower abdominal or urinary symptoms. Please assess.'},
+  leg:{title:'Legs',icon:'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â¦Ãƒâ€šÃ‚Âµ',sub:'Leg pain, swelling, muscle weakness',simple:'Leg pain or swelling',q:'I have pain or swelling in my legs. Please assess.'},
+  foot:{title:'Feet & Ankles',icon:'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â¦Ãƒâ€šÃ‚Â¶',sub:'Foot pain, ankle swelling, wounds',simple:'Foot pain or wound',q:'I have pain or wounds in my feet. Please assess.'}
 };
 
 // AUTH helper
@@ -659,8 +659,8 @@ window.onload = async () => {
 
 function buildLang(){
   const L=LANGS[lang];
-  document.getElementById('chat-title').textContent=lang==='en'?'BisaRx AI Pharmacist':lang==='tw'?'BisaRx AI OduruyÃƒâ€°Ã¢â‚¬Âºfo':lang==='ha'?'BisaRx AI Likitan Magani':'BisaRx Pharmacien IA';
-  document.getElementById('chat-sub').textContent='Direct clinical guidance Ãƒâ€šÃ‚Â· Voice Ãƒâ€šÃ‚Â· Multilingual';
+  document.getElementById('chat-title').textContent=lang==='en'?'BisaRx AI Pharmacist':lang==='tw'?'BisaRx AI OduruyÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âºfo':lang==='ha'?'BisaRx AI Likitan Magani':'BisaRx Pharmacien IA';
+  document.getElementById('chat-sub').textContent='Direct clinical guidance ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Voice ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Multilingual';
   document.getElementById('disc-label').textContent=L.discLabel;
   document.getElementById('disc-text').textContent=L.disc;
   document.getElementById('tinput').placeholder=L.placeholder;
@@ -912,14 +912,14 @@ function selectZone(zone){
   const z=ZONES[zone];if(!z)return;
   document.querySelectorAll('.body-zone').forEach(el=>{el.setAttribute('stroke','var(--primary-dark)');el.setAttribute('fill','rgba(26,122,74,0.08)');});
   document.querySelectorAll(`[data-zone="${zone}"]`).forEach(el=>{el.setAttribute('stroke','var(--accent)');el.setAttribute('fill','rgba(240,165,0,0.18)');});
-  document.getElementById('bodymap-info').innerHTML=`<div class="zone-card"><div class="zone-emoji">${z.icon||'ÃƒÂ°Ã…Â¸Ã‚Â©Ã‚Âº'}</div><div class="zone-title">${z.title}</div><div class="zone-sub">${z.sub}</div><div class="zone-simple">Simple meaning: ${z.simple}</div><div class="zone-btns"><button class="zbtn primary" onclick="askZone('${zone}')">Send This Area</button><button class="zbtn secondary" onclick="speakZone('${zone}')">Speak This Out</button></div></div>`;
+  document.getElementById('bodymap-info').innerHTML=`<div class="zone-card"><div class="zone-emoji">${z.icon||'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Âº'}</div><div class="zone-title">${z.title}</div><div class="zone-sub">${z.sub}</div><div class="zone-simple">Simple meaning: ${z.simple}</div><div class="zone-btns"><button class="zbtn primary" onclick="askZone('${zone}')">Send This Area</button><button class="zbtn secondary" onclick="speakZone('${zone}')">Speak This Out</button></div></div>`;
   speakZone(zone);
 }
 function askZone(zone){go('chat',document.querySelector('.nav-item'));document.getElementById('tinput').value=ZONES[zone].q;send();}
 function renderBodyMapLanding(){
   const el=document.getElementById('bodymap-info');
   if(!el) return;
-  el.innerHTML=`<div class="zone-card"><div class="zone-emoji">ÃƒÂ°Ã…Â¸Ã‚Â©Ã‚Âº</div><div class="zone-title">Choose a body part</div><div class="zone-sub">Tap the picture or use the large buttons above. The system can read the option aloud before sending it to chat.</div><div class="zone-btns"><button class="zbtn secondary" onclick="speakBodyMapHelp()">Hear Instructions</button></div></div>`;
+  el.innerHTML=`<div class="zone-card"><div class="zone-emoji">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Âº</div><div class="zone-title">Choose a body part</div><div class="zone-sub">Tap the picture or use the large buttons above. The system can read the option aloud before sending it to chat.</div><div class="zone-btns"><button class="zbtn secondary" onclick="speakBodyMapHelp()">Hear Instructions</button></div></div>`;
 }
 function speakZone(zone){
   const z=ZONES[zone];
@@ -973,7 +973,7 @@ function refreshOverview(u){
   document.getElementById('ov-conds').textContent=conditionsList.length;
   document.getElementById('ov-allergies').textContent=allergiesList.length;
   const active=meds.filter(x=>x.status==='Active');
-  document.getElementById('ov-meds-list').innerHTML=active.length?active.map(x=>`<div class="med-item"><div><div class="med-name">${x.name}</div><div class="med-dose">${x.dose} Ãƒâ€šÃ‚Â· ${x.freq}</div></div><span class="badge g">Active</span></div>`).join(''):'<div class="empty">None recorded</div>';
+  document.getElementById('ov-meds-list').innerHTML=active.length?active.map(x=>`<div class="med-item"><div><div class="med-name">${x.name}</div><div class="med-dose">${x.dose} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${x.freq}</div></div><span class="badge g">Active</span></div>`).join(''):'<div class="empty">None recorded</div>';
   document.getElementById('ov-allergy-list').innerHTML=allergiesList.length?allergiesList.map(a=>`<span class="allergy-chip" style="cursor:default">${a}</span>`).join(''):'<div class="empty">None recorded</div>';
   document.getElementById('ov-conds-list').innerHTML=conditionsList.length?conditionsList.map(c=>`<span class="cond-chip" style="cursor:default">${c}</span>`).join(''):'<div class="empty">None recorded</div>';
 }
@@ -1005,7 +1005,7 @@ async function saveMedical(){
 function loadMedsList(meds){
   const el=document.getElementById('meds-list');
   if(!meds||!meds.length){el.innerHTML='<div class="empty">No medications added yet.</div>';return;}
-  el.innerHTML=meds.map((m,i)=>`<div class="med-item"><div><div class="med-name">${m.name} ${m.dose}</div><div class="med-dose">${m.freq}${m.doctor?' Ãƒâ€šÃ‚Â· Dr. '+m.doctor:''}</div></div><div style="display:flex;gap:7px;align-items:center"><span class="badge ${m.status==='Active'?'g':m.status==='Paused'?'a':'b'}">${m.status}</span><button class="btn danger" style="padding:4px 9px;font-size:11px" onclick="removeMed(${m.id})">Remove</button></div></div>`).join('');
+  el.innerHTML=meds.map((m,i)=>`<div class="med-item"><div><div class="med-name">${m.name} ${m.dose}</div><div class="med-dose">${m.freq}${m.doctor?' ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Dr. '+m.doctor:''}</div></div><div style="display:flex;gap:7px;align-items:center"><span class="badge ${m.status==='Active'?'g':m.status==='Paused'?'a':'b'}">${m.status}</span><button class="btn danger" style="padding:4px 9px;font-size:11px" onclick="removeMed(${m.id})">Remove</button></div></div>`).join('');
 }
 async function addMed(){
   const name=document.getElementById('med-name').value.trim(),dose=document.getElementById('med-dose').value.trim(),freq=document.getElementById('med-freq').value,status=document.getElementById('med-status').value,doctor=document.getElementById('med-doctor').value.trim(),msg=document.getElementById('med-msg');
@@ -1038,7 +1038,7 @@ function renderPrescriptionHistory(rxArray){
           <div class="rxdot" style="background:${rx.status==='Active'?'var(--primary)':'var(--primary-light)'}"></div>
           <div style="flex:1">
             <div class="rxdrug">${rx.drug_name}</div>
-            <div class="rxdet">${rx.details} Ãƒâ€šÃ‚Â· ${new Date(rx.created_at).toLocaleDateString()}</div>
+            <div class="rxdet">${rx.details} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${new Date(rx.created_at).toLocaleDateString()}</div>
           </div>
           <span class="rxst ${rx.status==='Active'?'ac':'pe'}">${rx.status}</span>
         </div>
@@ -1091,7 +1091,7 @@ function buildLang() {
   if (!chatTitle || !chatSub || !discLabel || !discText || !textInput || !langBadge || !chipsEl) return;
 
   chatTitle.textContent = lang === 'fr' ? 'BisaRx Assistant Clinique' : 'BisaRx Clinical Care Assistant';
-  chatSub.textContent = 'Professional guidance Ã‚Â· Voice enabled Ã‚Â· Multilingual support';
+  chatSub.textContent = 'Professional guidance Ãƒâ€šÃ‚Â· Voice enabled Ãƒâ€šÃ‚Â· Multilingual support';
   discLabel.textContent = L.discLabel;
   discText.textContent = L.disc;
   textInput.placeholder = L.placeholder;
@@ -1216,7 +1216,7 @@ function refreshOverview(u) {
   document.getElementById('ov-allergies').textContent = allergiesList.length;
   const active = meds.filter(x => x.status === 'Active');
   document.getElementById('ov-meds-list').innerHTML = active.length
-    ? active.map(x => `<div class="med-item"><div><div class="med-name">${x.name}</div><div class="med-dose">${x.dose} Ãƒâ€šÃ‚Â· ${x.freq}</div></div><span class="badge g">Active</span></div>`).join('')
+    ? active.map(x => `<div class="med-item"><div><div class="med-name">${x.name}</div><div class="med-dose">${x.dose} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${x.freq}</div></div><span class="badge g">Active</span></div>`).join('')
     : '<div class="empty">None recorded</div>';
   document.getElementById('ov-allergy-list').innerHTML = allergiesList.length
     ? allergiesList.map(a => `<span class="allergy-chip" style="cursor:default">${a}</span>`).join('')
@@ -1232,7 +1232,7 @@ function loadMedsList(meds) {
     el.innerHTML = '<div class="empty">No medications added yet.</div>';
     return;
   }
-  el.innerHTML = meds.map(m => `<div class="med-item"><div><div class="med-name">${m.name} ${m.dose}</div><div class="med-dose">${m.freq}${m.doctor ? ' Ãƒâ€šÃ‚Â· Dr. ' + m.doctor : ''}</div></div><div style="display:flex;gap:7px;align-items:center"><span class="badge ${m.status === 'Active' ? 'g' : m.status === 'Paused' ? 'a' : 'b'}">${m.status}</span><button class="btn danger" style="padding:4px 9px;font-size:11px" onclick="removeMed(${m.id})">Remove</button></div></div>`).join('');
+  el.innerHTML = meds.map(m => `<div class="med-item"><div><div class="med-name">${m.name} ${m.dose}</div><div class="med-dose">${m.freq}${m.doctor ? ' ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Dr. ' + m.doctor : ''}</div></div><div style="display:flex;gap:7px;align-items:center"><span class="badge ${m.status === 'Active' ? 'g' : m.status === 'Paused' ? 'a' : 'b'}">${m.status}</span><button class="btn danger" style="padding:4px 9px;font-size:11px" onclick="removeMed(${m.id})">Remove</button></div></div>`).join('');
 }
 
 function renderPrescriptionHistory(rxArray) {
@@ -1251,7 +1251,7 @@ function renderPrescriptionHistory(rxArray) {
           <div class="rxdot" style="background:${rx.status === 'Active' ? 'var(--primary)' : 'var(--primary-light)'}"></div>
           <div style="flex:1">
             <div class="rxdrug">${rx.drug_name}</div>
-            <div class="rxdet">${rx.details} Ãƒâ€šÃ‚Â· ${new Date(rx.created_at).toLocaleDateString()}</div>
+            <div class="rxdet">${rx.details} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${new Date(rx.created_at).toLocaleDateString()}</div>
           </div>
           <span class="rxst ${rx.status === 'Active' ? 'ac' : 'pe'}">${rx.status}</span>
         </div>
@@ -1300,7 +1300,7 @@ function updateAuthUI() {
     const label = document.getElementById('user-label');
     if (label) {
       const roleLabel = currentSession.role === 'admin' ? 'Admin' : currentSession.role === 'pharmacist' ? 'Pharmacist' : 'Patient';
-      label.textContent = `${currentSession.display_name || currentUser || 'User'} Ãƒâ€šÃ‚Â· ${roleLabel}`;
+      label.textContent = `${currentSession.display_name || currentUser || 'User'} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${roleLabel}`;
     }
   }
 
@@ -1728,8 +1728,8 @@ function renderAdminCases(cases = [], pharmacists = []) {
         <div class="case-list-info">
           <div class="case-list-name">${patientName}</div>
           <div class="case-list-meta">
-            <span>Status: ${c.status}</span> Ãƒâ€šÃ‚Â· 
-            <span>${new Date(c.created_at).toLocaleString()}</span> Ãƒâ€šÃ‚Â· 
+            <span>Status: ${c.status}</span> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· 
+            <span>${new Date(c.created_at).toLocaleString()}</span> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· 
             <span>Assigned: ${c.pharmacist?.name || 'Unassigned'}</span>
           </div>
         </div>
@@ -1884,7 +1884,7 @@ function getZoneOptions(zone) {
 function renderBodyMapLanding() {
   const el = document.getElementById('bodymap-info');
   if (!el) return;
-  el.innerHTML = `<div class="zone-card"><div class="zone-emoji">ÃƒÂ°Ã…Â¸Ã‚Â©Ã‚Âº</div><div class="zone-title">Choose a body part</div><div class="zone-sub">Tap the body area, then choose what kind of problem it is and how bad it feels.</div><div class="zone-btns"><button class="zbtn secondary" onclick="speakBodyMapHelp()">Hear Instructions</button></div></div>`;
+  el.innerHTML = `<div class="zone-card"><div class="zone-emoji">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Âº</div><div class="zone-title">Choose a body part</div><div class="zone-sub">Tap the body area, then choose what kind of problem it is and how bad it feels.</div><div class="zone-btns"><button class="zbtn secondary" onclick="speakBodyMapHelp()">Hear Instructions</button></div></div>`;
 }
 
 function selectZone(zone) {
@@ -1901,7 +1901,7 @@ function selectZone(zone) {
   const symptomButtons = getZoneOptions(zone).map(option => `<button class="chip" onclick="askZone('${zone}','${option}','moderate')">${option}</button>`).join('');
   document.getElementById('bodymap-info').innerHTML = `
     <div class="zone-card">
-      <div class="zone-emoji">${z.icon || 'ÃƒÂ°Ã…Â¸Ã‚Â©Ã‚Âº'}</div>
+      <div class="zone-emoji">${z.icon || 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Âº'}</div>
       <div class="zone-title">${z.title}</div>
       <div class="zone-sub">${z.sub}</div>
       <div class="zone-simple">Choose the problem type first:</div>
@@ -1984,6 +1984,22 @@ function formatPrescriptionDetails(details = '') {
   return String(details || '').replace(/\s*\|\|\s*/g, ' | ').replace(/\n+/g, ' | ');
 }
 
+function extractCaseDetailSection(details = '', label = '') {
+  const target = String(label || '').toLowerCase();
+  if (!target) return '';
+  const section = String(details || '')
+    .split('||')
+    .map(part => part.trim())
+    .find(part => part.toLowerCase().startsWith(target));
+  if (!section) return '';
+  const separatorIndex = section.indexOf(':');
+  return separatorIndex >= 0 ? section.slice(separatorIndex + 1).trim() : section.trim();
+}
+
+function formatClinicalProfileSnapshot(snapshot = '') {
+  return String(snapshot || '').replace(/\s*\|\s*/g, ' | ');
+}
+
 function renderPrescriptionHistory(rxArray) {
   const container = document.getElementById('history-content');
   if (!container) return;
@@ -2007,6 +2023,7 @@ function renderPrescriptionHistory(rxArray) {
                 <span class="rxst ${rx.status === 'Reviewed' || rx.status === 'Delivered' ? 'ac' : 'pe'}">${rx.status}</span>
               </div>
               <div class="rxdet">Summary: ${rx.case_summary || formatPrescriptionDetails(rx.details)}</div>
+              ${extractCaseDetailSection(rx.details, 'Patient clinical profile for pharmacist review:') ? `<div class="rxdet"><strong>Clinical Profile Shared:</strong> ${formatClinicalProfileSnapshot(extractCaseDetailSection(rx.details, 'Patient clinical profile for pharmacist review:'))}</div>` : ''}
               ${rx.pharmacist_feedback ? `<div class="rxdet"><strong>Pharmacist Feedback:</strong> ${rx.pharmacist_feedback}</div>` : ''}
               ${rx.referral_advice ? `<div class="rxdet"><strong>Referral:</strong> ${rx.referral_advice}</div>` : ''}
               ${rx.follow_up_instructions ? `<div class="rxdet"><strong>Follow-up:</strong> ${rx.follow_up_instructions}</div>` : ''}
@@ -2092,6 +2109,7 @@ function renderCaseCard(c) {
       <h4>AI Fast Review Support</h4>
       <div class="case-details"><strong>AI Intake Summary:</strong> ${support.ai_intake_summary || c.ai_summary || 'No AI summary recorded'}</div>
       <div class="case-details"><strong>Recent Patient Statements:</strong> ${support.recent_patient_statements || c.case_summary || c.patient_message || 'No recent patient statements captured'}</div>
+      <div class="case-details"><strong>Patient Clinical Profile:</strong> ${formatClinicalProfileSnapshot(support.clinical_profile || 'No patient clinical profile was shared.')}</div>
       <div class="case-details"><strong>Matched Medication:</strong> ${matchedMedications}</div>
       <div class="case-details"><strong>Data File Guidance:</strong> ${support.dataset_guidance || 'No dataset guidance matched for this case yet.'}</div>
       <div class="case-details"><strong>PDF Guidance:</strong> ${support.pdf_guidance || 'No PDF guidance matched for this case yet.'}</div>
@@ -2320,7 +2338,7 @@ function updateAuthUI() {
     const label = document.getElementById('user-label');
     if (label) {
       const roleLabel = currentSession.role === 'admin' ? 'Admin' : currentSession.role === 'pharmacist' ? 'Pharmacist' : 'Patient';
-      label.textContent = `${currentSession.display_name || currentUser || 'User'} Ãƒâ€šÃ‚Â· ${roleLabel}`;
+      label.textContent = `${currentSession.display_name || currentUser || 'User'} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${roleLabel}`;
     }
   }
   if (navChat) navChat.style.display = isAdminView || isPharmacistView || isPharmacistPortal || isAdminPortal ? 'none' : 'flex';
