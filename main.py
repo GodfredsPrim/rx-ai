@@ -547,8 +547,8 @@ def _build_local_chat_fallback(
     if any(keyword in lowered for keyword in urgent_keywords):
         if input_language == "twi":
             return (
-                "Ayoo, sorry paa sɛ woretwa mu saa. Saa nsɛnkyerɛnne yi betumi ayɛ asiane, enti kɔ ayaresabea anaa frɛ emergency ntɛm. "
-                "Wobɛtumi akɔ ayaresabea mprempren?"
+                "Ayoo, sorry paa sÃ‰â€º woretwa mu saa. Saa nsÃ‰â€ºnkyerÃ‰â€ºnne yi betumi ayÃ‰â€º asiane, enti kÃ‰â€ ayaresabea anaa frÃ‰â€º emergency ntÃ‰â€ºm. "
+                "WobÃ‰â€ºtumi akÃ‰â€ ayaresabea mprempren?"
             )
         return (
             "I am really sorry you are dealing with this. Those symptoms can be dangerous, so please go to the nearest hospital or seek emergency care now. "
@@ -566,31 +566,31 @@ def _build_local_chat_fallback(
     if input_language == "twi":
         if not has_duration:
             return (
-                "Ayoo, sorry paa sɛ woretɛ saa."
+                "Ayoo, sorry paa sÃ‰â€º woretÃ‰â€º saa."
                 f"{context_line} "
-                "Mepa wo kyɛw, bere bɛn na yareɛ no fii ase?"
+                "Mepa wo kyÃ‰â€ºw, bere bÃ‰â€ºn na yareÃ‰â€º no fii ase?"
             )
         if not has_severity:
             return (
-                "Meda wo ase sɛ woka kyerɛ me."
+                "Meda wo ase sÃ‰â€º woka kyerÃ‰â€º me."
                 f"{context_line} "
-                "Seesei, ɛreyɛ den anaa ɛretew?"
+                "Seesei, Ã‰â€ºreyÃ‰â€º den anaa Ã‰â€ºretew?"
             )
         if not has_multiple_symptoms:
             return (
                 "Me te ase."
                 f"{context_line} "
-                "Yareɛ yi akyi no, nsɛnkyerɛnne foforo bɛn na woahu bio?"
+                "YareÃ‰â€º yi akyi no, nsÃ‰â€ºnkyerÃ‰â€ºnne foforo bÃ‰â€ºn na woahu bio?"
             )
         return (
-            "Mehu sɛ wei haw wo paa."
+            "Mehu sÃ‰â€º wei haw wo paa."
             f"{context_line} "
-            "Mepa wo kyɛw, saa bere yi mu no, dɛn na ɛhaw wo paa sen biara?"
+            "Mepa wo kyÃ‰â€ºw, saa bere yi mu no, dÃ‰â€ºn na Ã‰â€ºhaw wo paa sen biara?"
         )
 
     if not has_duration:
         return (
-            f"I’m sorry you’re feeling this way.{context_line} "
+            f"IÃ¢â‚¬â„¢m sorry youÃ¢â‚¬â„¢re feeling this way.{context_line} "
             "To guide you safely, when exactly did these symptoms start?"
         )
 
@@ -613,7 +613,7 @@ def _build_local_chat_fallback(
         )
 
     return (
-        "I’m sorry you’re feeling unwell."
+        "IÃ¢â‚¬â„¢m sorry youÃ¢â‚¬â„¢re feeling unwell."
         f"{context_line} "
         "Please tell me when the symptoms started so I can guide you step by step."
     )
@@ -662,9 +662,9 @@ def _build_fallback_consult_summary(translated_messages: list[dict], input_langu
     short_summary = summary_source[:220] if summary_source else "the reported symptoms"
     if input_language == "twi":
         return (
-            "Meda wo ase. Makaboa nsɛm a wode ama no nyinaa ano. "
-            f"Nsɛm titiriw a mede rekɔma oduruyɛfo no ne: {short_summary}. "
-            "Mede bɛkɔma oduruyɛfo a ɔwɔ tumi ahwɛ mu na ɔnyɛ ayaresa ho gyinae."
+            "Meda wo ase. Makaboa nsÃ‰â€ºm a wode ama no nyinaa ano. "
+            f"NsÃ‰â€ºm titiriw a mede rekÃ‰â€ma oduruyÃ‰â€ºfo no ne: {short_summary}. "
+            "Mede bÃ‰â€ºkÃ‰â€ma oduruyÃ‰â€ºfo a Ã‰â€wÃ‰â€ tumi ahwÃ‰â€º mu na Ã‰â€nyÃ‰â€º ayaresa ho gyinae."
         )
     return (
         "Thank you. I have gathered the key clinical details. "
@@ -734,6 +734,72 @@ def _build_pharmacist_case_details(
         f"Dataset guidance for pharmacist review only: {guidance_text} || "
         f"PDF guidance for pharmacist review only: {pdf_text}"
     )
+
+
+def _extract_ai_medication_suggestions(dataset_guidance: str) -> list[dict]:
+    suggestions: list[dict] = []
+    guidance = (dataset_guidance or "").strip()
+    if not guidance or guidance == "No dataset guidance matched.":
+        return suggestions
+
+    for section in [part.strip() for part in guidance.split(" | ") if part.strip()]:
+        if section.startswith("medicine_dataset.csv:"):
+            payload = section.split(":", 1)[1].strip()
+            for match in re.finditer(r"([^,(]+)\s*\(([^)]*)\)", payload):
+                medication = match.group(1).strip()
+                metadata = [part.strip() for part in match.group(2).split(";", 1)]
+                category = metadata[0] if metadata else ""
+                indication = metadata[1] if len(metadata) > 1 else ""
+                direction = " - ".join([part for part in [category, indication] if part]) or "Matched from medicine dataset"
+                suggestions.append(
+                    {
+                        "source": "medicine_dataset.csv",
+                        "medication": medication,
+                        "direction": direction,
+                        "label": f"{medication}: {direction}",
+                    }
+                )
+        elif section.startswith("final.csv:"):
+            payload = section.split(":", 1)[1].strip()
+            for item in [entry.strip() for entry in payload.split(",") if entry.strip()]:
+                disease, arrow, medication = item.partition("->")
+                if not arrow:
+                    continue
+                disease_name = disease.strip()
+                medication_name = medication.strip()
+                direction = f"Matched condition: {disease_name}" if disease_name else "Matched from final dataset"
+                suggestions.append(
+                    {
+                        "source": "final.csv",
+                        "medication": medication_name,
+                        "direction": direction,
+                        "label": f"{medication_name}: {direction}",
+                    }
+                )
+
+    unique_suggestions: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for suggestion in suggestions:
+        key = (
+            suggestion.get("source", "").lower(),
+            suggestion.get("medication", "").strip().lower(),
+        )
+        if not suggestion.get("medication") or key in seen:
+            continue
+        seen.add(key)
+        unique_suggestions.append(suggestion)
+    return unique_suggestions
+
+
+def _get_default_ai_medication(rx: models.PrescriptionHistory) -> str:
+    dataset_guidance = ""
+    for chunk in (rx.details or "").split(" || "):
+        section = chunk.strip()
+        if section.lower().startswith("dataset guidance for pharmacist review only:"):
+            dataset_guidance = section.split(":", 1)[1].strip()
+            break
+    suggestions = _extract_ai_medication_suggestions(dataset_guidance)
+    return suggestions[0]["medication"] if suggestions else ""
 
 
 def _infer_urgency_level(text: str) -> str:
@@ -953,10 +1019,12 @@ def _serialize_case(rx: models.PrescriptionHistory) -> dict:
         "routine": "Use the AI intake and dataset guidance to speed up standard pharmacist review.",
     }
     support_sections["fast_delivery_note"] = urgency_hint.get(rx.urgency_level or "routine", urgency_hint["routine"])
+    ai_medication_suggestions = _extract_ai_medication_suggestions(support_sections["dataset_guidance"])
+    current_drug_name = rx.drug_name if rx.drug_name != "Pharmacist review required" else None
 
     return {
         "id": rx.id,
-        "drug_name": rx.drug_name,
+        "drug_name": current_drug_name,
         "details": rx.details,
         "patient_message": rx.patient_message,
         "case_summary": rx.case_summary,
@@ -971,6 +1039,7 @@ def _serialize_case(rx: models.PrescriptionHistory) -> dict:
         "status": rx.status,
         "created_at": rx.created_at.isoformat() if rx.created_at else None,
         "pharmacist_support": support_sections,
+        "ai_medication_suggestions": ai_medication_suggestions,
         "patient": {
             "id": patient.id if patient else None,
             "username": patient.username if patient else "",
@@ -1254,6 +1323,10 @@ def get_profile(current_user: models.User = Depends(auth.get_current_user), db: 
     }
 
 
+@app.get("/api/profile/reports", response_model=List[schemas.Prescription])
+def get_profile_reports(current_user: models.User = Depends(auth.get_current_user)):
+    return current_user.prescriptions
+
 @app.post("/api/chat", response_model=schemas.ChatResponse)
 def chat(request: schemas.ChatRequest, current_user: models.User = Depends(get_optional_user), db: Session = Depends(get_db)):
     # If user is not logged in, they can still use chat (guest mode)
@@ -1448,8 +1521,13 @@ def pharmacist_dashboard(
         models.PrescriptionHistory.pharmacist_id == current_pharmacist.id,
     ).order_by(models.PrescriptionHistory.created_at.desc()).all()
 
-    in_review_cases = [c for c in assigned_cases if c.status in {"Pending", "In Review"}]
-    completed_cases = [c for c in assigned_cases if c.status in {"Reviewed", "Ordered", "Delivered"}]
+    completed_case_ids = {
+        c.id
+        for c in assigned_cases
+        if c.follow_up_status == "feedback_sent" or c.status in {"Reviewed", "Ordered", "Delivered", "Completed"}
+    }
+    in_review_cases = [c for c in assigned_cases if c.id not in completed_case_ids]
+    completed_cases = [c for c in assigned_cases if c.id in completed_case_ids]
 
     return {
         "pharmacist": _serialize_pharmacist(current_pharmacist),
@@ -1531,7 +1609,10 @@ def pharmacist_review_case(
         raise HTTPException(status_code=403, detail="This case is not assigned to you")
 
     case.pharmacist_id = current_pharmacist.id
-    case.drug_name = (review.drug or case.drug_name or "Pharmacist review completed").strip()
+    requested_drug = (review.drug or "").strip()
+    current_drug = case.drug_name if case.drug_name and case.drug_name != "Pharmacist review required" else ""
+    selected_drug = requested_drug or _get_default_ai_medication(case) or current_drug or "Pharmacist review completed"
+    case.drug_name = selected_drug.strip()
     diagnosis = (review.diagnosis or "").strip()
     advice = review.advice.strip()
     referral_advice = (review.referral_advice or "").strip()
@@ -1849,7 +1930,7 @@ RED_FLAGS = [
     {
         "condition": "Stomach / Abdomen",
         "flags": [
-            "Severe dehydration — sunken eyes, no urine",
+            "Severe dehydration Ã¢â‚¬â€ sunken eyes, no urine",
             "Blood or mucus in stool",
             "Rigid board-like abdomen",
             "Multiple household members ill",
@@ -1902,7 +1983,7 @@ def get_reference_data():
             "category": "Antimalarial",
             "indication": "Malaria",
             "tags": [
-                {"t": "Coartem®", "c": "g"},
+                {"t": "CoartemÃ‚Â®", "c": "g"},
                 {"t": "6 doses/3 days", "c": "b"},
                 {"t": "With food", "c": "a"},
             ],

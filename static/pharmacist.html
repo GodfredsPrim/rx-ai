@@ -11,7 +11,45 @@
   <link rel="stylesheet" href="css/styles.css?v=20260409-4">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
-<body data-portal="pharmacist">
+<body data-portal="pharmacist" class="portal-locked">
+<style>
+  body.portal-locked #main-app { display:none; }
+  #portal-gate {
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:32px;
+    background:radial-gradient(circle at top, rgba(26,122,74,0.12), transparent 48%), linear-gradient(180deg, #f8fbf9 0%, #eef4f1 100%);
+  }
+  body:not(.portal-locked) #portal-gate { display:none; }
+  .portal-gate-card {
+    width:min(100%, 620px);
+    padding:40px 32px;
+    border-radius:28px;
+    background:#ffffff;
+    border:1px solid rgba(15,23,42,0.08);
+    box-shadow:0 24px 60px rgba(15,23,42,0.12);
+    text-align:center;
+  }
+  .portal-gate-card h1 {
+    margin:12px 0;
+    font-size:clamp(2rem,5vw,3rem);
+    line-height:1.05;
+    color:#163120;
+  }
+  .portal-gate-card p {
+    margin:0 auto 20px;
+    max-width:42ch;
+    color:#4b6356;
+  }
+  .portal-gate-actions {
+    display:flex;
+    justify-content:center;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+</style>
 
 <!-- ══════════════════════════════════════
      LOGIN MODAL
@@ -61,6 +99,18 @@
 <!-- ══════════════════════════════════════
      MAIN APPLICATION
      ══════════════════════════════════════ -->
+<div id="portal-gate" aria-hidden="false">
+  <div class="portal-gate-card">
+    <span class="hero-kicker">Pharmacist Workspace</span>
+    <h1>Sign in to open the pharmacist dashboard.</h1>
+    <p>The pharmacist portal stays hidden until a verified pharmacist logs in.</p>
+    <div class="portal-gate-actions">
+      <button class="btn btn-primary" onclick="openLoginModal()">Pharmacist Sign In</button>
+      <a class="btn btn-secondary" href="/">Back to Main Site</a>
+    </div>
+  </div>
+</div>
+
 <div id="main-app">
   <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleMobileMenu()"></div>
   <div class="app-container">
@@ -699,7 +749,7 @@
 </div><!-- /main-app -->
 
 <script>window.BISARX_PORTAL = "pharmacist";</script>
-<script src="js/app.js?v=20260409-1"></script>
+<script src="js/app.js?v=20260410-1"></script>
 </body>
 </html>
 
