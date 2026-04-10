@@ -1,0 +1,430 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RxAI Waitlist</title>
+  <meta name="description" content="Join the RxAI waitlist so our team can follow up with you.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #163231;
+      --muted: #5d7470;
+      --brand: #0f766e;
+      --brand-deep: #0b4f49;
+      --sand: #f4efe7;
+      --card: rgba(255, 255, 255, 0.9);
+      --line: rgba(22, 50, 49, 0.12);
+      --success-bg: #ecfdf5;
+      --success-text: #166534;
+      --error-bg: #fff1f2;
+      --error-text: #be123c;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Plus Jakarta Sans", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(15, 118, 110, 0.2), transparent 34%),
+        radial-gradient(circle at bottom right, rgba(212, 170, 102, 0.18), transparent 24%),
+        linear-gradient(180deg, #fbfaf7 0%, #f2f7f6 100%);
+    }
+
+    .shell {
+      width: min(1120px, calc(100% - 32px));
+      margin: 32px auto;
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 24px;
+      align-items: stretch;
+    }
+
+    .panel, .card {
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background: var(--card);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+    }
+
+    .panel {
+      padding: 34px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .panel::after {
+      content: "";
+      position: absolute;
+      inset: auto -60px -60px auto;
+      width: 220px;
+      height: 220px;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(15, 118, 110, 0.14), transparent 64%);
+      pointer-events: none;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 22px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.72);
+      border: 1px solid rgba(15, 118, 110, 0.14);
+    }
+
+    .brand img {
+      width: 40px;
+      height: 40px;
+      border-radius: 14px;
+    }
+
+    .eyebrow {
+      font-size: 0.8rem;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--brand);
+      margin: 0 0 12px;
+    }
+
+    h1 {
+      margin: 0 0 14px;
+      font-size: clamp(2.3rem, 4vw, 4rem);
+      line-height: 0.96;
+      letter-spacing: -0.05em;
+      max-width: 10ch;
+    }
+
+    .lead {
+      margin: 0 0 24px;
+      max-width: 42ch;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.65;
+    }
+
+    .notes {
+      display: grid;
+      gap: 14px;
+      margin-top: 28px;
+    }
+
+    .note-card {
+      padding: 16px 18px;
+      border-radius: 20px;
+      background: rgba(255,255,255,0.78);
+      border: 1px solid rgba(22, 50, 49, 0.1);
+    }
+
+    .note-card strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 0.98rem;
+    }
+
+    .note-card span {
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 0.94rem;
+    }
+
+    .card {
+      padding: 30px;
+      align-self: center;
+    }
+
+    .card h2 {
+      margin: 0 0 8px;
+      font-size: 1.55rem;
+      letter-spacing: -0.03em;
+    }
+
+    .card p {
+      margin: 0 0 22px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    label {
+      display: block;
+      margin: 0 0 8px;
+      font-size: 0.92rem;
+      font-weight: 700;
+    }
+
+    .field {
+      margin-bottom: 14px;
+    }
+
+    input, textarea {
+      width: 100%;
+      border: 1px solid rgba(22, 50, 49, 0.16);
+      border-radius: 16px;
+      padding: 14px 15px;
+      font: inherit;
+      color: var(--ink);
+      background: rgba(255,255,255,0.96);
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: rgba(15, 118, 110, 0.7);
+      box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.12);
+    }
+
+    textarea {
+      min-height: 124px;
+      resize: vertical;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 8px;
+    }
+
+    button, .link-btn {
+      appearance: none;
+      border: 0;
+      border-radius: 16px;
+      padding: 14px 18px;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+      text-decoration: none;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+    }
+
+    button {
+      color: white;
+      background: linear-gradient(135deg, var(--brand) 0%, var(--brand-deep) 100%);
+      box-shadow: 0 14px 28px rgba(15, 118, 110, 0.2);
+    }
+
+    button:hover, .link-btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .link-btn {
+      color: var(--brand-deep);
+      background: #eef7f6;
+    }
+
+    .feedback {
+      display: none;
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      font-weight: 600;
+      line-height: 1.5;
+    }
+
+    .feedback.show { display: block; }
+    .feedback.success {
+      background: var(--success-bg);
+      color: var(--success-text);
+      border: 1px solid rgba(22, 101, 52, 0.16);
+    }
+    .feedback.error {
+      background: var(--error-bg);
+      color: var(--error-text);
+      border: 1px solid rgba(190, 18, 60, 0.16);
+    }
+
+    .fineprint {
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.55;
+    }
+
+    footer {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto 28px;
+      color: var(--muted);
+      font-size: 0.88rem;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 900px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        max-width: none;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .shell {
+        width: min(100%, calc(100% - 20px));
+        margin: 20px auto;
+      }
+
+      .panel, .card {
+        border-radius: 24px;
+      }
+
+      .panel, .card {
+        padding: 24px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      footer {
+        width: min(100%, calc(100% - 20px));
+        margin-bottom: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="panel">
+      <div class="brand">
+        <img src="/logo.png" alt="RxAI logo">
+        <div>
+          <div style="font-size:0.75rem;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:var(--brand);">RxAI</div>
+          <div style="font-weight:700;">Waitlist Access</div>
+        </div>
+      </div>
+
+      <p class="eyebrow">Fast intake</p>
+      <h1>Join the waitlist in one minute.</h1>
+      <p class="lead">Share your contact details and a short note about what you need. Our team can review the list and reach back out without losing track of who scanned your QR code.</p>
+
+      <div class="notes">
+        <div class="note-card">
+          <strong>Simple for walk-ins</strong>
+          <span>People can scan the QR code, fill this form on their phone, and keep moving without needing a full account.</span>
+        </div>
+        <div class="note-card">
+          <strong>Useful details up front</strong>
+          <span>Name, phone, email, location, and a short note are stored together so follow-up is easier.</span>
+        </div>
+        <div class="note-card">
+          <strong>Ready to share</strong>
+          <span>If you need the printable QR poster, open the dedicated QR page from the link in the form card.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Tell us how to reach you</h2>
+      <p>We will save your spot and keep your latest details if you submit again with the same email.</p>
+
+      <form id="waitlist-form">
+        <div class="field">
+          <label for="full-name">Full name</label>
+          <input id="full-name" name="full_name" type="text" placeholder="Ama Mensah" required>
+        </div>
+
+        <div class="grid">
+          <div class="field">
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" placeholder="you@example.com" required>
+          </div>
+          <div class="field">
+            <label for="phone">Phone number</label>
+            <input id="phone" name="phone" type="tel" placeholder="+233 55 123 4567" required>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="location">City or location</label>
+          <input id="location" name="location" type="text" placeholder="Accra, Kumasi, or nearby landmark">
+        </div>
+
+        <div class="field">
+          <label for="notes">What should we know?</label>
+          <textarea id="notes" name="notes" placeholder="A short note about your interest, timing, or what you want help with."></textarea>
+        </div>
+
+        <div class="actions">
+          <button type="submit" id="submit-btn">Join waitlist</button>
+          <a class="link-btn" href="/waitlist/qr">Open QR page</a>
+        </div>
+
+        <div id="form-feedback" class="feedback" role="status" aria-live="polite"></div>
+        <p class="fineprint">By joining, you are only sharing contact details for follow-up. This page is not for urgent medical care.</p>
+      </form>
+    </section>
+  </main>
+
+  <footer>
+    <span>RxAI waitlist intake</span>
+    <span id="footer-year"></span>
+  </footer>
+
+  <script>
+    const form = document.getElementById('waitlist-form');
+    const feedback = document.getElementById('form-feedback');
+    const submitBtn = document.getElementById('submit-btn');
+    document.getElementById('footer-year').textContent = `Copyright ${new Date().getFullYear()} RxAI`;
+
+    function showFeedback(message, type) {
+      feedback.textContent = message;
+      feedback.className = `feedback show ${type}`;
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving...';
+      feedback.className = 'feedback';
+      feedback.textContent = '';
+
+      const payload = {
+        full_name: document.getElementById('full-name').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        phone: document.getElementById('phone').value.trim(),
+        location: document.getElementById('location').value.trim() || undefined,
+        notes: document.getElementById('notes').value.trim() || undefined,
+        source: 'qr_waitlist'
+      };
+
+      try {
+        const response = await fetch('/api/waitlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || 'Unable to save your waitlist details right now.');
+        }
+        form.reset();
+        showFeedback(data.message || 'Your details were saved.', 'success');
+      } catch (error) {
+        showFeedback(error.message || 'Something went wrong while saving your details.', 'error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Join waitlist';
+      }
+    });
+  </script>
+</body>
+</html>

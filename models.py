@@ -135,3 +135,14 @@ class CaseEvent(Base):
     created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
 
     case = relationship("PrescriptionHistory", back_populates="events")
+
+class WaitlistEntry(Base):
+    __tablename__ = "waitlist_entries"
+    id = Column(Integer, primary_key=True, index=True)
+    full_name = Column(String, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=False)
+    phone = Column(String, default="")
+    location = Column(String, default="")
+    notes = Column(Text, default="")
+    source = Column(String, default="qr_waitlist")
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))

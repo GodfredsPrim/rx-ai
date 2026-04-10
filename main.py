@@ -1,4 +1,5 @@
 from pathlib import Path
+from io import BytesIO, StringIO
 import re
 import csv
 from typing import List
@@ -9,7 +10,7 @@ import pypdf
 from authlib.integrations.starlette_client import OAuth
 from fastapi import FastAPI, Depends, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
@@ -99,6 +100,36 @@ oauth.register(
     client_kwargs={"scope": "openid email profile"},
 )
 
+
+def _get_public_base_url(request: Request | None = None) -> str:
+    frontend_url = os.getenv("FRONTEND_URL", "").strip()
+    if frontend_url:
+        return frontend_url.rstrip("/")
+    if request:
+        return str(request.base_url).rstrip("/")
+    return "http://127.0.0.1:8000"
+
+
+def _get_waitlist_public_info_payload(request: Request) -> schemas.WaitlistPublicInfo:
+    base_url = _get_public_base_url(request)
+    return schemas.WaitlistPublicInfo(
+        waitlist_url=f"{base_url}/waitlist",
+        qr_image_url=f"{base_url}/api/waitlist/qr",
+        qr_page_url=f"{base_url}/waitlist/qr",
+    )
+
+
+def _serialize_waitlist_entry(entry: models.WaitlistEntry) -> dict:
+    return {
+        "id": entry.id,
+        "full_name": entry.full_name,
+        "email": entry.email,
+        "phone": entry.phone,
+        "location": entry.location,
+        "notes": entry.notes,
+        "source": entry.source,
+        "created_at": entry.created_at.isoformat() if entry.created_at else None,
+    }
 
 def _find_guidelines_pdf() -> Path | None:
     configured = os.getenv("GUIDELINES_PDF_PATH")
@@ -1729,6 +1760,7 @@ def admin_dashboard(
             "total_cases": total_cases,
             "verified_pharmacists": len([p for p in pharmacists if p.is_verified]),
             "users_with_profiles": users_with_profiles,
+            "waitlist_entries": db.query(models.WaitlistEntry).count(),
         },
         "pharmacists": [_serialize_pharmacist(pharmacist) for pharmacist in pharmacists],
         "cases": [_serialize_case(case) for case in cases],
@@ -2007,6 +2039,135 @@ RED_FLAGS = [
     },
 ]
 
+
+@app.get("/api/waitlist/public", response_model=schemas.WaitlistPublicInfo)
+def get_waitlist_public_info(request: Request):
+    return _get_waitlist_public_info_payload(request)
+
+
+@app.post("/api/waitlist", response_model=schemas.WaitlistSubmitResponse)
+def submit_waitlist_entry(
+    waitlist_entry: schemas.WaitlistEntryCreate,
+    db: Session = Depends(get_db),
+):
+    full_name = waitlist_entry.full_name.strip()
+    email = waitlist_entry.email.lower().strip()
+    phone = waitlist_entry.phone.strip()
+    location = (waitlist_entry.location or "").strip()
+    notes = (waitlist_entry.notes or "").strip()
+    source = (waitlist_entry.source or "qr_waitlist").strip() or "qr_waitlist"
+
+    if not full_name:
+        raise HTTPException(status_code=400, detail="Full name is required")
+    if not phone:
+        raise HTTPException(status_code=400, detail="Phone number is required")
+
+    existing_entry = db.query(models.WaitlistEntry).filter(models.WaitlistEntry.email == email).first()
+    if existing_entry:
+        existing_entry.full_name = full_name
+        existing_entry.phone = phone
+        existing_entry.location = location
+        existing_entry.notes = notes
+        existing_entry.source = source
+        db.commit()
+        db.refresh(existing_entry)
+        return schemas.WaitlistSubmitResponse(
+            status="updated",
+            message="You're already on the waitlist, so we refreshed your details.",
+            entry=schemas.WaitlistEntryResponse.model_validate(existing_entry),
+        )
+
+    new_entry = models.WaitlistEntry(
+        full_name=full_name,
+        email=email,
+        phone=phone,
+        location=location,
+        notes=notes,
+        source=source,
+    )
+    db.add(new_entry)
+    db.commit()
+    db.refresh(new_entry)
+
+    return schemas.WaitlistSubmitResponse(
+        status="created",
+        message="You're on the waitlist. We'll reach out with next steps.",
+        entry=schemas.WaitlistEntryResponse.model_validate(new_entry),
+    )
+
+
+@app.get("/api/waitlist/qr")
+def get_waitlist_qr(request: Request):
+    try:
+        import qrcode
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="QR generation is unavailable until the qrcode dependency is installed.",
+        ) from exc
+
+    waitlist_info = _get_waitlist_public_info_payload(request)
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(waitlist_info.waitlist_url)
+    qr.make(fit=True)
+
+    image = qr.make_image(fill_color="#0f766e", back_color="white")
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    buffer.seek(0)
+
+    return StreamingResponse(
+        buffer,
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=300"},
+    )
+
+
+@app.get("/api/admin/waitlist")
+def admin_list_waitlist(
+    request: Request,
+    current_admin: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    entries = db.query(models.WaitlistEntry).order_by(models.WaitlistEntry.created_at.desc()).all()
+    return {
+        "count": len(entries),
+        "entries": [_serialize_waitlist_entry(entry) for entry in entries],
+        "public": _get_waitlist_public_info_payload(request).model_dump(),
+    }
+
+
+@app.get("/api/admin/waitlist/export")
+def admin_export_waitlist(
+    current_admin: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    entries = db.query(models.WaitlistEntry).order_by(models.WaitlistEntry.created_at.desc()).all()
+    csv_buffer = StringIO()
+    writer = csv.writer(csv_buffer)
+    writer.writerow(["id", "full_name", "email", "phone", "location", "notes", "source", "created_at"])
+    for entry in entries:
+        writer.writerow([
+            entry.id,
+            entry.full_name,
+            entry.email,
+            entry.phone,
+            entry.location,
+            entry.notes,
+            entry.source,
+            entry.created_at.isoformat() if entry.created_at else "",
+        ])
+
+    return StreamingResponse(
+        iter([csv_buffer.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="waitlist_entries.csv"'},
+    )
 
 @app.get("/api/reference", response_model=schemas.ReferenceData)
 def get_reference_data():
@@ -2289,10 +2450,19 @@ def submit_guest_case(
     )
 
 
+@app.get("/waitlist", include_in_schema=False)
+def waitlist_portal():
+    return FileResponse(STATIC_DIR / "waitlist.html")
+
+
+@app.get("/waitlist/qr", include_in_schema=False)
+def waitlist_qr_portal():
+    return FileResponse(STATIC_DIR / "waitlist_qr.html")
+
+
 @app.get("/", include_in_schema=False)
 def patient_portal():
     return FileResponse(STATIC_DIR / "index.html")
-
 
 @app.get("/pharmacist", include_in_schema=False)
 def pharmacist_portal():

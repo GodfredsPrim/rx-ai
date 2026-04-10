@@ -166,3 +166,37 @@ class GuestCaseResponse(BaseModel):
     case_id: int
     message: str
     case_summary: str
+
+class WaitlistEntryCreate(BaseModel):
+    full_name: str
+    email: EmailStr
+    phone: str
+    location: Optional[str] = None
+    notes: Optional[str] = None
+    source: Optional[str] = "qr_waitlist"
+
+
+class WaitlistEntryResponse(BaseModel):
+    id: int
+    full_name: str
+    email: EmailStr
+    phone: str
+    location: Optional[str] = None
+    notes: Optional[str] = None
+    source: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class WaitlistSubmitResponse(BaseModel):
+    status: str
+    message: str
+    entry: WaitlistEntryResponse
+
+
+class WaitlistPublicInfo(BaseModel):
+    waitlist_url: str
+    qr_image_url: str
+    qr_page_url: str

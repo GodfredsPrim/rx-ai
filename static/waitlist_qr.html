@@ -1,0 +1,318 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RxAI Waitlist QR</title>
+  <meta name="description" content="Share or print the RxAI waitlist QR code.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #102a2a;
+      --muted: #60706d;
+      --brand: #0f766e;
+      --brand-deep: #0b4f49;
+      --paper: #fffdf8;
+      --line: rgba(16, 42, 42, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Plus Jakarta Sans", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top, rgba(15, 118, 110, 0.14), transparent 30%),
+        linear-gradient(180deg, #f6fbfa 0%, #fbf7ef 100%);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .poster {
+      width: min(100%, 960px);
+      display: grid;
+      grid-template-columns: 0.95fr 1.05fr;
+      gap: 20px;
+      padding: 22px;
+      border-radius: 32px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.92);
+      box-shadow: 0 28px 70px rgba(15, 23, 42, 0.12);
+    }
+
+    .qr-card, .info-card {
+      border-radius: 26px;
+      border: 1px solid var(--line);
+      background: var(--paper);
+      padding: 28px;
+    }
+
+    .qr-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      background:
+        radial-gradient(circle at top, rgba(15, 118, 110, 0.09), transparent 42%),
+        var(--paper);
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.72);
+      border: 1px solid rgba(15, 118, 110, 0.14);
+    }
+
+    .brand img {
+      width: 40px;
+      height: 40px;
+      border-radius: 14px;
+    }
+
+    #qr-image {
+      width: min(100%, 320px);
+      aspect-ratio: 1;
+      border-radius: 24px;
+      background: white;
+      border: 1px solid rgba(16, 42, 42, 0.08);
+      padding: 16px;
+      object-fit: contain;
+    }
+
+    .kicker {
+      margin: 0 0 12px;
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--brand);
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(2rem, 4vw, 3.4rem);
+      line-height: 0.96;
+      letter-spacing: -0.05em;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    .info-card {
+      display: grid;
+      align-content: start;
+      gap: 18px;
+    }
+
+    .link-box {
+      padding: 16px 18px;
+      border-radius: 18px;
+      background: #f4faf8;
+      border: 1px solid rgba(15, 118, 110, 0.12);
+      word-break: break-all;
+      font-weight: 600;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    button, a {
+      appearance: none;
+      border: 0;
+      border-radius: 16px;
+      padding: 14px 18px;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+      text-decoration: none;
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .primary {
+      color: white;
+      background: linear-gradient(135deg, var(--brand) 0%, var(--brand-deep) 100%);
+      box-shadow: 0 14px 28px rgba(15, 118, 110, 0.2);
+    }
+
+    .secondary {
+      color: var(--brand-deep);
+      background: #eef7f6;
+    }
+
+    button:hover, a:hover { transform: translateY(-1px); }
+
+    .note {
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: #fff7ed;
+      color: #9a3412;
+      border: 1px solid rgba(154, 52, 18, 0.12);
+      display: none;
+    }
+
+    .note.show { display: block; }
+
+    .mini-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .mini-card {
+      padding: 14px 16px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.9);
+    }
+
+    .mini-card strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 0.94rem;
+    }
+
+    .mini-card span {
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.55;
+    }
+
+    @media print {
+      body {
+        background: white;
+        padding: 0;
+      }
+
+      .poster {
+        box-shadow: none;
+        border: 0;
+        width: 100%;
+      }
+    }
+
+    @media (max-width: 860px) {
+      .poster {
+        grid-template-columns: 1fr;
+      }
+
+      .mini-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="poster">
+    <section class="qr-card">
+      <div class="brand">
+        <img src="/logo.png" alt="RxAI logo">
+        <div>
+          <div style="font-size:0.75rem;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:var(--brand);">RxAI</div>
+          <div style="font-weight:700;">Waitlist QR</div>
+        </div>
+      </div>
+      <img id="qr-image" src="/api/waitlist/qr" alt="QR code for the RxAI waitlist form">
+      <p style="margin-top:16px;max-width:28ch;">Let people scan this code to open the waitlist form directly on their phone.</p>
+    </section>
+
+    <section class="info-card">
+      <div>
+        <p class="kicker">Shareable poster</p>
+        <h1>Print it, pin it, or send it.</h1>
+        <p>The QR points to your waitlist form so you can collect names, emails, phone numbers, and short notes without manual paper intake.</p>
+      </div>
+
+      <div class="link-box" id="waitlist-url">Loading waitlist link...</div>
+
+      <div class="actions">
+        <a id="open-link" class="primary" href="/waitlist" target="_blank" rel="noreferrer">Open waitlist form</a>
+        <a id="download-link" class="secondary" href="/api/waitlist/qr" download="rxai-waitlist-qr.png">Download QR</a>
+        <button type="button" class="secondary" id="copy-btn">Copy waitlist link</button>
+        <button type="button" class="secondary" onclick="window.print()">Print poster</button>
+      </div>
+
+      <div id="qr-note" class="note" role="status" aria-live="polite"></div>
+
+      <div class="mini-grid">
+        <div class="mini-card">
+          <strong>Public intake</strong>
+          <span>Scanned users land on a simple standalone waitlist page with no login required.</span>
+        </div>
+        <div class="mini-card">
+          <strong>Admin export</strong>
+          <span>Collected entries are available from the protected admin API and CSV export endpoint.</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const waitlistUrlEl = document.getElementById('waitlist-url');
+    const openLink = document.getElementById('open-link');
+    const copyBtn = document.getElementById('copy-btn');
+    const downloadLink = document.getElementById('download-link');
+    const qrImage = document.getElementById('qr-image');
+    const note = document.getElementById('qr-note');
+
+    function setNote(message) {
+      note.textContent = message;
+      note.classList.add('show');
+    }
+
+    function getFallbackWaitlistUrl() {
+      return `${window.location.origin}/waitlist`;
+    }
+
+    async function loadPublicInfo() {
+      try {
+        const response = await fetch('/api/waitlist/public');
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || 'Unable to load the waitlist link.');
+        }
+        waitlistUrlEl.textContent = data.waitlist_url;
+        openLink.href = data.waitlist_url;
+      } catch (error) {
+        const fallbackUrl = getFallbackWaitlistUrl();
+        waitlistUrlEl.textContent = fallbackUrl;
+        openLink.href = fallbackUrl;
+        setNote('The page fell back to the local waitlist URL.');
+      }
+    }
+
+    copyBtn.addEventListener('click', async () => {
+      const text = waitlistUrlEl.textContent.trim();
+      try {
+        await navigator.clipboard.writeText(text);
+        copyBtn.textContent = 'Copied';
+        setTimeout(() => { copyBtn.textContent = 'Copy waitlist link'; }, 1400);
+      } catch (error) {
+        setNote('Copy failed on this browser. You can still copy the link from the box above.');
+      }
+    });
+
+    qrImage.addEventListener('error', () => {
+      setNote('The QR image could not be generated here. Install the qrcode dependency and refresh, or share the waitlist link directly.');
+      downloadLink.style.display = 'none';
+    });
+
+    loadPublicInfo();
+  </script>
+</body>
+</html>
