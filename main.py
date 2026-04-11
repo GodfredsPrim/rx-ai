@@ -22,6 +22,7 @@ import auth
 from auth import get_current_user, get_optional_user, get_current_pharmacist, get_current_admin
 import models
 import schemas
+import chat_engine
 from database import SessionLocal, engine, get_db
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -1421,143 +1422,17 @@ def get_profile_reports(current_user: models.User = Depends(auth.get_current_use
 @app.post("/api/chat", response_model=schemas.ChatResponse)
 def chat(request: schemas.ChatRequest, current_user: models.User = Depends(get_optional_user), db: Session = Depends(get_db)):
     # If user is not logged in, they can still use chat (guest mode)
-    # If logged in, current_user will be the authenticated user
-    
-    # Store the user_id for prescription history (if logged in)
     user_id = current_user.id if current_user else None
-    
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
 
-    # Detect Twi using exact dataset mapping and translate to English for model prompt context
-    input_language = "en"
-    for m in messages:
-        if m["role"] == "user" and _translate_twi_to_english(m["content"]):
-            input_language = "twi"
-            break
+    result = chat_engine.process_chat(messages=messages, db=db, user_id=user_id)
 
-    translated_messages = []
-    for m in messages:
-        if m["role"] == "user" and input_language == "twi":
-            translated = _translate_twi_to_english(m["content"])
-            translated_messages.append({"role": "user", "content": translated or m["content"]})
-        else:
-            translated_messages.append(m)
-
-    relevant_pdf_context = _get_relevant_pdf_context(translated_messages)
-
-    prompt_parts = [SYSTEM_PROMPT]
-    if relevant_pdf_context:
-        prompt_parts.append(
-            "Use the following PDF guideline excerpts when they are relevant to the user question. "
-            "Prefer these excerpts over guessing.\n\n"
-            f"{relevant_pdf_context}"
-        )
-
-    # Add explicit language instruction for the model if input is Twi
-    if input_language == "twi":
-        prompt_parts.append("Answer in Twi in a caring, clear way. If you need to translate medical terms, keep them understandable for non-English speakers. Still follow the conversation rules and use [CONSULT_READY] when ready.")
-
-    try:
-        response = openai_client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[{"role": "system", "content": "\n\n".join(prompt_parts)}] + translated_messages,
-            max_tokens=1000,
-        )
-        reply = response.choices[0].message.content
-
-        # If input was Twi, translate the reply back to Twi for fluency
-        if input_language == "twi":
-            translation_response = openai_client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=[
-                    {"role": "system", "content": "Translate the following English medical advice to fluent Twi. Keep it natural, caring, and concise. Use simple terms for medical concepts. If the text contains [CONSULT_READY], keep that marker exactly as is."},
-                    {"role": "user", "content": reply}
-                ],
-                max_tokens=1000,
-            )
-            reply = translation_response.choices[0].message.content
-
-        # Check if the AI or local rules are ready to hand off to a pharmacist
-        marker_handoff = "[CONSULT_READY]" in reply
-        local_handoff = _should_auto_handoff_to_pharmacist(translated_messages, reply)
-        is_consulting = marker_handoff or local_handoff
-        matched_drugs = []
-
-        if is_consulting:
-            reply = reply.replace("[CONSULT_READY]", "").strip()
-            if not marker_handoff:
-                reply = _build_fallback_consult_summary(
-                    translated_messages=translated_messages,
-                    input_language=input_language,
-                )
-
-            all_user_text = " ".join(
-                m["content"] for m in translated_messages if m["role"] == "user"
-            )
-            search_text = all_user_text + " " + reply
-            matched_drugs = _search_medicine_dataset(search_text, limit=4)
-            final_matches = _search_final_dataset(search_text, limit=4)
-
-            _create_case_record(
-                db=db,
-                user_id=user_id,
-                translated_messages=translated_messages,
-                ai_summary=reply,
-                matched_drugs=matched_drugs,
-                final_matches=final_matches,
-                relevant_pdf_context=relevant_pdf_context,
-                actor_note="Case created from model-driven triage handoff.",
-            )
-            reply = (
-                f"{reply}\n\n"
-                "I have prepared your case summary and sent it for licensed pharmacist review. "
-                "The pharmacist will assess the information and decide the appropriate treatment."
-            )
-
-        return {
-            "reply": reply,
-            "drugs": None,
-            "consulting": is_consulting,
-            "error": None,
-        }
-    except Exception as e:
-        should_handoff = _should_auto_handoff_to_pharmacist(translated_messages)
-        if should_handoff:
-            fallback_reply = _build_fallback_consult_summary(
-                translated_messages=translated_messages,
-                input_language=input_language,
-            )
-            search_text = " ".join(
-                m["content"] for m in translated_messages if m["role"] == "user"
-            ) + " " + fallback_reply
-            matched_drugs = _search_medicine_dataset(search_text, limit=4)
-            final_matches = _search_final_dataset(search_text, limit=4)
-            _create_case_record(
-                db=db,
-                user_id=user_id,
-                translated_messages=translated_messages,
-                ai_summary=fallback_reply,
-                matched_drugs=matched_drugs,
-                final_matches=final_matches,
-                relevant_pdf_context=relevant_pdf_context,
-                actor_note="Case created from fallback triage handoff.",
-            )
-            fallback_reply = (
-                f"{fallback_reply}\n\n"
-                "Your case has been submitted for licensed pharmacist review."
-            )
-        else:
-            fallback_reply = _build_local_chat_fallback(
-                translated_messages=translated_messages,
-                input_language=input_language,
-                relevant_pdf_context=relevant_pdf_context,
-            )
-        return {
-            "reply": fallback_reply,
-            "drugs": None,
-            "consulting": should_handoff,
-            "error": str(e),
-        }
+    return {
+        "reply": result["reply"],
+        "drugs": result["drugs"],
+        "consulting": result["consulting"],
+        "error": result["error"],
+    }
 
 
 @app.get("/api/cases/public")
@@ -2472,6 +2347,11 @@ def pharmacist_portal():
 @app.get("/admin", include_in_schema=False)
 def admin_portal():
     return FileResponse(STATIC_DIR / "admin.html")
+
+
+# -- WhatsApp webhook --
+from whatsapp_bot import router as wa_router
+app.include_router(wa_router)
 
 
 if STATIC_DIR.exists():
