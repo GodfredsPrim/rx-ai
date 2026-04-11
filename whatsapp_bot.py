@@ -250,6 +250,11 @@ async def handle_webhook(request: Request):
     simplicity (acceptable for moderate traffic).
     """
     body = await request.body()
+    data = await request.json()
+    print("====================================", flush=True)
+    print(f"[[WEBHOOK RECEIVED]]: {data}", flush=True)
+    print("====================================", flush=True)
+
     signature = request.headers.get("X-Hub-Signature-256", "")
     if not _verify_signature(body, signature):
         raise HTTPException(status_code=403, detail="Invalid signature")
