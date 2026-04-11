@@ -1,4 +1,14 @@
-﻿node_modules/
+node_modules/
 .env
 data.sqlite
 data.sqlite-*
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+env2/
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.log
