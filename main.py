@@ -24,6 +24,7 @@ from auth import get_current_user, get_optional_user, get_current_pharmacist, ge
 import models
 import schemas
 import chat_engine
+import whatsapp_bot
 from database import SessionLocal, engine, get_db
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -51,6 +52,7 @@ models.Base.metadata.create_all(bind=engine)
 _ensure_legacy_schema_updates()
 
 app = FastAPI(title="RxAI Ghana API")
+app.include_router(whatsapp_bot.router)
 
 app.add_middleware(
     SessionMiddleware,
