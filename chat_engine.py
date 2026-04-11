@@ -894,3 +894,70 @@ def process_chat(
             "error": str(e),
             "case_id": case_id,
         }
+
+
+# ── streaming helper ─────────────────────────────────────────────────
+def build_system_messages(messages: list[dict]) -> list[dict]:
+    """Build the full messages list (system prompt + history) for streaming endpoints."""
+    input_language = "en"
+    for m in messages:
+        if m["role"] == "user" and translate_twi_to_english(m["content"]):
+            input_language = "twi"
+            break
+
+    translated: list[dict] = []
+    for m in messages:
+        if m["role"] == "user" and input_language == "twi":
+            t = translate_twi_to_english(m["content"])
+            translated.append({"role": "user", "content": t or m["content"]})
+        else:
+            translated.append(m)
+
+    relevant_pdf_context = get_relevant_pdf_context(translated)
+    prompt_parts = [SYSTEM_PROMPT]
+    if relevant_pdf_context:
+        prompt_parts.append(
+            "Use the following PDF guideline excerpts when relevant:\n\n" + relevant_pdf_context
+        )
+    if input_language == "twi":
+        prompt_parts.append(
+            "Answer in Twi. Keep it natural and understandable. Use [CONSULT_READY] when ready."
+        )
+
+    system_content = "\n\n".join(prompt_parts)
+    return [{"role": "system", "content": system_content}] + translated
+
+
+# ── Abena AI translation ─────────────────────────────────────────────
+import httpx as _httpx
+
+ABENA_API_KEY = os.getenv("ABENA_API_KEY", "")
+ABENA_TRANSLATE_URL = "https://abena.mobobi.com/playground/api/v1/translate/translate/"
+
+ABENA_LANG_CODES = {
+    "tw": "twi_Latn",
+    "ha": "hau_Latn",
+    "fr": "fra_Latn",
+    "en": "eng_Latn",
+}
+
+
+def translate_with_abena(text: str, source_lang: str, target_lang: str) -> str | None:
+    """Translate text using Abena AI REST API. Returns None on failure or missing key."""
+    if not ABENA_API_KEY or not text.strip():
+        return None
+    src = ABENA_LANG_CODES.get(source_lang, source_lang)
+    tgt = ABENA_LANG_CODES.get(target_lang, target_lang)
+    try:
+        resp = _httpx.post(
+            ABENA_TRANSLATE_URL,
+            json={"text": text, "source_lang": src, "target_lang": tgt},
+            headers={"Authorization": f"Bearer {ABENA_API_KEY}", "Content-Type": "application/json"},
+            timeout=10.0,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            return data.get("translation") or data.get("translated_text") or None
+    except Exception:
+        pass
+    return None

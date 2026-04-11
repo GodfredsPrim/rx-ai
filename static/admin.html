@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=20260409-4">
+  <link rel="stylesheet" href="css/styles.css?v=20260411-3">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body data-portal="admin" class="portal-locked">
@@ -77,9 +77,7 @@
     <!-- Login Form -->
     <form id="form-login" onsubmit="event.preventDefault(); doLogin();">
       <div class="auth-role-switch" role="radiogroup" aria-label="Select sign in role">
-        <button type="button" class="auth-role-btn on" id="login-role-user" data-role="user" onclick="setLoginMode('user', this)">Patient</button>
-        <button type="button" class="auth-role-btn" id="login-role-pharmacist" data-role="pharmacist" onclick="setLoginMode('pharmacist', this)">Pharmacist</button>
-        <button type="button" class="auth-role-btn" id="login-role-admin" data-role="admin" onclick="setLoginMode('admin', this)">Admin</button>
+        <button type="button" class="auth-role-btn on" id="login-role-admin" data-role="admin" onclick="setLoginMode('admin', this)">Admin Sign In</button>
       </div>
       <p class="auth-mode-help" id="login-mode-help">Patients and admins can sign in with username or email.</p>
       <div class="form-group">
@@ -645,7 +643,8 @@
         
         <!-- Pharmacist Tabs -->
         <div class="profile-tabs" role="tablist" style="margin-bottom:16px;">
-          <button class="profile-tab ntab on" role="tab" onclick="showPharmaTab('assigned',this)">Assigned Cases</button>
+          <button class="profile-tab ntab on" role="tab" onclick="showPharmaTab('assigned',this)">My Cases</button>
+          <button class="profile-tab ntab" role="tab" onclick="showPharmaTab('pending',this)">New Queue</button>
           <button class="profile-tab ntab" role="tab" onclick="showPharmaTab('completed',this)">Completed</button>
         </div>
         
@@ -656,6 +655,15 @@
           <div class="stat-card"><span class="stat-label">Verification</span><span class="stat-value" id="ph-stat-verified">No</span></div>
         </div>
         
+        <!-- Pending Queue - New Cases -->
+        <div id="pharma-tab-pending" style="display:none;">
+          <div class="pharmacist-queue-wrapper">
+            <div id="pharmacist-pending-queue" class="pharmacist-queue">
+              <div class="empty">No pending cases in queue.</div>
+            </div>
+          </div>
+        </div>
+
         <!-- Assigned Cases -->
         <div id="pharma-tab-assigned">
           <div class="pharmacist-queue-wrapper">
@@ -709,6 +717,10 @@
             <div class="stat-card"><span class="stat-label">In Review</span><span class="stat-value" id="admin-inreview-cases">0</span></div>
             <div class="stat-card"><span class="stat-label">Completed</span><span class="stat-value" id="admin-completed-cases">0</span></div>
             <div class="stat-card"><span class="stat-label">Verified Pharmacists</span><span class="stat-value" id="admin-verified-pharmacists">0</span></div>
+          </div>
+          <!-- AI Insights Card -->
+          <div id="admin-insights-card" style="margin-bottom:16px;">
+            <div class="empty">Loading AI insights...</div>
           </div>
         </div>
         
@@ -771,7 +783,7 @@
 </div><!-- /main-app -->
 
 <script>window.BISARX_PORTAL = "admin";</script>
-<script src="js/app.js?v=20260410-1"></script>
+<script src="js/app.js?v=20260411-5"></script>
 </body>
 </html>
 

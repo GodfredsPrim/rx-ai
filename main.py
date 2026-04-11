@@ -8,7 +8,8 @@ import os
 from dotenv import load_dotenv
 import pypdf
 from authlib.integrations.starlette_client import OAuth
-from fastapi import FastAPI, Depends, HTTPException, Request, status
+import json
+from fastapi import FastAPI, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordRequestForm
@@ -100,6 +101,32 @@ oauth.register(
     server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
     client_kwargs={"scope": "openid email profile"},
 )
+
+
+# ─── WebSocket Connection Manager ─────────────────────────────────────────────
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: dict[int, list[WebSocket]] = {}  # user_id -> sockets
+
+    async def connect(self, websocket: WebSocket, user_id: int):
+        await websocket.accept()
+        self.active_connections.setdefault(user_id, []).append(websocket)
+
+    def disconnect(self, websocket: WebSocket, user_id: int):
+        conns = self.active_connections.get(user_id, [])
+        if websocket in conns:
+            conns.remove(websocket)
+
+    async def notify_user(self, user_id: int, data: dict):
+        for ws in list(self.active_connections.get(user_id, [])):
+            try:
+                await ws.send_text(json.dumps(data))
+            except Exception:
+                pass
+
+
+ws_manager = ConnectionManager()
+# ──────────────────────────────────────────────────────────────────────────────
 
 
 def _get_public_base_url(request: Request | None = None) -> str:
@@ -1384,6 +1411,7 @@ def get_session(request: Request, db: Session = Depends(get_db)):
         return {
             "role": "pharmacist",
             "display_name": pharmacist.full_name or pharmacist.username or pharmacist.email,
+            "pharmacist_id": pharmacist.id,
         }
 
     user = db.query(models.User).filter(models.User.email == email).first()
@@ -1397,7 +1425,7 @@ def get_session(request: Request, db: Session = Depends(get_db)):
         if full_name:
             display_name = full_name
 
-    return {"role": resolved_role, "display_name": display_name}
+    return {"role": resolved_role, "display_name": display_name, "user_id": user.id}
 
 
 @app.get("/api/profile")
@@ -1433,6 +1461,104 @@ def chat(request: schemas.ChatRequest, current_user: models.User = Depends(get_o
         "consulting": result["consulting"],
         "error": result["error"],
     }
+
+
+@app.post("/api/chat/stream")
+async def chat_stream(
+    request: schemas.ChatRequest,
+    current_user: models.User = Depends(get_optional_user),
+    db: Session = Depends(get_db),
+):
+    """Streaming SSE chat endpoint – delivers AI tokens progressively, then creates a case if needed."""
+    from fastapi.responses import StreamingResponse as _SR
+    user_id = current_user.id if current_user else None
+    messages = [{"role": m.role, "content": m.content} for m in request.messages]
+
+    async def event_generator():
+        try:
+            stream = openai_client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=chat_engine.build_system_messages(messages),
+                stream=True,
+                max_tokens=900,
+                temperature=0.4,
+            )
+            full_reply = ""
+            for chunk in stream:
+                delta = chunk.choices[0].delta.content if chunk.choices else None
+                if delta:
+                    full_reply += delta
+                    yield f"data: {json.dumps({'token': delta})}\n\n"
+
+            # --- Post-stream: detect handoff and create case ---
+            is_consulting = "[CONSULT_READY]" in full_reply
+            if not is_consulting:
+                is_consulting = chat_engine.should_auto_handoff_to_pharmacist(
+                    [{"role": m.role, "content": m.content} for m in request.messages],
+                    full_reply
+                )
+
+            case_id = None
+            if is_consulting:
+                # Strip the marker from the reply sent to patient
+                clean_reply = full_reply.replace("[CONSULT_READY]", "").strip()
+                if not clean_reply:
+                    clean_reply = chat_engine.build_fallback_consult_summary(
+                        [{"role": m.role, "content": m.content} for m in request.messages],
+                        "en",
+                    )
+                # Build search context for drug matching
+                all_user_text = " ".join(
+                    m.content for m in request.messages if m.role == "user"
+                ) + " " + clean_reply
+                matched_drugs = chat_engine.search_medicine_dataset(all_user_text, limit=4)
+                final_matches = chat_engine.search_final_dataset(all_user_text, limit=4)
+                relevant_pdf = chat_engine.get_relevant_pdf_context(
+                    [{"role": m.role, "content": m.content} for m in request.messages]
+                )
+                case = chat_engine.create_case_record(
+                    db=db,
+                    user_id=user_id,
+                    translated_messages=[{"role": m.role, "content": m.content} for m in request.messages],
+                    ai_summary=clean_reply,
+                    matched_drugs=matched_drugs,
+                    final_matches=final_matches,
+                    relevant_pdf_context=relevant_pdf,
+                    actor_note="Case created from streaming triage handoff.",
+                )
+                case_id = case.id
+                full_reply = clean_reply + (
+                    "\n\nI have prepared your case summary and sent it to a licensed pharmacist for review. "
+                    "The pharmacist will assess and decide the right treatment."
+                )
+                # Notify patient if logged in
+                if user_id:
+                    try:
+                        await ws_manager.notify_user(user_id, {
+                            "type": "case_created",
+                            "case_id": case_id,
+                            "message": "Your case has been sent to a pharmacist.",
+                        })
+                    except Exception:
+                        pass
+
+            yield f"data: {json.dumps({'done': True, 'full': full_reply, 'consulting': is_consulting, 'case_id': case_id})}\n\n"
+
+        except Exception as exc:
+            yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+
+    return _SR(event_generator(), media_type="text/event-stream")
+
+
+@app.websocket("/ws/patient/{user_id}")
+async def patient_websocket(websocket: WebSocket, user_id: int):
+    """WebSocket endpoint for real-time patient notifications."""
+    await ws_manager.connect(websocket, user_id)
+    try:
+        while True:
+            await websocket.receive_text()  # keep alive
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket, user_id)
 
 
 @app.get("/api/cases/public")
@@ -1604,7 +1730,77 @@ def pharmacist_review_case(
     )
     db.commit()
     db.refresh(case)
-    return {"status": "success", "case": _serialize_case(case)}
+    serialized = _serialize_case(case)
+    # Notify patient via WebSocket (non-blocking background task)
+    if case.user_id:
+        import asyncio
+        notification = {
+            "type": "case_updated",
+            "case_id": case.id,
+            "drug_name": case.drug_name,
+            "pharmacist_feedback": case.pharmacist_feedback,
+            "referral_advice": case.referral_advice,
+            "follow_up_instructions": case.follow_up_instructions,
+            "status": case.status,
+        }
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.ensure_future(ws_manager.notify_user(case.user_id, notification))
+            else:
+                asyncio.run(ws_manager.notify_user(case.user_id, notification))
+        except Exception:
+            pass
+    return {"status": "success", "case": serialized}
+
+
+@app.post("/api/cases/{case_id}/ai-suggest")
+def case_ai_suggest(
+    case_id: int,
+    current_pharmacist: models.Pharmacist = Depends(get_current_pharmacist),
+    db: Session = Depends(get_db),
+):
+    """AI suggestion to help pharmacist fill in review form fields."""
+    case = db.query(models.PrescriptionHistory).filter(models.PrescriptionHistory.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    context = (
+        f"Case summary: {case.case_summary or 'Not provided'}\n"
+        f"Patient message: {case.patient_message or 'Not provided'}\n"
+        f"AI intake summary: {case.ai_summary or 'Not provided'}\n"
+        f"Symptom area: {case.symptom_area or 'General'}\n"
+        f"Urgency: {case.urgency_level or 'routine'}\n"
+    )
+
+    prompt = (
+        "You are a clinical pharmacist AI assistant. Based on the case context below, "
+        "suggest the most appropriate pharmacist response. Output ONLY valid JSON with these keys: "
+        "drug_name, pharmacist_feedback (2-3 sentences for patient), referral_advice (or empty string), "
+        "follow_up_instructions (or empty string), dosage.\n\nCase:\n" + context
+    )
+
+    try:
+        response = openai_client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=400,
+            temperature=0.3,
+        )
+        raw = response.choices[0].message.content.strip()
+        # Strip markdown code fences if present
+        raw = re.sub(r"^```[a-z]*\n?", "", raw).rstrip("`").strip()
+        suggestion = json.loads(raw)
+    except Exception as exc:
+        suggestion = {
+            "drug_name": _get_default_ai_medication(case) or "",
+            "pharmacist_feedback": "Please review the case carefully and provide appropriate clinical advice.",
+            "referral_advice": "",
+            "follow_up_instructions": "Monitor and return if symptoms worsen.",
+            "dosage": "As directed",
+        }
+
+    return {"suggestion": suggestion}
 
 
 @app.get("/api/admin/dashboard")
@@ -1613,21 +1809,25 @@ def admin_dashboard(
     db: Session = Depends(get_db),
 ):
     pharmacists = db.query(models.Pharmacist).order_by(models.Pharmacist.full_name.asc(), models.Pharmacist.username.asc()).all()
-    cases = db.query(models.PrescriptionHistory).order_by(models.PrescriptionHistory.created_at.desc()).limit(50).all()
-    users = db.query(models.User).order_by(models.User.id.desc()).limit(20).all()
-    
-    # Calculate detailed stats
-    total_cases = db.query(models.PrescriptionHistory).count()
-    pending_cases = db.query(models.PrescriptionHistory).filter(models.PrescriptionHistory.status == "Pending").count()
-    in_review_cases = db.query(models.PrescriptionHistory).filter(models.PrescriptionHistory.status == "In Review").count()
-    reviewed_cases = db.query(models.PrescriptionHistory).filter(models.PrescriptionHistory.status.in_(["Reviewed", "Ordered", "Delivered"])).count()
-    
-    # Users with profiles
+    all_cases_raw = db.query(models.PrescriptionHistory).all()
+    urgency_rank = {"urgent": 0, "priority": 1, "routine": 2}
+    status_rank = {"Pending": 0, "In Review": 1, "Reviewed": 2, "Ordered": 3, "Delivered": 4, "Completed": 5}
+    cases = sorted(all_cases_raw, key=lambda c: (
+        urgency_rank.get(c.urgency_level or "routine", 2),
+        status_rank.get(c.status or "Pending", 0),
+        -(c.created_at.timestamp() if c.created_at else 0)
+    ))
+    all_users = db.query(models.User).order_by(models.User.id.desc()).all()
+
+    total_cases = len(all_cases_raw)
+    pending_cases = sum(1 for c in all_cases_raw if c.status == "Pending")
+    in_review_cases = sum(1 for c in all_cases_raw if c.status == "In Review")
+    reviewed_cases = sum(1 for c in all_cases_raw if c.status in {"Reviewed", "Ordered", "Delivered"})
     users_with_profiles = db.query(models.User).join(models.Profile).count()
-    
+
     return {
         "stats": {
-            "total_users": db.query(models.User).count(),
+            "total_users": len(all_users),
             "total_pharmacists": len(pharmacists),
             "pending_cases": pending_cases,
             "in_review_cases": in_review_cases,
@@ -1639,8 +1839,55 @@ def admin_dashboard(
         },
         "pharmacists": [_serialize_pharmacist(pharmacist) for pharmacist in pharmacists],
         "cases": [_serialize_case(case) for case in cases],
-        "recent_users": [_serialize_user(u) for u in users],
+        "recent_users": [_serialize_user(u) for u in all_users[:20]],
+        "all_users": [_serialize_user(u) for u in all_users],
     }
+
+
+@app.get("/api/admin/insights")
+def admin_insights(
+    current_admin: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """AI-generated system insights for admin overview."""
+    all_cases = db.query(models.PrescriptionHistory).all()
+    total_cases = len(all_cases)
+    pending = sum(1 for c in all_cases if c.status == "Pending")
+    urgent = sum(1 for c in all_cases if (c.urgency_level or "") == "urgent")
+    reviewed = sum(1 for c in all_cases if c.status in {"Reviewed", "Ordered", "Delivered"})
+    total_users = db.query(models.User).count()
+    pharmacists = db.query(models.Pharmacist).filter(models.Pharmacist.is_verified == True).count()
+    resolution_rate = round((reviewed / total_cases * 100) if total_cases else 0, 1)
+
+    prompt = (
+        f"You are a clinical operations AI advisor for BisaRx, a Ghanaian community pharmacy platform. "
+        f"Current stats: {total_cases} total cases, {pending} pending, {urgent} urgent, {reviewed} reviewed, "
+        f"{total_users} patients, {pharmacists} active pharmacists, {resolution_rate}% resolution rate. "
+        f"In 3 concise bullet points, give the admin specific, actionable recommendations to improve system performance."
+    )
+    try:
+        response = openai_client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=300,
+            temperature=0.5,
+        )
+        insights_text = response.choices[0].message.content.strip()
+    except Exception:
+        insights_text = (
+            f"\u2022 {pending} cases pending. Assign pharmacists promptly.\n"
+            f"\u2022 Resolution rate is {resolution_rate}%. Target 90%+ for optimal care.\n"
+            f"\u2022 {urgent} urgent cases need immediate attention."
+        )
+    return {
+        "stats": {
+            "total_cases": total_cases, "pending": pending, "urgent": urgent,
+            "reviewed": reviewed, "resolution_rate": resolution_rate,
+            "total_users": total_users, "active_pharmacists": pharmacists,
+        },
+        "insights": insights_text,
+    }
+
 
 
 def _serialize_user(user: models.User) -> dict:

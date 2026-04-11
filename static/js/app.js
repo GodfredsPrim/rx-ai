@@ -1,5 +1,7 @@
 const API_URL = '/api';
 const PORTAL_MODE = window.BISARX_PORTAL || document.body?.dataset?.portal || 'patient';
+let _chatGreetingShown = false; // guard against duplicate welcome messages
+let _patientWs = null;          // WebSocket for real-time notifications
 
 function isPortalMode(mode) {
   return PORTAL_MODE === mode;
@@ -196,9 +198,9 @@ function handleConditionSelection(condition) {
 
 // Fallback data when API is unavailable
 window.FALLBACK_CONDITIONS = [
-  {name:'Malaria / Fever',drug:'Artemether + Lumefantrine',tags:[{t:'CoartemÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â®',c:'g'},{t:'6 doses/3 days',c:'b'},{t:'With food',c:'a'}],q:'Tell me about malaria symptoms and Coartem treatment.'},
+  {name:'Malaria / Fever',drug:'Artemether + Lumefantrine',tags:[{t:'Coartem®',c:'g'},{t:'6 doses/3 days',c:'b'},{t:'With food',c:'a'}],q:'Tell me about malaria symptoms and Coartem treatment.'},
   {name:'Headache',drug:'Paracetamol / Ibuprofen',tags:[{t:'Tension',c:'b'},{t:'Migraine',c:'b'},{t:'Refer if severe',c:'r'}],q:'Headache assessment and first-line treatment?'},
-  {name:'Diarrhea',drug:'ORS + Zinc 10ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ20mg',tags:[{t:'Rehydration',c:'g'},{t:'Zinc',c:'b'},{t:'Metronidazole if amoebic',c:'a'}],q:'Diarrhea management advice.'},
+  {name:'Diarrhea',drug:'ORS + Zinc 10–20mg',tags:[{t:'Rehydration',c:'g'},{t:'Zinc',c:'b'},{t:'Metronidazole if amoebic',c:'a'}],q:'Diarrhea management advice.'},
   {name:'Cough / URTI',drug:'Steam / Guaifenesin',tags:[{t:'Fluids',c:'g'},{t:'Antibiotic if bacterial',c:'a'},{t:'Refer if SOB',c:'r'}],q:'Cough and cold management?'},
   {name:'Abdominal Pain',drug:'Antacid / Omeprazole',tags:[{t:'Gastritis',c:'b'},{t:'NSAID for cramps',c:'g'},{t:'Refer if severe',c:'r'}],q:'Abdominal pain assessment?'},
   {name:'Skin Rash',drug:'Hydrocortisone / Clotrimazole',tags:[{t:'Allergic',c:'a'},{t:'Fungal',c:'b'},{t:'Antihistamine',c:'g'}],q:'Skin rash first-line treatment?'},
@@ -212,7 +214,7 @@ window.FALLBACK_REDFLAGS = [
   {condition:'Malaria / Severe Fever',flags:['Cannot keep oral medication down','Confusion, convulsions, or severe weakness','Yellowing of eyes or dark urine','Fever lasting more than 3 days despite treatment','Pregnant or infant under 6 months']},
   {condition:'Head / Neurological',flags:['Sudden severe thunderclap headache','Neck stiffness with fever','Vision changes or slurred speech','Headache after head injury']},
   {condition:'Breathing / Chest',flags:['Difficulty breathing at rest','Coughing blood','Rapid breathing in children','Productive cough with fever over 3 days']},
-  {condition:'Stomach / Abdomen',flags:['Severe dehydration ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â sunken eyes, no urine','Blood or mucus in stool','Rigid board-like abdomen','Multiple household members ill']},
+  {condition:'Stomach / Abdomen',flags:['Severe dehydration ÃƒÆ’¢Ãƒ¢ââ‚¬Å¡¬Ãƒ¢ââ€š¬ sunken eyes, no urine','Blood or mucus in stool','Rigid board-like abdomen','Multiple household members ill']},
   {condition:'General Danger Signs',flags:['Altered consciousness or unconsciousness','Uncontrolled bleeding','Pregnancy with acute serious illness','Patient cannot stand or self-care']}
 ];
 
@@ -263,24 +265,24 @@ const LANGS = {
     discLabel:"Note:"
   },
   tw:{
-    greeting:"Wo yareÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº bÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âºn na ÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂºwÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â wo? Ka kyerÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº me sÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂºdeÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº wo te wo ho ne bere a ÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âºdii so.",
-    chips:["Me ti yÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº me yaw","Me yafunu yÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº me yaw","MewÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â atiridiinini","MewÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ekoÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â","Me ba yareÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº","Honam yareÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº"],
-    placeholder:"Ka me nkyÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âºn sÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂºdeÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº wo te wo ho...",
-    disc:"WÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â atwerÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº wÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â standard health guidelines so. ÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Ânsesa oduruyÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âºfo anaasÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº ÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂdÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âkotaa.",
-    discLabel:"NkÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂmmÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âdie:"
+    greeting:"Wo yareɛ bɛn na ɛwɛ wo? Ka kyerɛ me sɛdeɛ wo te wo ho ne bere a ɛdii so.",
+    chips:["Me ti yɛ me yaw","Me yafunu yɛ me yaw","Mewɛ atiridiinini","Mewɛ ekoɛ","Me ba yareɛ","Honam yareɛ"],
+    placeholder:"Ka me nkyɛn sɛdeɛ wo te wo ho...",
+    disc:"Wɛ atwerɛ wɛ standard health guidelines so. ɛnsesa oduruyɛfo anaasɛ ɛdɛkotaa.",
+    discLabel:"Nkɛmmɛdie:"
   },
   ha:{
     greeting:"Mene ne alamu ku? Bayyana yadda kuke ji da tsawon lokaci.",
-    chips:["Ina da ciwon kai","Ciki na yi mini ciwo","Ina da zazzabi","Ina da tari","ÃƒÆ’Ã¢â‚¬Â Ãƒâ€¦Ã‚Â ana ba shi da lafiya","Ina da kuraje"],
+    chips:["Ina da ciwon kai","Ciki na yi mini ciwo","Ina da zazzabi","Ina da tari","ÃƒÆ’ââ‚¬ Ãƒâ€¦ ana ba shi da lafiya","Ina da kuraje"],
     placeholder:"Bayyana alamun ku...",
-    disc:"Jagora ne kawai. TuntuÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œi likitan magani ko likita.",
-    discLabel:"GargaÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Âi:"
+    disc:"Jagora ne kawai. Tuntuɓi likitan magani ko likita.",
+    discLabel:"GargaÃƒÆ’ââ‚¬°Ãƒ¢ââ€š¬ââ‚¬i:"
   },
   fr:{
-    greeting:"Quels sont vos symptÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´mes? DÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©crivez ce que vous ressentez et depuis combien de temps.",
-    chips:["J'ai mal ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  la tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªte","Douleur abdominale","J'ai de la fiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨vre","Je tousse","Mon enfant est malade","ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°ruption cutanÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e"],
-    placeholder:"DÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©crivez vos symptÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´mes...",
-    disc:"Conseils gÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©nÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©raux seulement. Consultez un pharmacien ou mÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©decin agrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©.",
+    greeting:"Quels sont vos symptômes? Décrivez ce que vous ressentez et depuis combien de temps.",
+    chips:["J'ai mal à la tête","Douleur abdominale","J'ai de la fièvre","Je tousse","Mon enfant est malade","Éruption cutanée"],
+    placeholder:"Décrivez vos symptômes...",
+    disc:"Conseils généraux seulement. Consultez un pharmacien ou médecin agréé.",
     discLabel:"Note:"
   }
 };
@@ -293,14 +295,14 @@ function getSpeechLang() {
 }
 
 const ZONES={
-  head:{title:'Head & Brain',icon:'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â¤ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢',sub:'Headache, dizziness, fever, vision changes',simple:'Head pain or dizziness',q:'I have pain in my head. Please assess.'},
-  throat:{title:'Throat & Neck',icon:'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¹Ã…â€œÃƒâ€šÃ‚Â£',sub:'Sore throat, difficulty swallowing, neck stiffness',simple:'Throat or neck problem',q:'I have throat or neck discomfort. Please assess.'},
-  chest:{title:'Chest & Lungs',icon:'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¹Ã…â€œÃƒâ€šÃ‚Â®ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢Ãƒâ€šÃ‚Â¨',sub:'Cough, shortness of breath, chest pain',simple:'Chest pain or breathing problem',q:'I have chest pain or breathing difficulty. Please assess.'},
-  abdomen:{title:'Stomach',icon:'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â¤Ãƒâ€šÃ‚Â¢',sub:'Stomach pain, nausea, vomiting, diarrhea',simple:'Stomach or belly pain',q:'I have abdominal pain or stomach discomfort. Please assess.'},
-  arm:{title:'Arms & Joints',icon:'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢Ãƒâ€šÃ‚Âª',sub:'Arm pain, joint swelling, muscle aches',simple:'Arm or joint pain',q:'I have pain in my arms or joints. Please assess.'},
-  lower:{title:'Lower Abdomen',icon:'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â»',sub:'Lower cramps, urinary problems, menstrual pain',simple:'Lower belly or urine problem',q:'I have lower abdominal or urinary symptoms. Please assess.'},
-  leg:{title:'Legs',icon:'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â¦Ãƒâ€šÃ‚Âµ',sub:'Leg pain, swelling, muscle weakness',simple:'Leg pain or swelling',q:'I have pain or swelling in my legs. Please assess.'},
-  foot:{title:'Feet & Ankles',icon:'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â¦Ãƒâ€šÃ‚Â¶',sub:'Foot pain, ankle swelling, wounds',simple:'Foot pain or wound',q:'I have pain or wounds in my feet. Please assess.'}
+  head:{title:'Head & Brain',icon:'🤕',sub:'Headache, dizziness, fever, vision changes',simple:'Head pain or dizziness',q:'I have pain in my head. Please assess.'},
+  throat:{title:'Throat & Neck',icon:'🗣',sub:'Sore throat, difficulty swallowing, neck stiffness',simple:'Throat or neck problem',q:'I have throat or neck discomfort. Please assess.'},
+  chest:{title:'Chest & Lungs',icon:'ÃƒÆ’°Ãƒâ€¦¸Ãƒâ€¹Ã…â€œ·®ÃƒÆ’¢Ãƒ¢ââ‚¬Å¡¬·ÃƒÆ’°Ãƒâ€¦¸Ãƒ¢ââ€š¬ââ€ž¢·¨',sub:'Cough, shortness of breath, chest pain',simple:'Chest pain or breathing problem',q:'I have chest pain or breathing difficulty. Please assess.'},
+  abdomen:{title:'Stomach',icon:'🤢',sub:'Stomach pain, nausea, vomiting, diarrhea',simple:'Stomach or belly pain',q:'I have abdominal pain or stomach discomfort. Please assess.'},
+  arm:{title:'Arms & Joints',icon:'🦾',sub:'Arm pain, joint swelling, muscle aches',simple:'Arm or joint pain',q:'I have pain in my arms or joints. Please assess.'},
+  lower:{title:'Lower Abdomen',icon:'🚽',sub:'Lower cramps, urinary problems, menstrual pain',simple:'Lower belly or urine problem',q:'I have lower abdominal or urinary symptoms. Please assess.'},
+  leg:{title:'Legs',icon:'🦵',sub:'Leg pain, swelling, muscle weakness',simple:'Leg pain or swelling',q:'I have pain or swelling in my legs. Please assess.'},
+  foot:{title:'Feet & Ankles',icon:'🦶',sub:'Foot pain, ankle swelling, wounds',simple:'Foot pain or wound',q:'I have pain or wounds in my feet. Please assess.'}
 };
 
 // AUTH helper
@@ -435,11 +437,20 @@ async function doLogin(){
     if(loginMode === 'pharmacist') endpoint = '/auth/pharmacist/login';
     
     const data=await callApi(endpoint,'POST',body);
-    localStorage.setItem('token',data.access_token);
-    currentUser=username;
+    localStorage.setItem('token', data.access_token);
+    currentUser = username;
     closeLoginModal();
     showToast('Welcome back!', 'success');
+    // Fetch fresh session to get user_id before initApp
+    try {
+      const sess = await callApi('/session');
+      currentSession = sess;
+    } catch(_) {}
     initApp();
+    // Connect WebSocket for patient real-time notifications
+    if (currentSession && currentSession.role === 'user') {
+      _connectPatientWebSocket();
+    }
   }catch(e){err.innerHTML=`<div class="err">${e.message}</div>`;}
   finally{btn.disabled=false;setLoginMode(loginMode);}
 }
@@ -637,10 +648,30 @@ async function initApp(){
     const hp=document.getElementById('history-auth-prompt');
     if(hc) hc.style.display='none';
     if(hp) hp.style.display='block';
+    
+    // Resume guest case polling if a pending case exists
+    const guestCaseId = localStorage.getItem('bisarx_case_id');
+    const guestCaseTs = localStorage.getItem('bisarx_case_ts');
+    if (guestCaseId && guestCaseTs) {
+      if (Date.now() - parseInt(guestCaseTs) < 3600000) { // Valid for 1 hour
+        setTimeout(() => _startGuestCasePolling(parseInt(guestCaseId)), 2000);
+      } else {
+        localStorage.removeItem('bisarx_case_id');
+        localStorage.removeItem('bisarx_case_ts');
+      }
+    }
   }
   updatePharmacistUI();
   refreshPharmacistDashboard();
-  addMsg('ai',LANGS[lang].greeting,[{t:'BisaRx',c:'g'},{t:'Clinical AI',c:'b'},{t:'Multilingual',c:'a'}]);
+  // Only show greeting once (guard against duplicates)
+  if (!_chatGreetingShown) {
+    addMsg('ai', LANGS[lang].greeting, [{ t: 'BisaRx', c: 'g' }, { t: 'Clinical AI', c: 'b' }, { t: 'Multilingual', c: 'a' }]);
+    _chatGreetingShown = true;
+  }
+  // Connect WebSocket for real-time patient results
+  if (isLoggedIn() && currentSession.role === 'user') {
+    _connectPatientWebSocket();
+  }
 }
 
 window.onload = async () => {
@@ -648,19 +679,33 @@ window.onload = async () => {
   if(token){
     try{
       const data = await callApi('/profile');
-      // pre-populate profile data
       currentUser = data.username || '';
     }catch(e){
       localStorage.removeItem('token');
     }
+  }
+  // Auto-set login mode for portal-specific pages
+  if (isPortalMode('pharmacist')) {
+    const el = document.getElementById('login-role-pharmacist');
+    if (el) { document.getElementById('login-username').dataset.loginMode = 'pharmacist'; }
+  } else if (isPortalMode('admin')) {
+    const el = document.getElementById('login-role-admin');
+    if (el) { document.getElementById('login-username').dataset.loginMode = 'admin'; }
+  }
+  // Fetch session to get user_id (needed for WebSocket)
+  if (isLoggedIn()) {
+    try {
+      const sess = await callApi('/session');
+      currentSession = sess;
+    } catch(_) {}
   }
   initApp();
 };
 
 function buildLang(){
   const L=LANGS[lang];
-  document.getElementById('chat-title').textContent=lang==='en'?'BisaRx AI Pharmacist':lang==='tw'?'BisaRx AI OduruyÃƒÆ’Ã¢â‚¬Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âºfo':lang==='ha'?'BisaRx AI Likitan Magani':'BisaRx Pharmacien IA';
-  document.getElementById('chat-sub').textContent='Direct clinical guidance ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Voice ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Multilingual';
+  document.getElementById('chat-title').textContent=lang==='en'?'BisaRx AI Pharmacist':lang==='tw'?'BisaRx AI Oduruyɛfo':lang==='ha'?'BisaRx AI Likitan Magani':'BisaRx Pharmacien IA';
+  document.getElementById('chat-sub').textContent='Direct clinical guidance · Voice · Multilingual';
   document.getElementById('disc-label').textContent=L.discLabel;
   document.getElementById('disc-text').textContent=L.disc;
   document.getElementById('tinput').placeholder=L.placeholder;
@@ -731,7 +776,9 @@ function addMsg(role,text,tags,msgId=null){
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
     <span>Listen</span>
   </button>`:'';
-  const formattedText=role==='ai'&&window.marked?marked.parse(text):text.replace(/\n/g,'<br>');
+  const formattedText = role === 'ai' && window.marked
+    ? marked.parse(DOMPurify ? DOMPurify.sanitize(text) : text)
+    : text.replace(/[\u00C0-\u00FF\u0100-\u017F]/g, c => c).replace(/\n/g, '<br>');
   d.innerHTML=`<div class="av ${role==='user'?'u':'ai'}">${role==='user'?'You':'Bx'}</div>
   <div class="bub ${role==='user'?'u':'ai'}" id="${messageId}">
     <div class="bub-text">${formattedText}${tagsHtml}</div>
@@ -801,45 +848,132 @@ function addDrugCards(drugs){
   requestAnimationFrame(() => c.scrollTo({top:c.scrollHeight,behavior:'smooth'}));
 }
 
-async function send(){
-  const input=document.getElementById('tinput'),btn=document.getElementById('send-btn');
-  const text=input.value.trim();if(!text)return;
-  addMsg('user',text);history.push({role:'user',content:text});
-  input.value='';input.style.height='auto';
-  btn.disabled=true;btn.innerHTML='<span class="typing" style="display:inline-flex;gap:4px;"><span></span><span></span><span></span></span>';
-  showTyping();
-  document.getElementById('chips').style.display='none';
-  try{
-    const res=await callApi('/chat','POST',{messages:history});
-    const reply=res.reply||'Please try again.';
-    rmTyping();
-    if(res.consulting){
-      addMsg('ai','Preparing your intake summary for pharmacist review...',[{t:'Review',c:'a'}]);
-      await new Promise(r=>setTimeout(r,1200));
-      addMsg('ai',reply);
-      history.push({role:'assistant',content:reply});
-      addMsg('ai','A licensed pharmacist will use this intake summary to assess the case and decide the right treatment.',[{t:'Under Review',c:'g'},{t:'Pharmacist Only',c:'b'}]);
-    }else{
-      addMsg('ai',reply);
-      history.push({role:'assistant',content:reply});
+async function send() {
+  const input = document.getElementById('tinput'), btn = document.getElementById('send-btn');
+  const text = input.value.trim(); if (!text) return;
+  addMsg('user', text); history.push({ role: 'user', content: text });
+  input.value = ''; input.style.height = 'auto';
+  btn.disabled = true;
+  btn.innerHTML = '<span class="typing" style="display:inline-flex;gap:4px;"><span></span><span></span><span></span></span>';
+  document.getElementById('chips').style.display = 'none';
+
+  // --- streaming via SSE ---
+  const token = getToken();
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  try {
+    // Create an AI message bubble immediately and stream tokens into it
+    const msgId = 'msg_' + Date.now();
+    const c = document.getElementById('msgs');
+    const d = document.createElement('div');
+    d.className = 'msg';
+    const tagsHtml = '';
+    const voiceBtnHtml = `<button class="msg-voice-btn" onclick="speakMsg('${msgId}', this)" title="Listen">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+      <span>Listen</span></button>`;
+    d.innerHTML = `<div class="av ai">Bx</div><div class="bub ai" id="${msgId}"><div class="bub-text"><span class="typing" style="display:inline-flex;gap:4px;"><span></span><span></span><span></span></span></div>${voiceBtnHtml}</div>`;
+    c.appendChild(d);
+    requestAnimationFrame(() => c.scrollTo({ top: c.scrollHeight, behavior: 'smooth' }));
+
+    const res = await fetch(API_URL + '/chat/stream', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ messages: history }),
+    });
+
+    if (!res.ok || !res.body) throw new Error('Stream failed');
+
+    const bubText = d.querySelector('.bub-text');
+    bubText.innerHTML = ''; // clear typing indicator
+    let fullReply = '';
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const payload = JSON.parse(line.slice(6));
+          if (payload.token) {
+            fullReply += payload.token;
+            bubText.innerHTML = window.marked ? marked.parse(fullReply) : fullReply.replace(/\n/g, '<br>');
+            c.scrollTo({ top: c.scrollHeight, behavior: 'smooth' });
+          }
+          if (payload.done) {
+            const finalReply = payload.full || fullReply;
+            history.push({ role: 'assistant', content: finalReply });
+            // Update the bubble with final rendered content
+            bubText.innerHTML = window.marked ? marked.parse(finalReply) : finalReply.replace(/\n/g, '<br>');
+            if (payload.consulting) {
+              // Store case_id for tracking (works for guests too)
+              if (payload.case_id) {
+                localStorage.setItem('bisarx_case_id', payload.case_id);
+                localStorage.setItem('bisarx_case_ts', Date.now().toString());
+                // Start polling for guest users
+                if (!isLoggedIn()) {
+                  _startGuestCasePolling(payload.case_id);
+                }
+              }
+              showToast('Your case has been sent to a pharmacist for review.', 'success');
+            }
+          }
+          if (payload.error) throw new Error(payload.error);
+        } catch (_) { /* ignore bad json */ }
+      }
     }
-    if(ttsOn)speak(reply);
-    document.getElementById('ai-summary').textContent=`Patient: "${text.substring(0,100)}..."\n\nBisaRx: ${reply.substring(0,250)}...`;
-    showDynamicChips(reply);
-    // Refresh history if logged in
-    if(isLoggedIn()){
-      try{
-        const data=await callApi('/profile');
-        renderPrescriptionHistory(data.prescriptions);
-      }catch(e){}
+
+    if (ttsOn) speak(fullReply);
+    const summaryEl = document.getElementById('ai-summary');
+    if (summaryEl) summaryEl.textContent = `Patient: "${text.substring(0, 100)}..."\n\nBisaRx: ${fullReply.substring(0, 250)}...`;
+    showDynamicChips(fullReply);
+    if (isLoggedIn()) {
+      try { const data = await callApi('/profile'); renderPrescriptionHistory(data.prescriptions); } catch (_) { }
     }
-  }catch(e){
+  } catch (e) {
+    const existingBub = document.getElementById('msg_' + Date.now().toString().slice(0, -3));
     rmTyping();
-    addMsg('ai','An error occurred. Please try again.',[{t:'Error',c:'r'},{t:'Try Again',c:'a'}]);
-    console.error('Chat error:',e.message);
+    addMsg('ai', 'An error occurred. Please try again.', [{ t: 'Error', c: 'r' }, { t: 'Try Again', c: 'a' }]);
+    console.error('Chat error:', e.message);
   }
-  btn.disabled=false;btn.innerHTML='<span>Send</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
+  btn.disabled = false;
+  btn.innerHTML = '<span>Send</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
 }
+
+// Guest case polling — for patients who aren't logged in
+let _guestCaseTimer = null;
+function _startGuestCasePolling(caseId) {
+  if (_guestCaseTimer) clearInterval(_guestCaseTimer);
+  let checks = 0;
+  _guestCaseTimer = setInterval(async () => {
+    checks++;
+    if (checks > 120) { clearInterval(_guestCaseTimer); _guestCaseTimer = null; return; } // stop after 10 min
+    try {
+      const data = await callApi(`/cases/guest/${caseId}`);
+      if (data.pharmacist_feedback) {
+        clearInterval(_guestCaseTimer); _guestCaseTimer = null;
+        localStorage.removeItem('bisarx_case_id');
+        const msg = [
+          '✅ **Your pharmacist has reviewed your case:**',
+          data.pharmacist_feedback,
+          data.drug_name ? `💊 **Recommended:** ${data.drug_name}` : '',
+          data.referral_advice ? `📋 **Referral:** ${data.referral_advice}` : '',
+          data.follow_up_instructions ? `🗓️ **Follow-up:** ${data.follow_up_instructions}` : '',
+        ].filter(Boolean).join('\n\n');
+        addMsg('ai', msg, [{ t: 'Pharmacist Review', c: 'g' }, { t: data.drug_name || 'Treatment', c: 'b' }]);
+        showToast('Your pharmacist result is ready!', 'success');
+      }
+    } catch (_) {}
+  }, 5000);
+}
+
+
 
 // TTS & VOICE
 function speak(text){
@@ -912,14 +1046,14 @@ function selectZone(zone){
   const z=ZONES[zone];if(!z)return;
   document.querySelectorAll('.body-zone').forEach(el=>{el.setAttribute('stroke','var(--primary-dark)');el.setAttribute('fill','rgba(26,122,74,0.08)');});
   document.querySelectorAll(`[data-zone="${zone}"]`).forEach(el=>{el.setAttribute('stroke','var(--accent)');el.setAttribute('fill','rgba(240,165,0,0.18)');});
-  document.getElementById('bodymap-info').innerHTML=`<div class="zone-card"><div class="zone-emoji">${z.icon||'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Âº'}</div><div class="zone-title">${z.title}</div><div class="zone-sub">${z.sub}</div><div class="zone-simple">Simple meaning: ${z.simple}</div><div class="zone-btns"><button class="zbtn primary" onclick="askZone('${zone}')">Send This Area</button><button class="zbtn secondary" onclick="speakZone('${zone}')">Speak This Out</button></div></div>`;
+  document.getElementById('bodymap-info').innerHTML=`<div class="zone-card"><div class="zone-emoji">${z.icon||'🫀'}</div><div class="zone-title">${z.title}</div><div class="zone-sub">${z.sub}</div><div class="zone-simple">Simple meaning: ${z.simple}</div><div class="zone-btns"><button class="zbtn primary" onclick="askZone('${zone}')">Send This Area</button><button class="zbtn secondary" onclick="speakZone('${zone}')">Speak This Out</button></div></div>`;
   speakZone(zone);
 }
 function askZone(zone){go('chat',document.querySelector('.nav-item'));document.getElementById('tinput').value=ZONES[zone].q;send();}
 function renderBodyMapLanding(){
   const el=document.getElementById('bodymap-info');
   if(!el) return;
-  el.innerHTML=`<div class="zone-card"><div class="zone-emoji">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Âº</div><div class="zone-title">Choose a body part</div><div class="zone-sub">Tap the picture or use the large buttons above. The system can read the option aloud before sending it to chat.</div><div class="zone-btns"><button class="zbtn secondary" onclick="speakBodyMapHelp()">Hear Instructions</button></div></div>`;
+  el.innerHTML=`<div class="zone-card"><div class="zone-emoji">🫀</div><div class="zone-title">Choose a body part</div><div class="zone-sub">Tap the picture or use the large buttons above. The system can read the option aloud before sending it to chat.</div><div class="zone-btns"><button class="zbtn secondary" onclick="speakBodyMapHelp()">Hear Instructions</button></div></div>`;
 }
 function speakZone(zone){
   const z=ZONES[zone];
@@ -973,7 +1107,7 @@ function refreshOverview(u){
   document.getElementById('ov-conds').textContent=conditionsList.length;
   document.getElementById('ov-allergies').textContent=allergiesList.length;
   const active=meds.filter(x=>x.status==='Active');
-  document.getElementById('ov-meds-list').innerHTML=active.length?active.map(x=>`<div class="med-item"><div><div class="med-name">${x.name}</div><div class="med-dose">${x.dose} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${x.freq}</div></div><span class="badge g">Active</span></div>`).join(''):'<div class="empty">None recorded</div>';
+  document.getElementById('ov-meds-list').innerHTML=active.length?active.map(x=>`<div class="med-item"><div><div class="med-name">${x.name}</div><div class="med-dose">${x.dose} · ${x.freq}</div></div><span class="badge g">Active</span></div>`).join(''):'<div class="empty">None recorded</div>';
   document.getElementById('ov-allergy-list').innerHTML=allergiesList.length?allergiesList.map(a=>`<span class="allergy-chip" style="cursor:default">${a}</span>`).join(''):'<div class="empty">None recorded</div>';
   document.getElementById('ov-conds-list').innerHTML=conditionsList.length?conditionsList.map(c=>`<span class="cond-chip" style="cursor:default">${c}</span>`).join(''):'<div class="empty">None recorded</div>';
 }
@@ -1005,7 +1139,7 @@ async function saveMedical(){
 function loadMedsList(meds){
   const el=document.getElementById('meds-list');
   if(!meds||!meds.length){el.innerHTML='<div class="empty">No medications added yet.</div>';return;}
-  el.innerHTML=meds.map((m,i)=>`<div class="med-item"><div><div class="med-name">${m.name} ${m.dose}</div><div class="med-dose">${m.freq}${m.doctor?' ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Dr. '+m.doctor:''}</div></div><div style="display:flex;gap:7px;align-items:center"><span class="badge ${m.status==='Active'?'g':m.status==='Paused'?'a':'b'}">${m.status}</span><button class="btn danger" style="padding:4px 9px;font-size:11px" onclick="removeMed(${m.id})">Remove</button></div></div>`).join('');
+  el.innerHTML=meds.map((m,i)=>`<div class="med-item"><div><div class="med-name">${m.name} ${m.dose}</div><div class="med-dose">${m.freq}${m.doctor?' · Dr. '+m.doctor:''}</div></div><div style="display:flex;gap:7px;align-items:center"><span class="badge ${m.status==='Active'?'g':m.status==='Paused'?'a':'b'}">${m.status}</span><button class="btn danger" style="padding:4px 9px;font-size:11px" onclick="removeMed(${m.id})">Remove</button></div></div>`).join('');
 }
 async function addMed(){
   const name=document.getElementById('med-name').value.trim(),dose=document.getElementById('med-dose').value.trim(),freq=document.getElementById('med-freq').value,status=document.getElementById('med-status').value,doctor=document.getElementById('med-doctor').value.trim(),msg=document.getElementById('med-msg');
@@ -1038,7 +1172,7 @@ function renderPrescriptionHistory(rxArray){
           <div class="rxdot" style="background:${rx.status==='Active'?'var(--primary)':'var(--primary-light)'}"></div>
           <div style="flex:1">
             <div class="rxdrug">${rx.drug_name}</div>
-            <div class="rxdet">${rx.details} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${new Date(rx.created_at).toLocaleDateString()}</div>
+            <div class="rxdet">${rx.details} · ${new Date(rx.created_at).toLocaleDateString()}</div>
           </div>
           <span class="rxst ${rx.status==='Active'?'ac':'pe'}">${rx.status}</span>
         </div>
@@ -1091,7 +1225,7 @@ function buildLang() {
   if (!chatTitle || !chatSub || !discLabel || !discText || !textInput || !langBadge || !chipsEl) return;
 
   chatTitle.textContent = lang === 'fr' ? 'BisaRx Assistant Clinique' : 'BisaRx Clinical Care Assistant';
-  chatSub.textContent = 'Professional guidance Ãƒâ€šÃ‚Â· Voice enabled Ãƒâ€šÃ‚Â· Multilingual support';
+  chatSub.textContent = 'Professional guidance ·· Voice enabled ·· Multilingual support';
   discLabel.textContent = L.discLabel;
   discText.textContent = L.disc;
   textInput.placeholder = L.placeholder;
@@ -1216,7 +1350,7 @@ function refreshOverview(u) {
   document.getElementById('ov-allergies').textContent = allergiesList.length;
   const active = meds.filter(x => x.status === 'Active');
   document.getElementById('ov-meds-list').innerHTML = active.length
-    ? active.map(x => `<div class="med-item"><div><div class="med-name">${x.name}</div><div class="med-dose">${x.dose} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${x.freq}</div></div><span class="badge g">Active</span></div>`).join('')
+    ? active.map(x => `<div class="med-item"><div><div class="med-name">${x.name}</div><div class="med-dose">${x.dose} · ${x.freq}</div></div><span class="badge g">Active</span></div>`).join('')
     : '<div class="empty">None recorded</div>';
   document.getElementById('ov-allergy-list').innerHTML = allergiesList.length
     ? allergiesList.map(a => `<span class="allergy-chip" style="cursor:default">${a}</span>`).join('')
@@ -1232,7 +1366,7 @@ function loadMedsList(meds) {
     el.innerHTML = '<div class="empty">No medications added yet.</div>';
     return;
   }
-  el.innerHTML = meds.map(m => `<div class="med-item"><div><div class="med-name">${m.name} ${m.dose}</div><div class="med-dose">${m.freq}${m.doctor ? ' ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Dr. ' + m.doctor : ''}</div></div><div style="display:flex;gap:7px;align-items:center"><span class="badge ${m.status === 'Active' ? 'g' : m.status === 'Paused' ? 'a' : 'b'}">${m.status}</span><button class="btn danger" style="padding:4px 9px;font-size:11px" onclick="removeMed(${m.id})">Remove</button></div></div>`).join('');
+  el.innerHTML = meds.map(m => `<div class="med-item"><div><div class="med-name">${m.name} ${m.dose}</div><div class="med-dose">${m.freq}${m.doctor ? ' · Dr. ' + m.doctor : ''}</div></div><div style="display:flex;gap:7px;align-items:center"><span class="badge ${m.status === 'Active' ? 'g' : m.status === 'Paused' ? 'a' : 'b'}">${m.status}</span><button class="btn danger" style="padding:4px 9px;font-size:11px" onclick="removeMed(${m.id})">Remove</button></div></div>`).join('');
 }
 
 function renderPrescriptionHistory(rxArray) {
@@ -1251,7 +1385,7 @@ function renderPrescriptionHistory(rxArray) {
           <div class="rxdot" style="background:${rx.status === 'Active' ? 'var(--primary)' : 'var(--primary-light)'}"></div>
           <div style="flex:1">
             <div class="rxdrug">${rx.drug_name}</div>
-            <div class="rxdet">${rx.details} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${new Date(rx.created_at).toLocaleDateString()}</div>
+            <div class="rxdet">${rx.details} · ${new Date(rx.created_at).toLocaleDateString()}</div>
           </div>
           <span class="rxst ${rx.status === 'Active' ? 'ac' : 'pe'}">${rx.status}</span>
         </div>
@@ -1300,7 +1434,7 @@ function updateAuthUI() {
     const label = document.getElementById('user-label');
     if (label) {
       const roleLabel = currentSession.role === 'admin' ? 'Admin' : currentSession.role === 'pharmacist' ? 'Pharmacist' : 'Patient';
-      label.textContent = `${currentSession.display_name || currentUser || 'User'} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${roleLabel}`;
+      label.textContent = `${currentSession.display_name || currentUser || 'User'} · ${roleLabel}`;
     }
   }
 
@@ -1402,7 +1536,7 @@ function renderCaseCard(c) {
 
 // Removed claimCase - admin now assigns cases to pharmacists
 
-// Admin tabs
+// Admin tabs — also trigger data loading on tab switch
 function showAdminTab(tab, el) {
   ['overview', 'users', 'pharmacists', 'cases'].forEach(t => {
     const el = document.getElementById('admin-tab-' + t);
@@ -1410,7 +1544,23 @@ function showAdminTab(tab, el) {
   });
   document.querySelectorAll('#panel-admin .ntab').forEach(n => n.classList.remove('on'));
   if (el) el.classList.add('on');
+  // Lazy-load specialized tabs
+  if (tab === 'users') loadAdminUsersTab();
+  if (tab === 'overview') loadAdminInsights();
 }
+
+async function loadAdminUsersTab() {
+  const el = document.getElementById('admin-users-list');
+  if (!el) return;
+  el.innerHTML = '<div class="empty">Loading users...</div>';
+  try {
+    const data = await callApi('/admin/users');
+    renderAdminUsers(data.users || []);
+  } catch (e) {
+    el.innerHTML = `<div class="empty">Failed to load users: ${e.message}</div>`;
+  }
+}
+
 
 // Pharmacist tabs
 function showPharmaTab(tab, el) {
@@ -1728,8 +1878,8 @@ function renderAdminCases(cases = [], pharmacists = []) {
         <div class="case-list-info">
           <div class="case-list-name">${patientName}</div>
           <div class="case-list-meta">
-            <span>Status: ${c.status}</span> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· 
-            <span>${new Date(c.created_at).toLocaleString()}</span> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· 
+            <span>Status: ${c.status}</span> · 
+            <span>${new Date(c.created_at).toLocaleString()}</span> · 
             <span>Assigned: ${c.pharmacist?.name || 'Unassigned'}</span>
           </div>
         </div>
@@ -1884,7 +2034,7 @@ function getZoneOptions(zone) {
 function renderBodyMapLanding() {
   const el = document.getElementById('bodymap-info');
   if (!el) return;
-  el.innerHTML = `<div class="zone-card"><div class="zone-emoji">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Âº</div><div class="zone-title">Choose a body part</div><div class="zone-sub">Tap the body area, then choose what kind of problem it is and how bad it feels.</div><div class="zone-btns"><button class="zbtn secondary" onclick="speakBodyMapHelp()">Hear Instructions</button></div></div>`;
+  el.innerHTML = `<div class="zone-card"><div class="zone-emoji">🫀</div><div class="zone-title">Choose a body part</div><div class="zone-sub">Tap the body area, then choose what kind of problem it is and how bad it feels.</div><div class="zone-btns"><button class="zbtn secondary" onclick="speakBodyMapHelp()">Hear Instructions</button></div></div>`;
 }
 
 function selectZone(zone) {
@@ -1901,7 +2051,7 @@ function selectZone(zone) {
   const symptomButtons = getZoneOptions(zone).map(option => `<button class="chip" onclick="askZone('${zone}','${option}','moderate')">${option}</button>`).join('');
   document.getElementById('bodymap-info').innerHTML = `
     <div class="zone-card">
-      <div class="zone-emoji">${z.icon || 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Âº'}</div>
+      <div class="zone-emoji">${z.icon || '🫀'}</div>
       <div class="zone-title">${z.title}</div>
       <div class="zone-sub">${z.sub}</div>
       <div class="zone-simple">Choose the problem type first:</div>
@@ -2102,13 +2252,20 @@ function renderCaseCard(c) {
   const support = c.pharmacist_support || {};
   const aiSuggestions = Array.isArray(c.ai_medication_suggestions) ? c.ai_medication_suggestions : [];
   const matchedMedications = aiSuggestions.length
-    ? aiSuggestions.map(suggestion => suggestion.medication).join(', ')
+    ? aiSuggestions.map(s => s.medication).join(', ')
     : 'No dataset medication match recorded.';
+  // Urgency color border
+  const urgencyColor = c.urgency_level === 'urgent' ? 'var(--danger)' : c.urgency_level === 'priority' ? 'var(--warning)' : 'var(--primary-light)';
+  const urgencyBadge = c.urgency_level === 'urgent'
+    ? '<span class="badge badge-danger" style="font-size:.7rem;">URGENT</span>'
+    : c.urgency_level === 'priority'
+    ? '<span class="badge badge-warning" style="font-size:.7rem;">PRIORITY</span>'
+    : '';
   const supportCard = `
     <div class="info-card" style="margin-top:12px;">
       <h4>AI Fast Review Support</h4>
       <div class="case-details"><strong>AI Intake Summary:</strong> ${support.ai_intake_summary || c.ai_summary || 'No AI summary recorded'}</div>
-      <div class="case-details"><strong>Recent Patient Statements:</strong> ${support.recent_patient_statements || c.case_summary || c.patient_message || 'No recent patient statements captured'}</div>
+      <div class="case-details"><strong>Recent Patient Statements:</strong> ${support.recent_patient_statements || c.case_summary || c.patient_message || 'Not captured'}</div>
       <div class="case-details"><strong>Patient Clinical Profile:</strong> ${formatClinicalProfileSnapshot(support.clinical_profile || 'No patient clinical profile was shared.')}</div>
       <div class="case-details"><strong>Matched Medication:</strong> ${matchedMedications}</div>
       <div class="case-details"><strong>Data File Guidance:</strong> ${support.dataset_guidance || 'No dataset guidance matched for this case yet.'}</div>
@@ -2151,6 +2308,9 @@ function renderCaseCard(c) {
         </select>
       </div>
       <div class="dashboard-form-actions">
+        <button class="btn btn-magic btn-sm" type="button" onclick="aiSuggestForm(${c.id})" id="ai-suggest-btn-${c.id}">
+          ✨ AI Suggest
+        </button>
         <button class="btn btn-primary btn-sm" onclick="submitCaseReview(${c.id})">Send To Patient</button>
         <button class="btn btn-secondary btn-sm" onclick="toggleReviewForm(${c.id})">Cancel</button>
       </div>
@@ -2158,10 +2318,10 @@ function renderCaseCard(c) {
   ` : '';
   const eventList = (c.events || []).slice(-3).map(event => `<div class="help-copy">${event.actor_role}: ${event.action} | ${event.note || 'No note'}</div>`).join('');
   return `
-    <div class="case-card">
+    <div class="case-card" style="border-left:4px solid ${urgencyColor};">
       <div class="case-header">
         <span class="case-user">${patientName}</span>
-        <span class="case-time">${new Date(c.created_at).toLocaleString()}</span>
+        <div style="display:flex;gap:6px;align-items:center;">${urgencyBadge}<span class="case-time">${new Date(c.created_at).toLocaleString()}</span></div>
       </div>
       <div class="dashboard-meta">
         <div class="case-details"><strong>Status:</strong> ${c.status}</div>
@@ -2183,36 +2343,54 @@ function renderCaseCard(c) {
   `;
 }
 
+async function aiSuggestForm(caseId) {
+  const btn = document.getElementById(`ai-suggest-btn-${caseId}`);
+  if (btn) { btn.disabled = true; btn.textContent = '✨ Thinking...'; }
+  try {
+    const data = await callApi(`/cases/${caseId}/ai-suggest`, 'POST');
+    const s = data.suggestion || {};
+    const setVal = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+    setVal(`review-drug-${caseId}`, s.drug_name);
+    setVal(`review-advice-${caseId}`, s.pharmacist_feedback);
+    setVal(`review-referral-${caseId}`, s.referral_advice);
+    setVal(`review-followup-${caseId}`, s.follow_up_instructions);
+    showToast('AI suggestion applied! Review and edit before sending.', 'success');
+  } catch (e) {
+    showToast(`AI suggest failed: ${e.message}`, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '✨ AI Suggest'; }
+  }
+}
+
+
 function renderPharmacistDashboard(pendingCases = [], assignedCases = [], completedCases = []) {
   pharmacistDashboardState = { pending: pendingCases, assigned: assignedCases, completed: completedCases };
-
   const pendingQueue = document.getElementById('pharmacist-pending-queue');
   const assignedQueue = document.getElementById('pharmacist-queue');
   const completedContainer = document.getElementById('pharmacist-completed');
   if (!pendingQueue || !assignedQueue || !completedContainer) return;
-
   ensureDashboardToolbar('pharmacist-pending-queue', 'pharmacist');
   const pendingFiltered = filterCases(pendingCases, 'pharmacist');
   const assignedFiltered = filterCases(assignedCases, 'pharmacist');
-
   const toolbar = pendingQueue.querySelector('.dashboard-toolbar')?.outerHTML || '';
   pendingQueue.innerHTML = toolbar + (
     pendingFiltered.length
       ? pendingFiltered.map(renderCaseCard).join('')
       : '<div class="empty">No pending cases in queue. Waiting for new cases...</div>'
   );
-
   assignedQueue.innerHTML = assignedFiltered.length
     ? assignedFiltered.map(renderCaseCard).join('')
     : '<div class="empty">No cases assigned to you yet.</div>';
-
   const completedFiltered = filterCases(completedCases, 'pharmacist');
   completedContainer.innerHTML = completedFiltered.length
     ? completedFiltered.map(renderCaseCard).join('')
     : '<div class="empty">No completed cases yet.</div>';
 }
 
+
 async function submitCaseReview(id) {
+  const btn = document.querySelector(`[onclick="submitCaseReview(${id})"]`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
   const diagnosis = document.getElementById(`review-diagnosis-${id}`)?.value.trim();
   const advice = document.getElementById(`review-advice-${id}`)?.value.trim();
   const referral_advice = document.getElementById(`review-referral-${id}`)?.value.trim();
@@ -2220,17 +2398,21 @@ async function submitCaseReview(id) {
   const drug = document.getElementById(`review-drug-${id}`)?.value.trim();
   const statusValue = document.getElementById(`review-status-${id}`)?.value || 'Reviewed';
   if (!advice) {
-    alert('Patient feedback is required.');
+    if (btn) { btn.disabled = false; btn.textContent = 'Send To Patient'; }
+    showToast('Patient feedback is required.', 'error');
     return;
   }
   try {
     await callApi(`/pharmacist/review/${id}`, 'POST', { diagnosis, advice, referral_advice, follow_up_instructions, drug, status: statusValue });
     openReviewForms.delete(id);
+    showToast('Results sent to patient successfully!', 'success');
     refreshPharmacistDashboard();
   } catch (e) {
-    alert(`Error: ${e.message}`);
+    showToast(`Error: ${e.message}`, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Send To Patient'; }
   }
 }
+
 
 function renderAdminCases(cases = [], pharmacists = []) {
   adminDashboardState = { cases, pharmacists };
@@ -2309,10 +2491,43 @@ async function refreshAdminDashboard() {
     document.getElementById('admin-verified-pharmacists').textContent = data.stats.verified_pharmacists;
     renderAdminPharmacists(data.pharmacists);
     renderAdminCases(data.cases, data.pharmacists);
+    // Load all users (not just recent) for the users tab
+    const usersToRender = data.all_users || data.recent_users || [];
+    renderAdminUsers(usersToRender);
+    // Optionally load insights for overview
+    loadAdminInsights();
   } catch (e) {
     console.error(e);
   }
 }
+
+async function loadAdminInsights() {
+  const insightsCard = document.getElementById('admin-insights-card');
+  if (!insightsCard) return;
+  insightsCard.innerHTML = '<div class="empty">Loading AI insights...</div>';
+  try {
+    const data = await callApi('/admin/insights');
+    const s = data.stats;
+    insightsCard.innerHTML = `
+      <div class="info-card" style="margin-bottom:16px;">
+        <h4 style="margin-bottom:12px;">📊 System Stats</h4>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px;">
+          <div style="text-align:center;"><div style="font-size:1.6rem;font-weight:700;color:var(--primary)">${s.total_cases}</div><div style="font-size:.8rem;color:var(--mist-500)">Total Cases</div></div>
+          <div style="text-align:center;"><div style="font-size:1.6rem;font-weight:700;color:var(--warning)">${s.pending}</div><div style="font-size:.8rem;color:var(--mist-500)">Pending</div></div>
+          <div style="text-align:center;"><div style="font-size:1.6rem;font-weight:700;color:var(--danger)">${s.urgent}</div><div style="font-size:.8rem;color:var(--mist-500)">Urgent</div></div>
+        </div>
+        <div style="font-size:.85rem;margin-bottom:4px;"><strong>Resolution Rate:</strong> ${s.resolution_rate}%</div>
+      </div>
+      <div class="info-card">
+        <h4 style="margin-bottom:12px;">✨ AI Recommendations</h4>
+        <div style="font-size:.88rem;line-height:1.6;white-space:pre-line;">${data.insights}</div>
+      </div>
+    `;
+  } catch (e) {
+    if (insightsCard) insightsCard.innerHTML = '<div class="empty">Could not load insights.</div>';
+  }
+}
+
 
 function updateAuthUI() {
   const loggedIn = isLoggedIn();
@@ -2338,7 +2553,7 @@ function updateAuthUI() {
     const label = document.getElementById('user-label');
     if (label) {
       const roleLabel = currentSession.role === 'admin' ? 'Admin' : currentSession.role === 'pharmacist' ? 'Pharmacist' : 'Patient';
-      label.textContent = `${currentSession.display_name || currentUser || 'User'} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${roleLabel}`;
+      label.textContent = `${currentSession.display_name || currentUser || 'User'} · ${roleLabel}`;
     }
   }
   if (navChat) navChat.style.display = isAdminView || isPharmacistView || isPharmacistPortal || isAdminPortal ? 'none' : 'flex';
@@ -2448,4 +2663,38 @@ async function initApp() {
   }
 
   addMsg('ai', LANGS[lang].greeting, [{ t: 'BisaRx', c: 'g' }, { t: 'Clinical AI', c: 'b' }, { t: 'Multilingual', c: 'a' }]);
+  _chatGreetingShown = true;
+  // Connect WebSocket for real-time patient results
+  _connectPatientWebSocket();
 }
+
+function _connectPatientWebSocket() {
+  if (!isLoggedIn() || isPortalMode('pharmacist') || isPortalMode('admin')) return;
+  if (_patientWs && _patientWs.readyState < 2) return; // already open or connecting
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const userId = currentSession.user_id || '';
+  if (!userId) return;
+  try {
+    _patientWs = new WebSocket(`${proto}://${location.host}/ws/patient/${userId}`);
+    _patientWs.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'case_updated' && data.pharmacist_feedback) {
+          showToast('Your pharmacist has sent results! Check History.', 'success', 8000);
+          // Inject result message into chat
+          const resultMsg = [
+            data.pharmacist_feedback,
+            data.drug_name ? `**Medication:** ${data.drug_name}` : '',
+            data.referral_advice ? `**Referral:** ${data.referral_advice}` : '',
+            data.follow_up_instructions ? `**Follow-up:** ${data.follow_up_instructions}` : '',
+          ].filter(Boolean).join('\n\n');
+          addMsg('ai', '✅ **Your pharmacist has reviewed your case:**\n\n' + resultMsg,
+            [{ t: 'Result', c: 'g' }, { t: 'Reviewed', c: 'b' }]);
+          if (isLoggedIn()) callApi('/profile').then(d => renderPrescriptionHistory(d.prescriptions)).catch(() => {});
+        }
+      } catch (_) { }
+    };
+    _patientWs.onclose = () => { _patientWs = null; };
+  } catch (_) { }
+}
+

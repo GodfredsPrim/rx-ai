@@ -422,6 +422,27 @@ img,svg { max-width:100%; height:auto; }
 .badge-primary,.badge.b { color:var(--white); background:linear-gradient(135deg,var(--primary-light),var(--primary)); }
 .badge-danger,.badge.r  { color:var(--white); background:linear-gradient(135deg,#ef6a6a,var(--danger)); }
 .badge.a                { color:var(--white); background:linear-gradient(135deg,#cf9b4d,var(--accent)); }
+.badge-warning          { color:#7a4f00; background:linear-gradient(135deg,#fde68a,#f59e0b); }
+
+/* AI Magic Button */
+.btn-magic {
+  display:inline-flex; align-items:center; gap:7px;
+  padding:9px 16px; border-radius:var(--r-full);
+  font-size:.82rem; font-weight:700; color:#fff;
+  background:linear-gradient(135deg,#8b5cf6,#06b6d4,#10b981);
+  background-size:300% 300%;
+  animation:gradientShift 3s ease infinite;
+  border:none; cursor:pointer;
+  box-shadow:0 4px 14px rgba(139,92,246,.3);
+  transition:box-shadow .2s, transform .2s;
+}
+.btn-magic:hover { box-shadow:0 6px 20px rgba(139,92,246,.42); transform:translateY(-1px); }
+.btn-magic:disabled { opacity:.65; cursor:not-allowed; animation:none; }
+@keyframes gradientShift {
+  0%   { background-position:0% 50%; }
+  50%  { background-position:100% 50%; }
+  100% { background-position:0% 50%; }
+}
 
 /* ── Disclaimer banner ── */
 .disclaimer-banner {
