@@ -262,8 +262,18 @@
         <!-- Quick chips -->
         <div class="quick-actions" id="chips" role="group" aria-label="Quick prompts"></div>
 
+        <!-- Image Preview -->
+        <div id="image-preview-container" style="display:none; padding:10px; position:relative; width: fit-content;">
+          <img id="image-preview" src="" style="max-height:80px; border-radius:8px; border:2px solid var(--primary-light);" alt="Image preview">
+          <button onclick="clearImagePreview()" style="position:absolute; top:2px; right:2px; background:var(--primary); color:white; border:none; border-radius:50%; width:22px; height:22px; cursor:pointer; font-size:12px; font-weight:bold; display:flex; align-items:center; justify-content:center;" aria-label="Clear image">✕</button>
+        </div>
+
         <!-- Input bar -->
         <div class="chat-input-container">
+          <input type="file" id="image-upload" accept="image/*" capture="environment" style="display:none;" onchange="handleImageUpload(event)">
+          <button class="icon-btn" id="camera-btn" onclick="document.getElementById('image-upload').click()" title="Attach image" aria-label="Upload photo">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+          </button>
           <button class="icon-btn voice-btn" id="mic-btn" onclick="toggleVoice()" title="Voice input" aria-label="Toggle voice input">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
           </button>
@@ -785,7 +795,7 @@
   </div>
 </div>
 
-<script src="js/app.js?v=20260411-5"></script>
+<script src="js/app.js?v=20260416-4"></script>
 </body>
 </html>
 

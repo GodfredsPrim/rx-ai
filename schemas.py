@@ -35,6 +35,7 @@ class PharmacistReviewRequest(BaseModel):
     diagnosis: Optional[str] = None
     advice: str
     drug: Optional[str] = None
+    drugs_list: Optional[List[dict]] = None # List of {name: str, point: str}
     referral_advice: Optional[str] = None
     follow_up_instructions: Optional[str] = None
     status: str = "Reviewed"
@@ -116,6 +117,7 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
+    image_data: Optional[str] = None
 
 class DrugMatch(BaseModel):
     name: str
@@ -130,6 +132,7 @@ class ChatResponse(BaseModel):
     drugs: Optional[List[DrugMatch]] = None
     consulting: bool = False
     error: Optional[str] = None
+    case_id: Optional[int] = None
 
 
 class RedFlagItem(BaseModel):

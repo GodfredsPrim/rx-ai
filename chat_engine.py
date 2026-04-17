@@ -751,6 +751,7 @@ def process_chat(
     messages: list[dict],
     db: Session,
     user_id: int | None = None,
+    image_data: str | None = None,
 ) -> dict:
     """
     Process a list of chat messages through the full triage pipeline.
@@ -790,10 +791,20 @@ def process_chat(
 
     case_id: int | None = None
 
+    final_messages = [{"role": "system", "content": "\n\n".join(prompt_parts)}] + translated_messages
+    
+    if image_data and final_messages:
+        last_msg = final_messages[-1]
+        text_content = last_msg["content"]
+        last_msg["content"] = [
+            {"type": "text", "text": text_content},
+            {"type": "image_url", "image_url": {"url": image_data}}
+        ]
+
     try:
         response = openai_client.chat.completions.create(
             model=MODEL_NAME,
-            messages=[{"role": "system", "content": "\n\n".join(prompt_parts)}] + translated_messages,
+            messages=final_messages,
             max_tokens=1000,
         )
         reply = response.choices[0].message.content
@@ -897,7 +908,7 @@ def process_chat(
 
 
 # ── streaming helper ─────────────────────────────────────────────────
-def build_system_messages(messages: list[dict]) -> list[dict]:
+def build_system_messages(messages: list[dict], image_data: str | None = None) -> list[dict]:
     """Build the full messages list (system prompt + history) for streaming endpoints."""
     input_language = "en"
     for m in messages:
@@ -925,7 +936,17 @@ def build_system_messages(messages: list[dict]) -> list[dict]:
         )
 
     system_content = "\n\n".join(prompt_parts)
-    return [{"role": "system", "content": system_content}] + translated
+    final_messages = [{"role": "system", "content": system_content}] + translated
+
+    if image_data and final_messages:
+        last_msg = final_messages[-1]
+        text_content = last_msg["content"]
+        last_msg["content"] = [
+            {"type": "text", "text": text_content},
+            {"type": "image_url", "image_url": {"url": image_data}}
+        ]
+    
+    return final_messages
 
 
 # ── Abena AI translation ─────────────────────────────────────────────

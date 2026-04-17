@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 import pypdf
 from authlib.integrations.starlette_client import OAuth
 import json
-from fastapi import FastAPI, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect, status
+from fastapi import FastAPI, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect, status, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordRequestForm
@@ -109,6 +109,8 @@ oauth.register(
 class ConnectionManager:
     def __init__(self):
         self.active_connections: dict[int, list[WebSocket]] = {}  # user_id -> sockets
+        self.case_connections: dict[int, list[WebSocket]] = {}    # case_id -> sockets (guests)
+        self.pharmacist_connections: list[WebSocket] = []
 
     async def connect(self, websocket: WebSocket, user_id: int):
         await websocket.accept()
@@ -119,8 +121,39 @@ class ConnectionManager:
         if websocket in conns:
             conns.remove(websocket)
 
+    async def connect_case(self, websocket: WebSocket, case_id: int):
+        await websocket.accept()
+        self.case_connections.setdefault(case_id, []).append(websocket)
+
+    def disconnect_case(self, websocket: WebSocket, case_id: int):
+        conns = self.case_connections.get(case_id, [])
+        if websocket in conns:
+            conns.remove(websocket)
+
+    async def connect_pharmacist(self, websocket: WebSocket):
+        await websocket.accept()
+        self.pharmacist_connections.append(websocket)
+
+    def disconnect_pharmacist(self, websocket: WebSocket):
+        if websocket in self.pharmacist_connections:
+            self.pharmacist_connections.remove(websocket)
+
     async def notify_user(self, user_id: int, data: dict):
         for ws in list(self.active_connections.get(user_id, [])):
+            try:
+                await ws.send_text(json.dumps(data))
+            except Exception:
+                pass
+
+    async def notify_case(self, case_id: int, data: dict):
+        for ws in list(self.case_connections.get(case_id, [])):
+            try:
+                await ws.send_text(json.dumps(data))
+            except Exception:
+                pass
+
+    async def notify_pharmacists(self, data: dict):
+        for ws in list(self.pharmacist_connections):
             try:
                 await ws.send_text(json.dumps(data))
             except Exception:
@@ -769,31 +802,9 @@ def _build_pharmacist_case_details(
     ]
     symptom_history = " | ".join(user_points[-4:])[:500]
 
-    pharmacist_guidance = []
-    for drug in matched_drugs[:3]:
-        name = drug.get("name") or "Unspecified option"
-        indication = drug.get("indication") or "General indication"
-        category = drug.get("category") or "General category"
-        pharmacist_guidance.append(f"{name} ({category}; {indication})")
-
-    final_guidance = []
-    for match in (final_matches or [])[:3]:
-        disease = match.get("disease") or "Unspecified condition"
-        drug = match.get("drug") or "Unspecified drug"
-        final_guidance.append(f"{disease} -> {drug}")
-
-    dataset_sections = []
-    if pharmacist_guidance:
-        dataset_sections.append(f"medicine_dataset.csv: {', '.join(pharmacist_guidance)}")
-    if final_guidance:
-        dataset_sections.append(f"final.csv: {', '.join(final_guidance)}")
-    guidance_text = " | ".join(dataset_sections) if dataset_sections else "No dataset guidance matched."
-    pdf_text = relevant_pdf_context[:700] if relevant_pdf_context else "No PDF guidance matched."
     return (
         f"AI intake summary: {ai_summary[:500]} || "
-        f"Recent patient statements: {symptom_history or 'Not captured'} || "
-        f"Dataset guidance for pharmacist review only: {guidance_text} || "
-        f"PDF guidance for pharmacist review only: {pdf_text}"
+        f"Recent patient statements: {symptom_history or 'Not captured'}"
     )
 
 
@@ -1450,18 +1461,31 @@ def get_profile_reports(current_user: models.User = Depends(auth.get_current_use
     return current_user.prescriptions
 
 @app.post("/api/chat", response_model=schemas.ChatResponse)
-def chat(request: schemas.ChatRequest, current_user: models.User = Depends(get_optional_user), db: Session = Depends(get_db)):
+def chat(
+    request: schemas.ChatRequest, 
+    background_tasks: BackgroundTasks, 
+    current_user: models.User = Depends(get_optional_user), 
+    db: Session = Depends(get_db)
+):
     # If user is not logged in, they can still use chat (guest mode)
     user_id = current_user.id if current_user else None
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
 
-    result = chat_engine.process_chat(messages=messages, db=db, user_id=user_id)
+    result = chat_engine.process_chat(messages=messages, db=db, user_id=user_id, image_data=request.image_data)
+
+    if result.get("case_id"):
+        # Notify pharmacists of new case in background
+        background_tasks.add_task(
+            ws_manager.notify_pharmacists, 
+            {"type": "case_created", "case_id": result.get("case_id")}
+        )
 
     return {
         "reply": result["reply"],
         "drugs": result["drugs"],
         "consulting": result["consulting"],
         "error": result["error"],
+        "case_id": result.get("case_id"),
     }
 
 
@@ -1480,7 +1504,7 @@ async def chat_stream(
         try:
             stream = openai_client.chat.completions.create(
                 model=MODEL_NAME,
-                messages=chat_engine.build_system_messages(messages),
+                messages=chat_engine.build_system_messages(messages, image_data=request.image_data),
                 stream=True,
                 max_tokens=900,
                 temperature=0.4,
@@ -1543,6 +1567,15 @@ async def chat_stream(
                         })
                     except Exception:
                         pass
+                
+                # Notify pharmacists of new case
+                try:
+                    await ws_manager.notify_pharmacists({
+                        "type": "case_created",
+                        "case_id": case_id
+                    })
+                except Exception:
+                    pass
 
             yield f"data: {json.dumps({'done': True, 'full': full_reply, 'consulting': is_consulting, 'case_id': case_id})}\n\n"
 
@@ -1561,6 +1594,28 @@ async def patient_websocket(websocket: WebSocket, user_id: int):
             await websocket.receive_text()  # keep alive
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket, user_id)
+
+
+@app.websocket("/ws/case/{case_id}")
+async def case_websocket(websocket: WebSocket, case_id: int):
+    """WebSocket endpoint for real-time case updates (guests and logged-in users)."""
+    await ws_manager.connect_case(websocket, case_id)
+    try:
+        while True:
+            await websocket.receive_text()  # keep alive
+    except WebSocketDisconnect:
+        ws_manager.disconnect_case(websocket, case_id)
+
+
+@app.websocket("/ws/pharmacist")
+async def pharmacist_websocket(websocket: WebSocket):
+    """WebSocket endpoint for pharmacist dashboard real-time updates."""
+    await ws_manager.connect_pharmacist(websocket)
+    try:
+        while True:
+            await websocket.receive_text()  # keep alive
+    except WebSocketDisconnect:
+        ws_manager.disconnect_pharmacist(websocket)
 
 
 @app.get("/api/cases/public")
@@ -1680,6 +1735,7 @@ def pharmacist_accept_case(
 def pharmacist_review_case(
     case_id: int,
     review: schemas.PharmacistReviewRequest,
+    background_tasks: BackgroundTasks,
     current_pharmacist: models.Pharmacist = Depends(get_current_pharmacist),
     db: Session = Depends(get_db),
 ):
@@ -1702,25 +1758,24 @@ def pharmacist_review_case(
     if case.pharmacist_id != current_pharmacist.id:
         raise HTTPException(status_code=403, detail="This case is not assigned to you")
 
-    case.pharmacist_id = current_pharmacist.id
-    requested_drug = (review.drug or "").strip()
-    current_drug = case.drug_name if case.drug_name and case.drug_name != "Pharmacist review required" else ""
-    selected_drug = requested_drug or _get_default_ai_medication(case) or current_drug or "Pharmacist review completed"
-    case.drug_name = selected_drug.strip()
-    diagnosis = (review.diagnosis or "").strip()
-    advice = review.advice.strip()
-    referral_advice = (review.referral_advice or "").strip()
-    follow_up = (review.follow_up_instructions or "").strip()
-    case.pharmacist_feedback = advice
-    case.referral_advice = referral_advice
-    case.follow_up_instructions = follow_up
+    # Multi-drug handling
+    if review.drugs_list and len(review.drugs_list) > 0:
+        drugs = [d.get("name", "").strip() for d in review.drugs_list if d.get("name")]
+        points = [f"{d.get('name')}: {d.get('point')}" for d in review.drugs_list if d.get("name")]
+        case.drug_name = ", ".join(drugs)
+        case.pharmacist_feedback = "\n".join(points)
+    else:
+        case.drug_name = (review.drug or "Pharmacist review completed").strip()
+        case.pharmacist_feedback = review.advice.strip()
+
+    case.referral_advice = (review.referral_advice or "").strip()
+    case.follow_up_instructions = (review.follow_up_instructions or "").strip()
     case.follow_up_status = "feedback_sent"
     case.details = (
         f"{case.details}\n\n"
-        f"Diagnosis note: {diagnosis or 'Not specified'}\n"
-        f"Pharmacist advice: {advice}\n"
-        f"Referral advice: {referral_advice or 'None'}\n"
-        f"Follow-up instructions: {follow_up or 'Monitor and return if symptoms worsen'}"
+        f"Prescription: {case.drug_name}\n"
+        f"Dosage: {case.pharmacist_feedback}\n"
+        f"Interaction: {case.referral_advice or 'None'}"
     )
     case.status = review.status
     _log_case_event(
@@ -1728,31 +1783,27 @@ def pharmacist_review_case(
         "pharmacist",
         current_pharmacist.full_name or current_pharmacist.username,
         "review_submitted",
-        advice,
+        case.pharmacist_feedback,
     )
     db.commit()
     db.refresh(case)
     serialized = _serialize_case(case)
     # Notify patient via WebSocket (non-blocking background task)
+    notification = {
+        "type": "case_updated",
+        "case_id": case.id,
+        "drug_name": case.drug_name,
+        "pharmacist_feedback": case.pharmacist_feedback,
+        "referral_advice": case.referral_advice,
+        "follow_up_instructions": case.follow_up_instructions,
+        "status": case.status,
+    }
+    # Notify logged-in user if applicable
     if case.user_id:
-        import asyncio
-        notification = {
-            "type": "case_updated",
-            "case_id": case.id,
-            "drug_name": case.drug_name,
-            "pharmacist_feedback": case.pharmacist_feedback,
-            "referral_advice": case.referral_advice,
-            "follow_up_instructions": case.follow_up_instructions,
-            "status": case.status,
-        }
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.ensure_future(ws_manager.notify_user(case.user_id, notification))
-            else:
-                asyncio.run(ws_manager.notify_user(case.user_id, notification))
-        except Exception:
-            pass
+        background_tasks.add_task(ws_manager.notify_user, case.user_id, notification)
+    # Always notify by case_id (covers guests)
+    background_tasks.add_task(ws_manager.notify_case, case.id, notification)
+
     return {"status": "success", "case": serialized}
 
 
