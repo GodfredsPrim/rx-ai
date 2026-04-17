@@ -285,17 +285,65 @@ function signOut() {
 
 // Navigation & Global UI
 function go(name, el) {
+  const isGuest = currentSession.role === 'guest';
+  const restrictedTabs = ['bodymap', 'conditions', 'redflag', 'profile', 'connect', 'history'];
+
+  // Handle restricted access for guests ONLY for relevant patient tabs
+  if (restrictedTabs.includes(name)) {
+    if (isGuest) {
+      showGuestRestriction(name);
+    } else {
+      hideGuestRestriction(name);
+    }
+  }
+
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('on'));
   const target = document.getElementById('panel-' + name);
   if (target) target.classList.add('on');
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('on'));
   if (el) el.classList.add('on');
+  
   if (name === 'pharmacist') refreshPharmacistDashboard();
   if (name === 'admin') refreshAdminDashboard();
+
+  // Reset scroll
+  const mainContent = document.getElementById('main-content');
+  if (mainContent) mainContent.scrollTop = 0;
+  if (target) target.scrollTop = 0;
+  window.scrollTo({ top: 0, behavior: 'auto' });
   
-  // ChatGPT style: auto-close sidebar on mobile after selection
   closeSidebar();
 }
+
+function showGuestRestriction(name) {
+  const panel = document.getElementById('panel-' + name);
+  if (!panel) return;
+  const prompt = panel.querySelector('.auth-prompt-overlay');
+  const content = panel.querySelector('.panel-content-wrapper') || panel.querySelector(':scope > div:not(.panel-header):not(.auth-prompt-overlay)');
+  
+  if (prompt) prompt.style.display = 'flex';
+  if (content) content.style.display = 'none';
+}
+
+function hideGuestRestriction(name) {
+  const panel = document.getElementById('panel-' + name);
+  if (!panel) return;
+  const prompt = panel.querySelector('.auth-prompt-overlay');
+  const content = panel.querySelector('.panel-content-wrapper');
+  
+  if (prompt) prompt.style.display = 'none';
+  if (content) {
+    content.style.display = 'block';
+  } else {
+    // If no wrapper, make sure children aren't accidentally hidden
+    panel.querySelectorAll(':scope > div:not(.auth-prompt-overlay)').forEach(child => {
+      if (child.style.display === 'none') child.style.display = 'block';
+    });
+  }
+}
+
+function goProfile(el) { go('profile', el); }
+function goHistory(el) { go('history', el); }
 
 function toggleSidebar() {
   const sb = document.querySelector('.sidebar');
@@ -452,8 +500,8 @@ function renderCaseCard(c, mode) {
 async function acceptCase(id) { 
   await callApi(`/pharmacist/cases/${id}/accept`, 'POST'); 
   showToast('Case accepted'); 
-  const tabBtn = document.querySelector('[onclick*="active"]');
-  if (tabBtn) showPharmaTab('active', tabBtn); 
+  const tabBtn = document.querySelector('[onclick*="assigned"]');
+  if (tabBtn) showPharmaTab('assigned', tabBtn); 
   refreshPharmacistDashboard(); 
 }
 
@@ -478,7 +526,7 @@ async function refreshPharmacistDashboard() {
     if (c) c.textContent = s.completed_cases || 0;
 
     renderPharmaQueue('pharmacist-pending-queue', data.pending_cases, 'pending');
-    renderPharmaQueue('pharmacist-queue', data.assigned_cases || data.in_review_cases, 'active');
+    renderPharmaQueue('pharmacist-queue', data.assigned_cases || data.in_review_cases, 'assigned');
     renderPharmaQueue('pharmacist-completed', data.completed_cases, 'completed');
 
     // Restore scroll positions
@@ -504,12 +552,12 @@ function renderPharmaQueue(id, cases = [], mode = 'pending') {
       <div class="dashboard-field"><label>Summary</label><div style="font-size:0.875rem;">${cs.case_summary || 'No details'}</div></div>
       <div class="dashboard-field"><label>Status</label><div><span class="badge badge-${cs.status === 'Pending' ? 'warning' : 'success'}">${cs.status}</span></div></div>
       ${mode === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="acceptCase(${cs.id})">Accept Case</button>` : ''}
-      ${mode === 'active' ? `
+      ${mode === 'assigned' ? `
         <hr style="margin:12px 0;border:none;border-top:1px solid var(--mist-200);">
         <div id="drug-rows-${cs.id}">
-          <div class="drug-row" style="display:grid; grid-template-columns: 1fr 2fr auto; gap:10px; margin-bottom:10px;">
+          <div class="drug-row" style="display:grid; grid-template-columns: 1fr 3fr auto; gap:10px; margin-bottom:15px; align-items: start;">
             <input type="text" class="rev-drug-name" placeholder="Drug Name" value="${cs.drug_name && cs.drug_name !== 'Pharmacist review required' ? cs.drug_name : ''}">
-            <input type="text" class="rev-drug-point" placeholder="Counselling Point" value="${cs.pharmacist_feedback || ''}">
+            <textarea class="rev-drug-point" placeholder="Dosage & Counselling Instructions" rows="2" style="resize: vertical;">${cs.pharmacist_feedback || ''}</textarea>
             <button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()" style="padding: 5px 10px;">&times;</button>
           </div>
         </div>
@@ -531,10 +579,10 @@ function addDrugRow(caseId) {
   if (!container) return;
   const row = document.createElement('div');
   row.className = 'drug-row';
-  row.style.cssText = 'display:grid; grid-template-columns: 1fr 2fr auto; gap:10px; margin-bottom:10px;';
+  row.style.cssText = 'display:grid; grid-template-columns: 1fr 3fr auto; gap:10px; margin-bottom:15px; align-items: start;';
   row.innerHTML = `
     <input type="text" class="rev-drug-name" placeholder="Drug Name">
-    <input type="text" class="rev-drug-point" placeholder="Counselling Point">
+    <textarea class="rev-drug-point" placeholder="Dosage & Counselling Instructions" rows="2" style="resize: vertical;"></textarea>
     <button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()" style="padding: 5px 10px;">&times;</button>
   `;
   container.appendChild(row);

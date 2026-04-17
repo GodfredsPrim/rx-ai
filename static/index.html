@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=20260411-3">
+  <link rel="stylesheet" href="css/styles.css?v=20260417-ui2">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1e3a30">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -28,7 +28,7 @@
   </button>
   <div class="mobile-brand">BisaRx</div>
   <button class="mobile-new-chat" onclick="newChat()" aria-label="New Chat">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
   </button>
 </header>
 
@@ -290,25 +290,40 @@
         <!-- Input bar -->
         <div class="chat-input-container">
           <input type="file" id="image-upload" accept="image/*" capture="environment" style="display:none;" onchange="handleImageUpload(event)">
-          <button class="icon-btn" id="camera-btn" onclick="document.getElementById('image-upload').click()" title="Attach image" aria-label="Upload photo">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
-          </button>
-          <button class="icon-btn voice-btn" id="mic-btn" onclick="toggleVoice()" title="Voice input" aria-label="Toggle voice input">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
-          </button>
-          <textarea class="chat-input" id="tinput" placeholder="Describe your symptoms…" rows="1" onkeydown="handleKey(event)" oninput="autoR(this)" aria-label="Type your symptoms"></textarea>
-          <button class="icon-btn sound-btn" id="spk-btn" onclick="toggleTTS()" title="Toggle voice output" aria-label="Toggle text-to-speech">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-          </button>
+          
+          <div class="chat-input-wrapper">
+            <button class="icon-btn" id="camera-btn" onclick="document.getElementById('image-upload').click()" title="Attach image" aria-label="Upload photo">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            </button>
+            
+            <button class="icon-btn voice-btn" id="mic-btn" onclick="toggleVoice()" title="Voice input" aria-label="Toggle voice input">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+            </button>
+
+            <textarea class="chat-input" id="tinput" placeholder="Type your symptoms here..." rows="1" onkeydown="handleKey(event)" oninput="autoR(this)" aria-label="Type your symptoms"></textarea>
+
+            <button class="icon-btn sound-btn" id="spk-btn" onclick="toggleTTS()" title="Toggle voice output" aria-label="Toggle text-to-speech">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+            </button>
+          </div>
+
           <button class="send-btn" id="send-btn" onclick="send()" aria-label="Send message">
-            <span>Send</span>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           </button>
         </div>
       </section>
 
       <!-- ── BODY MAP PANEL (hidden by default) ── -->
       <section class="panel" id="panel-bodymap" aria-labelledby="bodymap-title">
+        <div class="auth-prompt-overlay" style="display:none;">
+          <div class="auth-prompt-box">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+            <h3>Sign in to access Body Map</h3>
+            <p>This clinical service requires a secure account to provide personalized guidance.</p>
+            <button class="btn btn-primary" onclick="openLoginModal()" style="padding:10px 28px;">Sign In</button>
+          </div>
+        </div>
+        <div class="panel-content-wrapper">
         <div class="panel-header">
           <div class="panel-info">
             <h2 id="bodymap-title">Body Map</h2>
@@ -379,13 +394,23 @@
           </div>
           <div id="bodymap-info" class="zone-info"></div>
         </div>
-      </section>
+              </div><!-- /panel-content-wrapper -->
+</section>
 
       <!-- ── SYMPTOM MAP PANEL ── -->
 
 
       <!-- ── CONDITIONS PANEL ── -->
       <section class="panel" id="panel-conditions" aria-labelledby="conditions-title">
+        <div class="auth-prompt-overlay" style="display:none;">
+          <div class="auth-prompt-box">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <h3>Sign in to access Clinical Reference</h3>
+            <p>This clinical service requires a secure account to provide personalized guidance.</p>
+            <button class="btn btn-primary" onclick="openLoginModal()" style="padding:10px 28px;">Sign In</button>
+          </div>
+        </div>
+        <div class="panel-content-wrapper">
         <div class="panel-header">
           <div class="panel-info">
             <h2 id="conditions-title">Conditions &amp; Medications</h2>
@@ -394,10 +419,20 @@
           <span class="badge badge-success">Reference</span>
         </div>
         <div class="conditions-grid" id="cgrid" style="overflow-y:auto;"></div>
-      </section>
+              </div><!-- /panel-content-wrapper -->
+</section>
 
       <!-- ── RED FLAGS PANEL ── -->
       <section class="panel" id="panel-redflag" aria-labelledby="redflag-title">
+        <div class="auth-prompt-overlay" style="display:none;">
+          <div class="auth-prompt-box">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <h3>Sign in to access Red Flags</h3>
+            <p>This clinical service requires a secure account to provide personalized guidance.</p>
+            <button class="btn btn-primary" onclick="openLoginModal()" style="padding:10px 28px;">Sign In</button>
+          </div>
+        </div>
+        <div class="panel-content-wrapper">
         <div class="panel-header">
           <div class="panel-info">
             <h2 id="redflag-title">Red Flag Symptoms</h2>
@@ -406,10 +441,20 @@
           <span class="badge badge-danger">Urgent</span>
         </div>
         <div class="redflags-list" id="rfbody"></div>
-      </section>
+              </div><!-- /panel-content-wrapper -->
+</section>
 
       <!-- ── PROFILE PANEL ── -->
       <section class="panel" id="panel-profile" aria-labelledby="profile-title">
+        <div class="auth-prompt-overlay" style="display:none;">
+          <div class="auth-prompt-box">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <h3>Sign in to access Profile</h3>
+            <p>This clinical service requires a secure account to provide personalized guidance.</p>
+            <button class="btn btn-primary" onclick="openLoginModal()" style="padding:10px 28px;">Sign In</button>
+          </div>
+        </div>
+        <div class="panel-content-wrapper">
         <div class="panel-header">
           <div class="panel-info">
             <h2 id="profile-title">My Profile</h2>
@@ -550,10 +595,20 @@
             </div>
           </div><!-- /profile-inner -->
         </div><!-- /profile-content -->
-      </section>
+              </div><!-- /panel-content-wrapper -->
+</section>
 
       <!-- ── CARE TEAM PANEL ── -->
       <section class="panel" id="panel-connect" aria-labelledby="connect-title">
+        <div class="auth-prompt-overlay" style="display:none;">
+          <div class="auth-prompt-box">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+            <h3>Sign in to access Care Team</h3>
+            <p>This clinical service requires a secure account to provide personalized guidance.</p>
+            <button class="btn btn-primary" onclick="openLoginModal()" style="padding:10px 28px;">Sign In</button>
+          </div>
+        </div>
+        <div class="panel-content-wrapper">
         <div class="panel-header">
           <div class="panel-info">
             <h2 id="connect-title">Connect with Care Team</h2>
@@ -596,10 +651,20 @@
             </div>
           </div>
         </div>
-      </section>
+              </div><!-- /panel-content-wrapper -->
+</section>
 
       <!-- ── HISTORY PANEL ── -->
       <section class="panel" id="panel-history" aria-labelledby="history-title">
+        <div class="auth-prompt-overlay" style="display:none;">
+          <div class="auth-prompt-box">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <h3>Sign in to access History</h3>
+            <p>This clinical service requires a secure account to provide personalized guidance.</p>
+            <button class="btn btn-primary" onclick="openLoginModal()" style="padding:10px 28px;">Sign In</button>
+          </div>
+        </div>
+        <div class="panel-content-wrapper">
         <div class="panel-header">
           <div class="panel-info">
             <h2 id="history-title">Prescription History</h2>
@@ -614,7 +679,8 @@
           </div>
         </div>
         <div class="history-content pbody" id="history-content"></div>
-      </section>
+              </div><!-- /panel-content-wrapper -->
+</section>
 
       <!-- ── CLINICIAN DASHBOARD ── -->
       <section class="panel" id="panel-pharmacist" aria-labelledby="pharmacist-title">
@@ -814,7 +880,7 @@
   </div>
 </div>
 
-<script src="js/app.js?v=20260416-4"></script>
+<script src="js/app.js?v=20260417-tabfix1"></script>
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {

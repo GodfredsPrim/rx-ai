@@ -1829,8 +1829,8 @@ def case_ai_suggest(
     prompt = (
         "You are a clinical pharmacist AI assistant. Based on the case context below, "
         "suggest the most appropriate pharmacist response. Output ONLY valid JSON with these keys: "
-        "drug_name, pharmacist_feedback (2-3 sentences for patient), referral_advice (or empty string), "
-        "follow_up_instructions (or empty string), dosage.\n\nCase:\n" + context
+        "drug_name, pharmacist_feedback (2-3 detailed points for the patient including dosage and usage instructions), "
+        "referral_advice (or empty string), follow_up_instructions (or empty string), dosage.\n\nCase:\n" + context
     )
 
     try:
