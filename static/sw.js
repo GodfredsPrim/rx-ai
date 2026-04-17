@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bisarx-v1';
+const CACHE_NAME = 'bisarx-v2-pill';
 const ASSETS = [
   '/',
   '/index.html',

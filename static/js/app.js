@@ -13,6 +13,8 @@ let patientReportSignatures = new Map();
 let patientReportStatePrimed = false;
 let patientReportSyncTimer = null;
 let conditions = [], allergies = [];
+let currentImageData = null;
+
 
 function isPortalMode(mode) { return PORTAL_MODE === mode; }
 function isDedicatedPortal() { return isPortalMode('admin') || isPortalMode('pharmacist'); }
@@ -283,18 +285,58 @@ function signOut() {
   window.location.href=getPortalHome();
 }
 
+function handleImageUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  if (!file.type.startsWith('image/')) {
+    showToast('Please select an image file', 'error');
+    return;
+  }
+
+  // Show loading toast for large images
+  if (file.size > 2 * 1024 * 1024) {
+    showToast('Processing image...', 'info', 1000);
+  }
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    currentImageData = e.target.result;
+    const previewContainer = document.getElementById('image-preview-container');
+    const previewImg = document.getElementById('image-preview');
+    
+    if (previewImg) previewImg.src = currentImageData;
+    if (previewContainer) {
+      previewContainer.style.display = 'flex';
+      // Smooth scroll to preview if on mobile
+      if (window.innerWidth < 768) {
+        previewContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearImagePreview() {
+  currentImageData = null;
+  const previewContainer = document.getElementById('image-preview-container');
+  if (previewContainer) previewContainer.style.display = 'none';
+  const fileInput = document.getElementById('camera-input');
+  if (fileInput) fileInput.value = '';
+}
+
 // Navigation & Global UI
 function go(name, el) {
   const isGuest = currentSession.role === 'guest';
   const restrictedTabs = ['bodymap', 'conditions', 'redflag', 'profile', 'connect', 'history'];
 
-  // Handle restricted access for guests ONLY for relevant patient tabs
-  if (restrictedTabs.includes(name)) {
-    if (isGuest) {
-      showGuestRestriction(name);
-    } else {
-      hideGuestRestriction(name);
-    }
+  // Handle restricted access for guests
+  if (restrictedTabs.includes(name) && isGuest) {
+    openLoginModal();
+    // Also show the restriction overlay in case they close the modal
+    showGuestRestriction(name);
+  } else if (restrictedTabs.includes(name)) {
+    hideGuestRestriction(name);
   }
 
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('on'));
@@ -456,8 +498,17 @@ async function send() {
   const messages = [...history, { role: 'user', content: text }];
 
   try {
-    const res = await callApi('/chat', 'POST', { messages });
+    const payload = { messages };
+    if (currentImageData) {
+      payload.image_data = currentImageData;
+    }
+    
+    const res = await callApi('/chat', 'POST', payload);
     const reply = res.reply || res.response || '';
+    
+    // Clear image immediately after sending
+    clearImagePreview();
+    
     history.push({ role: 'user', content: text }, { role: 'assistant', content: reply });
     
     const drugTags = (res.drugs || []).map(d => ({ t: d.name, c: 'g' }));
@@ -978,6 +1029,11 @@ function _connectPharmacistWebSocket() {
       setTimeout(_connectPharmacistWebSocket, 5000); 
     };
   } catch (_) { }
+}
+
+function autoResizeTextarea(el) {
+  el.style.height = 'auto';
+  el.style.height = (el.scrollHeight) + 'px';
 }
 
 // Start
