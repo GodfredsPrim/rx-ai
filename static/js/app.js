@@ -361,6 +361,16 @@ function closeSidebar() {
   document.body.classList.remove('sidebar-open');
 }
 
+function toggleMobileMenu() {
+  toggleSidebar();
+}
+
+window.addEventListener('resize', () => {
+  if (window.innerWidth > 900) {
+    closeSidebar();
+  }
+});
+
 function newChat() {
   history = [];
   _chatGreetingShown = false;

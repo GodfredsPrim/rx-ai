@@ -3386,3 +3386,245 @@ select:focus,
     min-width: 44px;
   }
 }
+
+/* ============================================================
+   Mobile Responsiveness Cleanup
+   Consolidates shell behavior across patient, admin, pharmacist
+   ============================================================ */
+
+.panel-info,
+.case-list-info,
+.pharmacist-info,
+.dashboard-inline,
+.dashboard-toolbar,
+.profile-tab,
+.tab {
+  min-width: 0;
+}
+
+.panel-info h2,
+.panel-info p,
+.case-list-meta,
+.case-details,
+.pharmacist-info h5,
+.pharmacist-info p {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  :root { --sidebar-w: min(86vw, 340px); }
+
+  html { font-size: 15px; }
+
+  .mobile-header {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    padding-inline: max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right));
+  }
+
+  .app-container {
+    display: block;
+    min-height: 100dvh;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: var(--sidebar-w);
+    max-width: 340px;
+    min-height: 100dvh;
+    transform: translateX(-104%);
+    transition: transform .28s cubic-bezier(.16,1,.3,1);
+    z-index: 120;
+    overflow-y: auto;
+    box-shadow: 0 24px 60px rgba(9, 14, 17, 0.32);
+  }
+
+  .sidebar.open { transform: translateX(0); }
+
+  .main-content {
+    min-height: 100dvh;
+    padding-top: calc(var(--mobile-header-h) + 10px);
+    overflow: visible;
+  }
+
+  .panel {
+    margin: 10px;
+    min-height: calc(100dvh - var(--mobile-header-h) - 20px);
+  }
+
+  #panel-chat .messages-container {
+    padding: 20px 16px 112px;
+    gap: 18px;
+  }
+
+  #panel-chat .chat-input-container {
+    width: calc(100% - 20px);
+    margin: 0 10px 10px;
+    padding: 12px;
+    border-radius: 22px;
+  }
+
+  .chat-hero,
+  .dashboard-banner,
+  .connect-layout,
+  .bodymap-wrapper,
+  .bodymap-intro,
+  .form-row,
+  .form-row.three,
+  .dashboard-inline,
+  .dashboard-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-grid,
+  .conditions-grid,
+  .info-cards,
+  .pharmacist-queue {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+
+  .profile-tabs,
+  .tab-container {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .profile-tabs::-webkit-scrollbar,
+  .tab-container::-webkit-scrollbar {
+    display: none;
+  }
+
+  .profile-tab,
+  .tab {
+    flex: 0 0 auto;
+    min-width: max-content;
+    white-space: nowrap;
+  }
+
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal-box {
+    width: 100%;
+    max-height: min(92vh, 100dvh - 12px);
+    margin: 0;
+    border-radius: 26px 26px 0 0;
+    padding: 24px 18px calc(24px + env(safe-area-inset-bottom));
+  }
+
+  #portal-gate {
+    padding: 20px 14px;
+  }
+
+  .portal-gate-card {
+    padding: 28px 20px;
+    border-radius: 22px;
+  }
+}
+
+@media (max-width: 640px) {
+  :root { --mobile-header-h: 60px; }
+
+  .panel {
+    margin: 8px;
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .panel-header {
+    gap: 10px;
+    margin-bottom: 16px;
+    padding-bottom: 14px;
+  }
+
+  .panel-badges {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .quick-symptoms,
+  .visual-icons-grid,
+  .bodymap-quick-grid,
+  .stats-grid,
+  .conditions-grid,
+  .info-cards,
+  .pharmacist-queue {
+    grid-template-columns: 1fr;
+  }
+
+  .blood-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .case-list-item,
+  .med-item,
+  .rxitem,
+  .pharmacist-card,
+  .case-card,
+  .case-header,
+  .panel-header,
+  .pharmacist-actions,
+  .case-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .case-list-actions,
+  .pharmacist-actions,
+  .case-actions,
+  .dashboard-form-actions {
+    width: 100%;
+  }
+
+  .case-list-actions .btn,
+  .pharmacist-actions .btn,
+  .case-actions .btn,
+  .dashboard-form-actions .btn,
+  .dashboard-inline input,
+  .dashboard-inline select {
+    width: 100%;
+  }
+
+  .lang-buttons {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #panel-chat .messages-container {
+    padding: 14px 12px 108px;
+  }
+
+  #panel-chat .chat-input-container {
+    width: calc(100% - 16px);
+    margin-inline: 8px;
+    margin-bottom: 8px;
+    padding: 10px;
+    border-radius: 18px;
+  }
+}
+
+@media (max-width: 380px) {
+  .mobile-header {
+    padding-inline: 10px;
+  }
+
+  .portal-gate-card,
+  .modal-box,
+  .panel {
+    padding-inline: 12px;
+  }
+
+  .blood-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #panel-chat .messages-container {
+    padding-inline: 10px;
+  }
+}
