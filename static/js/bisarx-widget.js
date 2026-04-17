@@ -231,25 +231,91 @@
         audio.play().catch(e => console.warn('Audio play blocked', e));
     }
 
+    function cleanEvalText(text) {
+        if (!text) return '';
+        return text.replace(/\*\*/g, '').replace(/📢/g, '').trim();
+    }
+
+    function generateEvaluationHTML(data) {
+        const drugName = cleanEvalText(data.drug_name);
+        const feedback = cleanEvalText(data.pharmacist_feedback);
+        const referral = cleanEvalText(data.referral_advice);
+        const followUp = cleanEvalText(data.follow_up_instructions);
+
+        return `
+            <div class="clinical-evaluation-card">
+                <div class="cec-header">
+                    <div class="cec-header-icon">⚕</div>
+                    <div class="cec-header-title">Clinical Report</div>
+                </div>
+                
+                ${drugName ? `
+                <div class="cec-section">
+                    <div class="cec-label">Medication</div>
+                    <div class="cec-drug-box">
+                        <div class="cec-drug-name">${drugName}</div>
+                    </div>
+                </div>
+                ` : ''}
+
+                <div class="cec-section">
+                    <div class="cec-label">Instructions</div>
+                    <div class="cec-content">${feedback || 'No specific instructions.'}</div>
+                </div>
+
+                ${referral ? `
+                <div class="cec-section">
+                    <div class="cec-label">Referral / Critical Action</div>
+                    <div class="cec-referral">${referral}</div>
+                </div>
+                ` : ''}
+            </div>
+        `;
+    }
+
     function connectWebSocket(caseId) {
         const wsProto = API_BASE.startsWith('https') ? 'wss' : 'ws';
         const wsUrl = `${API_BASE.replace(/^http/, wsProto)}/ws/case/${caseId}`;
         
+        if (caseWs) try { caseWs.close(); } catch(e){}
+        
         caseWs = new WebSocket(wsUrl);
+        caseWs.onopen = () => console.log('BisaRx: Connected to real-time updates');
         caseWs.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
                 if (data.type === 'case_updated' && data.pharmacist_feedback) {
                     if (data.play_loud_sound) playLoudNotification();
-                    const feedback = `📢 **Pharmacist Review Complete**\n\n${data.pharmacist_feedback}\n\n${data.drug_name ? `**Medication:** ${data.drug_name}` : ''}\n${data.referral_advice ? `**Referral:** ${data.referral_advice}` : ''}`;
-                    addBotMessage(feedback);
+                    const evaluationHTML = generateEvaluationHTML(data);
+                    addBotMessage(evaluationHTML);
+                    // Successfully received evaluation
+                    currentCaseId = null; 
                 }
             } catch (e) {}
         };
         caseWs.onclose = () => {
-            setTimeout(() => connectWebSocket(caseId), 5000);
+            if (currentCaseId) setTimeout(() => connectWebSocket(caseId), 5000);
         };
     }
+
+    async function checkCaseStatus() {
+        if (!currentCaseId) return;
+        try {
+            const res = await fetch(`${API_BASE}/api/cases/guest/${currentCaseId}`);
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.status === 'Reviewed' || data.pharmacist_feedback) {
+                const evaluationHTML = generateEvaluationHTML(data);
+                addBotMessage(evaluationHTML);
+                playLoudNotification();
+                currentCaseId = null; // Stop polling
+            }
+        } catch (e) {}
+        if (currentCaseId) setTimeout(checkCaseStatus, 15000); // Poll every 15s
+    }
+
+    // Start polling if we have a case
+    setInterval(() => { if (currentCaseId) checkCaseStatus(); }, 60000); // Safety check every minute
 
     init();
 })();

@@ -420,6 +420,10 @@ function showPharmaTab(tab, el) {
 
 async function refreshPharmacistDashboard() {
   try {
+    const activeElement = document.activeElement;
+    const scrollPositions = {};
+    document.querySelectorAll('.pharmacist-queue').forEach(q => scrollPositions[q.id] = q.scrollTop);
+
     const data = await callApi('/pharmacist/dashboard');
     const s = data.stats || {};
     const p = document.getElementById('ph-stat-pending'), a = document.getElementById('ph-stat-assigned'), c = document.getElementById('ph-stat-completed');
@@ -430,6 +434,18 @@ async function refreshPharmacistDashboard() {
     renderPharmaQueue('pharmacist-pending-queue', data.pending_cases, 'pending');
     renderPharmaQueue('pharmacist-queue', data.assigned_cases || data.in_review_cases, 'active');
     renderPharmaQueue('pharmacist-completed', data.completed_cases, 'completed');
+
+    // Restore scroll positions
+    Object.entries(scrollPositions).forEach(([id, pos]) => {
+      const q = document.getElementById(id);
+      if (q) q.scrollTop = pos;
+    });
+
+    // Try to restore focus if it was in an input that still exists
+    if (activeElement && activeElement.id) {
+        const newEl = document.getElementById(activeElement.id);
+        if (newEl) newEl.focus();
+    }
   } catch (e) { console.warn('Refresh failed', e); }
 }
 
@@ -452,6 +468,7 @@ function renderPharmaQueue(id, cases = [], mode = 'pending') {
           </div>
         </div>
         <button class="btn btn-sm" style="background:var(--mist-100); color:var(--primary); margin-bottom:15px;" onclick="addDrugRow(${cs.id})">+ Add Drug</button>
+        <button class="btn btn-sm btn-magic" style="margin-bottom:15px; margin-left:8px;" onclick="fillAiSuggestion(${cs.id}, this)">💡 AI Suggest</button>
         <button class="btn btn-primary btn-sm" style="display:block; width:100%;" onclick="submitReview(${cs.id})">Submit to Patient</button>
       ` : ''}
       ${mode === 'completed' ? `
@@ -475,6 +492,45 @@ function addDrugRow(caseId) {
     <button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()" style="padding: 5px 10px;">&times;</button>
   `;
   container.appendChild(row);
+}
+
+async function fillAiSuggestion(caseId, btn) {
+  try {
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = 'Thinking...';
+    
+    const res = await callApi(`/cases/${caseId}/ai-suggest`, 'POST');
+    const suggestion = res.suggestion;
+    
+    if (suggestion) {
+      const container = document.getElementById(`drug-rows-${caseId}`);
+      if (!container) return;
+      
+      // Clear empty rows or take the first one
+      const rows = container.querySelectorAll('.drug-row');
+      let targetRow = rows[0];
+      
+      // If the first row is already filled, add a new one
+      const nameInput = targetRow.querySelector('.rev-drug-name');
+      const pointInput = targetRow.querySelector('.rev-drug-point');
+      
+      if (nameInput.value.trim() || pointInput.value.trim()) {
+        addDrugRow(caseId);
+        const newRows = container.querySelectorAll('.drug-row');
+        targetRow = newRows[newRows.length - 1];
+      }
+      
+      targetRow.querySelector('.rev-drug-name').value = suggestion.drug_name || '';
+      targetRow.querySelector('.rev-drug-point').value = suggestion.pharmacist_feedback || '';
+      showToast('AI suggestion applied!', 'success');
+    }
+  } catch (e) {
+    showToast('Failed to get AI suggestion', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '💡 AI Suggest';
+  }
 }
 
 async function submitReview(id) {
@@ -700,34 +756,83 @@ function _connectPatientWebSocket() {
   } catch (_) { }
 }
 
+function cleanEvalText(text) {
+  if (!text) return '';
+  return text.replace(/\*\*/g, '').replace(/📢/g, '').trim();
+}
+
+function generateEvaluationHTML(data) {
+  const drugName = cleanEvalText(data.drug_name);
+  const feedback = cleanEvalText(data.pharmacist_feedback);
+  const referral = cleanEvalText(data.referral_advice);
+  const followUp = cleanEvalText(data.follow_up_instructions);
+
+  return `
+    <div class="clinical-evaluation-card">
+      <div class="cec-header">
+        <div class="cec-header-icon">⚕</div>
+        <div class="cec-header-title">Clinical Evaluation Report</div>
+      </div>
+      
+      ${drugName ? `
+      <div class="cec-section">
+        <div class="cec-label">Prescription / Medication</div>
+        <div class="cec-drug-box">
+          <div class="cec-drug-name">${drugName}</div>
+        </div>
+      </div>
+      ` : ''}
+
+      <div class="cec-section">
+        <div class="cec-label">Pharmacist Guidance</div>
+        <div class="cec-content">${feedback || 'No specific instructions provided.'}</div>
+      </div>
+
+      ${referral ? `
+      <div class="cec-section">
+        <div class="cec-label">Referral / Critical Action</div>
+        <div class="cec-referral">${referral}</div>
+      </div>
+      ` : ''}
+
+      ${followUp ? `
+      <div class="cec-section">
+        <div class="cec-label">Follow-up Instructions</div>
+        <div class="cec-content">${followUp}</div>
+      </div>
+      ` : ''}
+    </div>
+  `;
+}
+
 function _connectCaseWebSocket(caseId) {
   if (isPortalMode('pharmacist') || isPortalMode('admin')) return;
   if (_caseWs && _caseWs.readyState < 2) return;
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   try {
     _caseWs = new WebSocket(`${proto}://${location.host}/ws/case/${caseId}`);
+    _caseWs.onopen = () => showToast('Connected to real-time pharmacist updates.', 'info', 2000);
     _caseWs.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'case_updated' && data.pharmacist_feedback) {
           if (data.play_loud_sound) playLoudNotification(true);
-          showToast('Pharmacist result received!', 'success', 8000);
-          const resultMsg = [
-            data.pharmacist_feedback,
-            data.drug_name ? `**Medication:** ${data.drug_name}` : '',
-            data.referral_advice ? `**Referral:** ${data.referral_advice}` : '',
-            data.follow_up_instructions ? `**Follow-up:** ${data.follow_up_instructions}` : '',
-          ].filter(Boolean).join('\n\n');
-          addMsg('ai', '📢 **Pharmacist Review Complete:**\n\n' + resultMsg, [{ t: 'Results', c: 'g' }, { t: 'Pharmacist', c: 'b' }]);
+          showToast('Pharmacist evaluation received!', 'success', 8000);
+          
+          const evaluationHTML = generateEvaluationHTML(data);
+          addMsg('ai', evaluationHTML, [{ t: 'Clinical Report', c: 'g' }, { t: 'Pharmacist Verified', c: 'b' }]);
+          
+          _caseWs.onclose = null; // Don't reconnect after success
           _caseWs.close();
         } else if (data.type === 'case_updated') {
-           showToast('Case updated.', 'info');
+           showToast('Case status updated.', 'info');
         }
       } catch (_) { }
     };
     _caseWs.onclose = () => { 
       _caseWs = null; 
-      setTimeout(() => _connectCaseWebSocket(caseId), 5000); 
+      // Reconnect if we're still waiting for pharmacist_feedback
+      setTimeout(() => _connectCaseWebSocket(caseId), 3000); 
     };
   } catch (_) { }
 }

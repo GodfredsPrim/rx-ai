@@ -239,19 +239,74 @@
   color: white;
 }
 
-/* Responsive */
-@media (max-width: 480px) {
-  .bisarx-widget-wrapper {
-    bottom: 16px;
-    right: 16px;
-    left: 16px;
-    align-items: stretch;
-  }
-  .bx-window {
-    width: 100%;
-    height: calc(100vh - 100px);
-  }
-  .bx-fab {
-    align-self: flex-end;
-  }
+/* Clinical Evaluation Card (Widget version) */
+.clinical-evaluation-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 12px;
+    border: 1px solid var(--bx-mist-200);
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    box-shadow: var(--bx-sh-sm);
+}
+.cec-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--bx-mist-100);
+}
+.cec-header-icon {
+    width: 28px;
+    height: 28px;
+    background: #f0f7f3;
+    color: var(--bx-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    font-size: 14px;
+}
+.cec-header-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--bx-primary);
+}
+.cec-section {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.cec-label {
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--bx-mist-500);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.cec-content {
+    font-size: 13px;
+    color: var(--bx-mist-800);
+    line-height: 1.4;
+}
+.cec-drug-box {
+    background: #f8faf9;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border-left: 3px solid var(--bx-primary);
+}
+.cec-drug-name {
+    font-weight: 700;
+    color: var(--bx-primary);
+    font-size: 13px;
+}
+.cec-referral {
+    background: rgba(229, 62, 62, 0.05);
+    border: 1px solid rgba(229, 62, 62, 0.1);
+    padding: 8px;
+    border-radius: 8px;
+    color: #e53e3e;
+    font-size: 12px;
 }
