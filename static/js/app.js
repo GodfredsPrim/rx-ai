@@ -292,7 +292,60 @@ function go(name, el) {
   if (el) el.classList.add('on');
   if (name === 'pharmacist') refreshPharmacistDashboard();
   if (name === 'admin') refreshAdminDashboard();
-  if (window.innerWidth <= 768) closeMobileMenu();
+  
+  // ChatGPT style: auto-close sidebar on mobile after selection
+  closeSidebar();
+}
+
+function toggleSidebar() {
+  const sb = document.querySelector('.sidebar');
+  const overlay = document.querySelector('.sidebar-overlay');
+  if (sb) sb.classList.toggle('open');
+  if (overlay) overlay.classList.toggle('open');
+  document.body.classList.toggle('sidebar-open');
+}
+
+function closeSidebar() {
+  const sb = document.querySelector('.sidebar');
+  const overlay = document.querySelector('.sidebar-overlay');
+  if (sb) sb.classList.remove('open');
+  if (overlay) overlay.classList.remove('open');
+  document.body.classList.remove('sidebar-open');
+}
+
+function newChat() {
+  history = [];
+  _chatGreetingShown = false;
+  const msgs = document.getElementById('msgs');
+  if (msgs) msgs.innerHTML = '';
+  const input = document.getElementById('tinput');
+  if (input) {
+    input.value = '';
+    input.style.height = 'auto'; // Reset height
+  }
+  _showGreeting();
+  go('chat', document.getElementById('nav-chat'));
+}
+
+function _showGreeting() {
+    if (_chatGreetingShown) return;
+    addMsg('ai', LANGS[lang].greeting, [{ t: 'BisaRx', c: 'g' }, { t: 'BisaRx Assistant', c: 'b' }, { t: 'Multilingual', c: 'a' }]);
+    _chatGreetingShown = true;
+}
+
+// PWA Install Logic
+function triggerPwaInstall() {
+  if (window.deferredPrompt) {
+    window.deferredPrompt.prompt();
+    window.deferredPrompt.userChoice.then((choiceResult) => {
+      if (choiceResult.outcome === 'accepted') {
+        showToast('Thank you for installing BisaRx!', 'success');
+      }
+      window.deferredPrompt = null;
+    });
+  } else {
+    showToast('To install: Open browser menu and select "Add to Home Screen"', 'info');
+  }
 }
 
 function updateAuthUI() {
@@ -381,15 +434,8 @@ function addMsg(role, text, tags = []) {
 }
 
 // Pharmacist Portal UI
-async function refreshPharmacistDashboard() {
-  const data = await callApi('/pharmacist/dashboard');
-  renderPharmacistDashboard(data.pending, data.assigned, data.completed);
-}
-
 function renderPharmacistDashboard(pending = [], assigned = [], completed = []) {
-  const pc = document.getElementById('pharma-pending'), ac = document.getElementById('pharma-assigned');
-  if (pc) pc.innerHTML = pending.length ? pending.map(c => renderCaseCard(c, 'pending')).join('') : '<div class="empty">No pending cases.</div>';
-  if (ac) ac.innerHTML = assigned.length ? assigned.map(c => renderCaseCard(c, 'assigned')).join('') : '<div class="empty">No assigned cases.</div>';
+  // This function is now deprecated in favor of renderPharmaQueue
 }
 
 function renderCaseCard(c, mode) {
@@ -677,9 +723,25 @@ async function initApp() {
     if (currentSession.role === 'admin') { go('admin', document.getElementById('nav-admin')); refreshAdminDashboard(); }
 
     if (!isDedicatedPortal() && !_chatGreetingShown) {
-      addMsg('ai', LANGS[lang].greeting, [{ t: 'BisaRx', c: 'g' }, { t: 'BisaRx Assistant', c: 'b' }, { t: 'Multilingual', c: 'a' }]);
-      _chatGreetingShown = true;
+      _showGreeting();
     }
+
+    // Auto-expanding chat input
+    const tinput = document.getElementById('tinput');
+    if (tinput) {
+        tinput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+    }
+
+    // Check for PWA after a short delay
+    setTimeout(() => {
+        if (!window.matchMedia('(display-mode: standalone)').matches && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+            showToast('Install BisonRx for a better experience', 'info', 8000);
+        }
+    }, 5000);
+
   } finally {
     hideLoading();
   }

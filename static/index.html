@@ -9,9 +9,28 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css?v=20260411-3">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1e3a30">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="BisaRx">
+  <link rel="apple-touch-icon" href="pwa-icon.png">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body data-portal="patient">
+
+<!-- ══════════════════════════════════════
+     MOBILE HEADER (CHATGPT STYLE)
+     ══════════════════════════════════════ -->
+<header class="mobile-header">
+  <button class="mobile-menu-toggle" onclick="toggleSidebar()" aria-label="Menu">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+  <div class="mobile-brand">BisaRx</div>
+  <button class="mobile-new-chat" onclick="newChat()" aria-label="New Chat">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+  </button>
+</header>
 
 <!-- ══════════════════════════════════════
      LOGIN MODAL
@@ -796,6 +815,25 @@
 </div>
 
 <script src="js/app.js?v=20260416-4"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').then(reg => {
+        console.log('SW registered:', reg);
+      }).catch(err => {
+        console.log('SW registration failed:', err);
+      });
+    });
+  }
+
+  // PWA Install Prompt Logic
+  let deferredPrompt;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    console.log('PWA install prompt deferred');
+  });
+</script>
 </body>
 </html>
 

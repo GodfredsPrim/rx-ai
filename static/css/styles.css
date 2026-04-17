@@ -142,19 +142,38 @@ img,svg { max-width:100%; height:auto; }
 /* ════════════════════════════════════════════════
    SIDEBAR
    ════════════════════════════════════════════════ */
-.sidebar {
-  width:var(--sidebar-w);
-  flex-shrink:0;
-  display:flex;
-  flex-direction:column;
-  min-height:100vh;
-  min-height:100dvh;
-  background:linear-gradient(180deg,rgba(255,255,255,.96) 0%,rgba(240,246,242,.90) 100%);
-  backdrop-filter:blur(24px);
-  border-right:1px solid rgba(226,232,240,.85);
-  box-shadow: inset -1px 0 0 rgba(255,255,255,.8), 20px 0 44px rgba(15,23,42,.05);
   z-index:10;
-  transition:left .32s cubic-bezier(.4,0,.2,1);
+  transition:all .32s cubic-bezier(.4,0,.2,1);
+  color:var(--white);
+  overflow:hidden;
+}
+
+.sidebar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--primary-dark);
+  z-index: -1;
+}
+
+#main-app[data-portal="patient"] .sidebar {
+  background: #0d1117;
+  border-right: 1px solid rgba(255,255,255,0.1);
+}
+
+#main-app[data-portal="patient"] .nav-item {
+  color: rgba(255,255,255,0.7);
+}
+
+#main-app[data-portal="patient"] .nav-item:hover {
+  background: rgba(255,255,255,0.05);
+  color: var(--white);
+}
+
+#main-app[data-portal="patient"] .nav-item.on {
+  background: rgba(255,255,255,0.12);
+  color: var(--white);
+  border-color: rgba(255,255,255,0.1);
 }
 
 .sidebar-header { padding:28px 22px 16px; }
@@ -377,7 +396,74 @@ img,svg { max-width:100%; height:auto; }
   -webkit-overflow-scrolling:touch;
 }
 
-#panel-chat { width:100%; max-width:1060px; margin:0 auto; }
+#panel-chat { 
+  width:100%; 
+  max-width:850px; 
+  margin:0 auto; 
+  display:flex;
+  flex-direction:column;
+  background:transparent;
+  border:none;
+  box-shadow:none;
+  padding:0;
+}
+
+#panel-chat .messages-container {
+  padding-bottom:120px;
+}
+
+#panel-chat .chat-input-container {
+  position:fixed;
+  bottom:30px;
+  left:50%;
+  transform:translateX(-50%);
+  width:calc(100% - 40px);
+  max-width:768px;
+  background:var(--white);
+  border-radius:26px;
+  padding:8px 10px;
+  box-shadow:0 10px 40px rgba(0,0,0,0.1);
+  border:1px solid var(--mist-200);
+  display:flex;
+  gap:8px;
+  align-items:flex-end;
+  z-index:100;
+  transition:var(--t);
+}
+
+#panel-chat .chat-input-container:focus-within {
+  box-shadow:0 12px 50px rgba(0,0,0,0.15);
+  border-color:var(--primary-light);
+}
+
+#panel-chat .chat-input {
+  flex:1;
+  background:transparent;
+  border:none;
+  outline:none;
+  padding:10px 6px;
+  max-height:200px;
+  min-height:44px;
+  font-size:1rem;
+}
+
+#panel-chat .send-btn {
+  width:40px;
+  height:40px;
+  border-radius:12px;
+  background:var(--primary);
+  color:var(--white);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transition:var(--t);
+  margin-bottom:2px;
+}
+
+#panel-chat .send-btn:disabled {
+  background:var(--mist-100);
+  color:var(--mist-300);
+}
 
 /* panel header */
 .panel-header {
@@ -686,6 +772,35 @@ img,svg { max-width:100%; height:auto; }
 .bub p+p,.bub ul+p,.bub p+ul { margin-top:9px; }
 .bub ul,.bub ol { padding-left:18px; }
 .bub-text { word-break:break-word; }
+  text-align: right;
+  color: var(--mist-900);
+}
+
+.bub.ai {
+  color: var(--mist-800);
+}
+
+.bub-text {
+  background: transparent;
+  padding: 0;
+}
+
+#panel-chat .messages-container {
+  display: flex;
+  flex-direction: column;
+  padding: 20px 0;
+}
+
+/* AI message container specifically for ChatGPT feel */
+.msg.ai {
+  width: 100vw;
+  margin-left: calc(-50vw + 50%);
+  padding-left: calc(50vw - 50%);
+  padding-right: calc(50vw - 50%);
+  background: rgba(30,58,48,0.03);
+  border-top: 1px solid rgba(0,0,0,0.02);
+  border-bottom: 1px solid rgba(0,0,0,0.02);
+}
 
 /* ── Typing ── */
 .typing { display:inline-flex; align-items:center; gap:5px; }
@@ -1652,18 +1767,67 @@ input:focus,textarea:focus,select:focus {
   body::before,
   body::after { opacity:.65; }
   .app-container { flex-direction:column; overflow:visible; }
-  .sidebar {
-    position:fixed; top:0; bottom:0; left:-100%;
-    width:min(85vw,300px);
-    max-width:320px;
-    min-height:100dvh;
-    transition:left .32s cubic-bezier(.4,0,.2,1);
-    box-shadow:20px 0 48px rgba(15,23,42,.15);
-    z-index:110;
-    background:linear-gradient(180deg,rgba(255,255,255,.99) 0%,rgba(241,246,243,.98) 100%);
-    backdrop-filter:none;
-  }
-  .sidebar.open { left:0; }
+.mobile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  height: 60px;
+  background: var(--glass-strong);
+  backdrop-filter: blur(20px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  border-bottom: 1px solid var(--mist-200);
+}
+
+@media (min-width: 769px) {
+  .mobile-header { display: none; }
+}
+
+.mobile-menu-toggle, .mobile-new-chat {
+  background: transparent;
+  border: none;
+  color: var(--mist-700);
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  transition: var(--t);
+}
+
+.mobile-menu-toggle:active, .mobile-new-chat:active {
+  background: var(--mist-100);
+}
+
+.mobile-brand {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--primary);
+  letter-spacing: -0.02em;
+}
+
+body.sidebar-open {
+  overflow: hidden;
+}
+
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+  z-index: 99;
+  display: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.sidebar-overlay.open {
+  display: block;
+  opacity: 1;
+}
   .main-content { 
     min-height:100dvh;
     padding:12px; 
@@ -1673,9 +1837,18 @@ input:focus,textarea:focus,select:focus {
   }
   #panel-chat { max-width:100%; }
   #panel-chat {
-    gap:10px;
-    padding:10px 0 0;
-    background:linear-gradient(180deg,rgba(255,255,255,.88),rgba(245,248,250,.82));
+    gap:0;
+    padding:0;
+    background:transparent;
+  }
+  #panel-chat .chat-input-container {
+    bottom:20px;
+    width:calc(100% - 24px);
+    padding:6px 8px;
+    border-radius:24px;
+  }
+  #panel-chat .chat-input {
+    font-size:0.95rem;
   }
   #panel-chat .panel-header {
     margin-bottom:0;
