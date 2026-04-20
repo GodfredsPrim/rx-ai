@@ -433,6 +433,21 @@ function _showGreeting() {
     _chatGreetingShown = true;
 }
 
+function updateChatWelcomeState() {
+  const panel = document.getElementById('panel-chat');
+  const messages = document.getElementById('msgs');
+  if (!panel || !messages) return;
+
+  const items = Array.from(messages.querySelectorAll('.msg'));
+  // We show the hero when there are NO messages.
+  // The first AI greeting will trigger the transition to the chat state.
+  const isWelcome = items.length === 0;
+  panel.classList.toggle('chat-welcome-state', isWelcome);
+  
+  const hero = document.getElementById('chat-welcome-hero');
+  if (hero) hero.style.display = isWelcome ? 'flex' : 'none';
+}
+
 // PWA Install Logic
 function triggerPwaInstall() {
   if (window.deferredPrompt) {
@@ -469,6 +484,7 @@ function updateAuthUI() {
 function buildLang() {
   const g = document.getElementById('msgs'), c = document.getElementById('chips'), p = document.getElementById('tinput'), d = document.getElementById('disc');
   if (g) g.innerHTML = '';
+  updateChatWelcomeState();
   if (c) c.innerHTML = LANGS[lang].chips.map(txt => `<div class="chip" onclick="document.getElementById('tinput').value='${txt}';send();">${txt}</div>`).join('');
   if (p) p.placeholder = LANGS[lang].placeholder;
   if (d) d.innerHTML = `<strong>${LANGS[lang].discLabel}</strong> ${LANGS[lang].disc}`;
@@ -540,6 +556,7 @@ function addMsg(role, text, tags = []) {
   
   m.innerHTML = avatar + bubble;
   g.appendChild(m); g.scrollTop = g.scrollHeight;
+  updateChatWelcomeState();
 }
 
 // Pharmacist Portal UI
@@ -608,28 +625,39 @@ function renderPharmaQueue(id, cases = [], mode = 'pending') {
   const el = document.getElementById(id);
   if (!el) return;
   el.innerHTML = cases.length ? cases.map(cs => `
-    <div class="case-card" id="case-evaluation-${cs.id}">
-      <div class="dashboard-field"><label>Patient</label><div>${cs.patient_name || 'Guest'}</div></div>
-      <div class="dashboard-field"><label>Summary</label><div style="font-size:0.875rem;">${cs.case_summary || 'No details'}</div></div>
+    <div class="case-card pharmacist-case-card" id="case-evaluation-${cs.id}">
+      <div class="dashboard-field"><label>Patient</label><div class="case-field-text">${cs.patient_name || 'Guest'}</div></div>
+      <div class="dashboard-field"><label>Summary</label><div class="case-field-text case-summary-text">${cs.case_summary || 'No details'}</div></div>
       <div class="dashboard-field"><label>Status</label><div><span class="badge badge-${cs.status === 'Pending' ? 'warning' : 'success'}">${cs.status}</span></div></div>
       ${mode === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="acceptCase(${cs.id})">Accept Case</button>` : ''}
       ${mode === 'assigned' ? `
-        <hr style="margin:12px 0;border:none;border-top:1px solid var(--mist-200);">
-        <div id="drug-rows-${cs.id}">
-          <div class="drug-row" style="display:grid; grid-template-columns: 1fr 3fr auto; gap:10px; margin-bottom:15px; align-items: start;">
-            <input type="text" class="rev-drug-name" placeholder="Drug Name" value="${cs.drug_name && cs.drug_name !== 'Pharmacist review required' ? cs.drug_name : ''}">
-            <textarea class="rev-drug-point" placeholder="Dosage & Counselling Instructions" rows="2" style="resize: vertical;">${cs.pharmacist_feedback || ''}</textarea>
-            <button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()" style="padding: 5px 10px;">&times;</button>
+        <div class="pharma-review-divider"></div>
+        <div class="pharma-review-block">
+          <div class="pharma-review-title">Medication Plan</div>
+          <div id="drug-rows-${cs.id}" class="drug-rows">
+            <div class="drug-row">
+              <div class="dashboard-field drug-name-field">
+                <label>Drug Name</label>
+                <input type="text" class="rev-drug-name" placeholder="Enter medication name" value="${cs.drug_name && cs.drug_name !== 'Pharmacist review required' ? cs.drug_name : ''}">
+              </div>
+              <div class="dashboard-field drug-point-field">
+                <label>Dosage and Counselling</label>
+                <textarea class="rev-drug-point" placeholder="Dose, duration, counselling points, and follow-up advice" rows="4">${cs.pharmacist_feedback || ''}</textarea>
+              </div>
+              <button class="btn btn-danger btn-sm drug-row-remove" onclick="this.parentElement.remove()" aria-label="Remove medication row">&times;</button>
+            </div>
           </div>
+          <div class="pharma-review-actions">
+            <button class="btn btn-sm btn-secondary" onclick="addDrugRow(${cs.id})">+ Add Drug</button>
+            <button class="btn btn-sm btn-magic" onclick="fillAiSuggestion(${cs.id}, this)">AI Suggest</button>
+          </div>
+          <button class="btn btn-primary btn-sm pharma-submit-btn" onclick="submitReview(${cs.id})">Submit to Patient</button>
         </div>
-        <button class="btn btn-sm" style="background:var(--mist-100); color:var(--primary); margin-bottom:15px;" onclick="addDrugRow(${cs.id})">+ Add Drug</button>
-        <button class="btn btn-sm btn-magic" style="margin-bottom:15px; margin-left:8px;" onclick="fillAiSuggestion(${cs.id}, this)">💡 AI Suggest</button>
-        <button class="btn btn-primary btn-sm" style="display:block; width:100%;" onclick="submitReview(${cs.id})">Submit to Patient</button>
       ` : ''}
       ${mode === 'completed' ? `
-        <hr style="margin:12px 0;border:none;border-top:1px solid var(--mist-200);">
-        <div class="dashboard-field"><label>Medication</label><div>${cs.drug_name || 'N/A'}</div></div>
-        <div class="dashboard-field"><label>Counselling Points</label><div style="font-size:0.875rem; white-space: pre-line;">${cs.pharmacist_feedback || 'N/A'}</div></div>
+        <div class="pharma-review-divider"></div>
+        <div class="dashboard-field"><label>Medication</label><div class="case-field-text">${cs.drug_name || 'N/A'}</div></div>
+        <div class="dashboard-field"><label>Counselling Points</label><div class="case-field-text case-feedback-text">${cs.pharmacist_feedback || 'N/A'}</div></div>
       ` : ''}
     </div>
   `).join('') : '<div class="empty">No cases here.</div>';
@@ -640,11 +668,16 @@ function addDrugRow(caseId) {
   if (!container) return;
   const row = document.createElement('div');
   row.className = 'drug-row';
-  row.style.cssText = 'display:grid; grid-template-columns: 1fr 3fr auto; gap:10px; margin-bottom:15px; align-items: start;';
   row.innerHTML = `
-    <input type="text" class="rev-drug-name" placeholder="Drug Name">
-    <textarea class="rev-drug-point" placeholder="Dosage & Counselling Instructions" rows="2" style="resize: vertical;"></textarea>
-    <button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()" style="padding: 5px 10px;">&times;</button>
+    <div class="dashboard-field drug-name-field">
+      <label>Drug Name</label>
+      <input type="text" class="rev-drug-name" placeholder="Enter medication name">
+    </div>
+    <div class="dashboard-field drug-point-field">
+      <label>Dosage and Counselling</label>
+      <textarea class="rev-drug-point" placeholder="Dose, duration, counselling points, and follow-up advice" rows="4"></textarea>
+    </div>
+    <button class="btn btn-danger btn-sm drug-row-remove" onclick="this.parentElement.remove()" aria-label="Remove medication row">&times;</button>
   `;
   container.appendChild(row);
 }
@@ -684,7 +717,7 @@ async function fillAiSuggestion(caseId, btn) {
     showToast('Failed to get AI suggestion', 'error');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '💡 AI Suggest';
+    btn.innerHTML = 'AI Suggest';
   }
 }
 

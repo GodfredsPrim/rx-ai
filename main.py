@@ -464,153 +464,16 @@ def _search_medicine_dataset(symptom_summary: str, limit: int = 5) -> list[dict]
         med_name = (med.get("Name") or "").lower()
 
         # Higher score for matched symptoms
-        for symptom in matched_symptoms:
-            if symptom in med_indication or symptom in med_category:
-                score += 5
-            # Check if indication keywords match
-            for ind in symptom_info[symptom]["indications"]:
-                if ind in med_indication:
-                    score += 3
-
-        # Score by token overlap with name/category
-        overlap = query_tokens.intersection(med["_tokens"])
-        score += len(overlap)
-
-        # Bonus for common OTC medications
-        common_meds = ["paracetamol", "acetaminophen", "ibuprofen", "aspirin", "ORS", "vitamin", "zinc", "amoxicillin", "coartem"]
-        for common in common_meds:
-            if common in med_name:
-                score += 1
-
-        if score > 0:
-            scored.append((score, med))
-
-    # Update: Cross-reference with final_dataset for better precision
-    for entry in final_dataset:
-        score = 0
-        disease = entry["disease"].lower()
-        drug_name = entry["drug"].lower()
-
-        # Check for symptom match in disease name
-        for symptom in matched_symptoms:
-            if symptom in disease:
-                score += 10 # High priority for disease match
-
-        # Token overlap
-        overlap = query_tokens.intersection(entry["_tokens"])
-        score += len(overlap)
-
-        if score > 5:
-            # We need to find or simulate the extra metadata (category, dose) since final.csv is simple
-            # We'll try to find a match in the main medicine_dataset first
-            med_info = next((m for m in medicine_dataset if m.get("Name", "").lower() == drug_name), None)
-            
-            scored.append((score, {
-                "Name": drug_name.title(),
-                "Category": med_info.get("Category", "Treatment") if med_info else "General medication",
-                "Dosage Form": med_info.get("Dosage Form", "Tablet/Syrup") if med_info else "As directed",
-                "Strength": med_info.get("Strength", "Standard") if med_info else "N/A",
-                "Indication": disease.title(),
-                "Classification": med_info.get("Classification", "OTC") if med_info else "General",
-                "_tokens": entry["_tokens"]
-            }))
-
-    scored.sort(key=lambda item: item[0], reverse=True)
-
-    # Deduplicate by drug name, keeping highest scored, ensure at least 3 results
-    seen_names = set()
-    results = []
-    for _, med in scored:
-        name = med.get("Name", "")
-        if name not in seen_names:
-            seen_names.add(name)
-            
-            # Determine dosage hint based on symptom match
-            dosage_hint = "Take as directed by your pharmacist or doctor"
-            for symptom in matched_symptoms:
-                if symptom in symptom_info:
-                    dosage_hint = symptom_info[symptom]["dosage_hint"]
-                    break
-            
-            results.append({
-                "name": name,
-                "category": med.get("Category", ""),
-                "dosage_form": med.get("Dosage Form", ""),
-                "strength": med.get("Strength", ""),
-                "indication": med.get("Indication", ""),
-                "classification": med.get("Classification", ""),
-                "dosage_instructions": dosage_hint,
-            })
-        if len(results) >= max(limit, 4):  # Increased limit for better results
-            break
-
-    return results
+def _search_medicine_dataset(*args, **kwargs):
+    return chat_engine.search_medicine_dataset(*args, **kwargs)
 
 
-def _search_final_dataset(symptom_summary: str, limit: int = 5) -> list[dict]:
-    if not final_dataset:
-        return []
-
-    query_tokens = _tokenize(symptom_summary)
-    if not query_tokens:
-        return []
-
-    scored: list[tuple[int, dict]] = []
-    for entry in final_dataset:
-        disease = entry.get("disease", "")
-        drug = entry.get("drug", "")
-        disease_lower = disease.lower()
-        drug_lower = drug.lower()
-        overlap = len(query_tokens.intersection(entry.get("_tokens", set())))
-        score = overlap
-        for token in query_tokens:
-            if len(token) > 2 and token in disease_lower:
-                score += 4
-            if len(token) > 2 and token in drug_lower:
-                score += 2
-        if score > 0:
-            scored.append((score, entry))
-
-    scored.sort(key=lambda item: item[0], reverse=True)
-    seen: set[tuple[str, str]] = set()
-    results: list[dict] = []
-    for _, entry in scored:
-        key = (entry.get("disease", "").lower(), entry.get("drug", "").lower())
-        if key in seen:
-            continue
-        seen.add(key)
-        results.append({
-            "disease": entry.get("disease", ""),
-            "drug": entry.get("drug", ""),
-        })
-        if len(results) >= limit:
-            break
-    return results
+def _search_final_dataset(*args, **kwargs):
+    return chat_engine.search_final_dataset(*args, **kwargs)
 
 
-def _get_relevant_pdf_context(messages: list[dict], limit: int = 3) -> str:
-    if not pdf_chunks:
-        return ""
-
-    query_text = " ".join(message["content"] for message in messages if message.get("role") == "user")
-    query_tokens = _tokenize(query_text)
-    if not query_tokens:
-        return ""
-
-    scored_chunks = []
-    for chunk in pdf_chunks:
-        overlap = query_tokens.intersection(chunk["tokens"])
-        if overlap:
-            scored_chunks.append((len(overlap), chunk["page"], chunk["text"]))
-
-    scored_chunks.sort(key=lambda item: item[0], reverse=True)
-    top_chunks = scored_chunks[:limit]
-    if not top_chunks:
-        return ""
-
-    return "\n\n".join(
-        f"PDF page {page}: {text}" for _, page, text in top_chunks
-    )
+def _get_relevant_pdf_context(*args, **kwargs):
+    return chat_engine.get_relevant_pdf_context(*args, **kwargs)
 
 
 def _build_local_chat_fallback(
@@ -641,8 +504,8 @@ def _build_local_chat_fallback(
     if any(keyword in lowered for keyword in urgent_keywords):
         if input_language == "twi":
             return (
-                "Ayoo, sorry paa sÃƒâ€°Ã¢â‚¬Âº woretwa mu saa. Saa nsÃƒâ€°Ã¢â‚¬ÂºnkyerÃƒâ€°Ã¢â‚¬Âºnne yi betumi ayÃƒâ€°Ã¢â‚¬Âº asiane, enti kÃƒâ€°Ã¢â‚¬Â ayaresabea anaa frÃƒâ€°Ã¢â‚¬Âº emergency ntÃƒâ€°Ã¢â‚¬Âºm. "
-                "WobÃƒâ€°Ã¢â‚¬Âºtumi akÃƒâ€°Ã¢â‚¬Â ayaresabea mprempren?"
+                "Ayoo, sorry paa sÃƒâ€°Ã¢â‚¬Âº woretwa mu saa. Saa nsÃƒâ€°Ã¢â‚¬ÂºnkyerÃƒâ€°Ã¢â‚¬Âºnne yi betumi ayÃƒâ€°Ã¢â‚¬Âº asiane, enti kÃƒâ€°Ã¢â‚¬Â  ayaresabea anaa frÃƒâ€°Ã¢â‚¬Âº emergency ntÃƒâ€°Ã¢â‚¬Âºm. "
+                "WobÃƒâ€°Ã¢â‚¬Âºtumi akÃƒâ€°Ã¢â‚¬Â  ayaresabea mprempren?"
             )
         return (
             "I am really sorry you are dealing with this. Those symptoms can be dangerous, so please go to the nearest hospital or seek emergency care now. "
@@ -757,8 +620,8 @@ def _build_fallback_consult_summary(translated_messages: list[dict], input_langu
     if input_language == "twi":
         return (
             "Meda wo ase. Makaboa nsÃƒâ€°Ã¢â‚¬Âºm a wode ama no nyinaa ano. "
-            f"NsÃƒâ€°Ã¢â‚¬Âºm titiriw a mede rekÃƒâ€°Ã¢â‚¬Âma oduruyÃƒâ€°Ã¢â‚¬Âºfo no ne: {short_summary}. "
-            "Mede bÃƒâ€°Ã¢â‚¬ÂºkÃƒâ€°Ã¢â‚¬Âma oduruyÃƒâ€°Ã¢â‚¬Âºfo a Ãƒâ€°Ã¢â‚¬ÂwÃƒâ€°Ã¢â‚¬Â tumi ahwÃƒâ€°Ã¢â‚¬Âº mu na Ãƒâ€°Ã¢â‚¬ÂnyÃƒâ€°Ã¢â‚¬Âº ayaresa ho gyinae."
+            f"NsÃƒâ€°Ã¢â‚¬Âºm titiriw a mede rekÃƒâ€°Ã¢â‚¬Â ma oduruyÃƒâ€°Ã¢â‚¬Âºfo no ne: {short_summary}. "
+            "Mede bÃƒâ€°Ã¢â‚¬ÂºkÃƒâ€°Ã¢â‚¬Â ma oduruyÃƒâ€°Ã¢â‚¬Âºfo a Ãƒâ€°Ã¢â‚¬Â wÃƒâ€°Ã¢â‚¬Â  tumi ahwÃƒâ€°Ã¢â‚¬Âº mu na Ãƒâ€°Ã¢â‚¬Â nyÃƒâ€°Ã¢â‚¬Âº ayaresa ho gyinae."
         )
     return (
         "Thank you. I have gathered the key clinical details. "
@@ -788,24 +651,8 @@ def _should_auto_handoff_to_pharmacist(translated_messages: list[dict], ai_reply
     return explicit_handoff_request or enough_clinical_detail
 
 
-def _build_pharmacist_case_details(
-    translated_messages: list[dict],
-    ai_summary: str,
-    matched_drugs: list[dict],
-    final_matches: list[dict] | None = None,
-    relevant_pdf_context: str = "",
-) -> str:
-    user_points = [
-        message["content"].strip()
-        for message in translated_messages
-        if message.get("role") == "user" and message.get("content", "").strip()
-    ]
-    symptom_history = " | ".join(user_points[-4:])[:500]
-
-    return (
-        f"AI intake summary: {ai_summary[:500]} || "
-        f"Recent patient statements: {symptom_history or 'Not captured'}"
-    )
+def _build_pharmacist_case_details(*args, **kwargs):
+    return chat_engine.build_pharmacist_case_details(*args, **kwargs)
 
 
 def _extract_ai_medication_suggestions(dataset_guidance: str) -> list[dict]:
@@ -874,157 +721,15 @@ def _get_default_ai_medication(rx: models.PrescriptionHistory) -> str:
     return suggestions[0]["medication"] if suggestions else ""
 
 
-def _build_patient_clinical_profile_snapshot(db: Session, user_id: int | None) -> str:
-    if not user_id:
-        return "No patient clinical profile was shared."
-
-    patient = db.query(models.User).filter(models.User.id == user_id).first()
-    if not patient:
-        return "No patient clinical profile was shared."
-
-    profile = patient.profile
-    medical = patient.medical
-    emergency = patient.emergency
-    active_medications = [
-        med for med in patient.medications
-        if (med.status or "").lower() in {"active", "ongoing", "current"}
-    ]
-    medication_source = active_medications if active_medications else list(patient.medications)
-    medications = ", ".join(
-        filter(
-            None,
-            [
-                f"{med.name} {med.dose}".strip() + (f" ({med.freq})" if med.freq else "")
-                for med in medication_source
-                if med.name
-            ],
-        )
-    ) or "None reported"
-    conditions = ", ".join(condition.name for condition in patient.conditions if condition.name) or "None reported"
-    allergies = ", ".join(allergy.name for allergy in patient.allergies if allergy.name) or "None reported"
-    full_name = " ".join(
-        part for part in [profile.first_name if profile else "", profile.last_name if profile else ""] if part
-    ).strip() or patient.username or patient.email or "Not provided"
-
-    sections = [
-        f"Patient: {full_name}",
-        f"DOB: {profile.dob if profile and profile.dob else 'Not provided'}",
-        f"Gender: {profile.gender if profile and profile.gender else 'Not provided'}",
-        f"Blood type: {profile.blood_type if profile and profile.blood_type else 'Not provided'}",
-        f"Phone: {profile.phone if profile and profile.phone else 'Not provided'}",
-        f"City: {profile.city if profile and profile.city else 'Not provided'}",
-        f"Address: {profile.address if profile and profile.address else 'Not provided'}",
-        f"Conditions: {conditions}",
-        f"Allergies: {allergies}",
-        f"Current medications: {medications}",
-        f"Smoking: {medical.smoking if medical and medical.smoking else 'Not reported'}",
-        f"Alcohol: {medical.alcohol if medical and medical.alcohol else 'Not reported'}",
-        f"Clinical notes: {medical.notes if medical and medical.notes else 'None'}",
-        f"Emergency alert: {emergency.alert if emergency and emergency.alert else 'None'}",
-    ]
-    return " | ".join(sections)
 
 
-def _infer_urgency_level(text: str) -> str:
-    lowered = (text or "").lower()
-    urgent_terms = ["difficulty breathing", "shortness of breath", "chest pain", "confusion", "convulsion", "unconscious", "bleeding"]
-    priority_terms = ["worse", "severe", "high fever", "vomiting", "dehydration"]
-    if any(term in lowered for term in urgent_terms):
-        return "urgent"
-    if any(term in lowered for term in priority_terms):
-        return "priority"
-    return "routine"
+
+def _log_case_event(*args, **kwargs):
+    return chat_engine.log_case_event(*args, **kwargs)
 
 
-def _detect_symptom_metadata(user_messages: list[str]) -> tuple[str, str]:
-    text = " ".join(user_messages).lower()
-    area_map = {
-        "head": ["head", "headache", "dizziness", "brain"],
-        "throat": ["throat", "neck", "swallow"],
-        "chest": ["chest", "breathing", "cough", "lungs"],
-        "abdomen": ["stomach", "abdomen", "belly", "vomiting", "diarrhea"],
-        "lower": ["urine", "urinary", "pelvic", "lower abdomen", "menstrual"],
-        "arm": ["arm", "joint", "shoulder", "elbow", "wrist"],
-        "leg": ["leg", "knee", "swelling", "thigh"],
-        "foot": ["foot", "ankle", "toe", "heel"],
-    }
-    type_map = {
-        "pain": ["pain", "ache", "hurt", "cramp"],
-        "rash": ["rash", "itch", "skin"],
-        "breathing": ["breathing", "cough", "shortness of breath"],
-        "digestive": ["vomiting", "diarrhea", "nausea", "stomach"],
-        "fever": ["fever", "temperature", "feverish"],
-        "wound": ["wound", "cut", "burn", "bleeding"],
-    }
-    symptom_area = next((area for area, terms in area_map.items() if any(term in text for term in terms)), "")
-    symptom_type = next((kind for kind, terms in type_map.items() if any(term in text for term in terms)), "")
-    return symptom_area, symptom_type
-
-
-def _log_case_event(case: models.PrescriptionHistory, actor_role: str, actor_name: str, action: str, note: str = ""):
-    case.events.append(
-        models.CaseEvent(
-            actor_role=actor_role,
-            actor_name=actor_name,
-            action=action,
-            note=note,
-        )
-    )
-
-
-def _create_case_record(
-    db: Session,
-    user_id: int | None,
-    translated_messages: list[dict],
-    ai_summary: str,
-    matched_drugs: list[dict],
-    final_matches: list[dict] | None = None,
-    relevant_pdf_context: str = "",
-    actor_note: str = "Case created from AI triage intake.",
-) -> models.PrescriptionHistory:
-    user_messages = [
-        message["content"].strip()
-        for message in translated_messages
-        if message.get("role") == "user" and message.get("content", "").strip()
-    ]
-    symptom_area, symptom_type = _detect_symptom_metadata(user_messages)
-    case_summary = " | ".join(user_messages[-4:])[:1000]
-
-    case_status = "Pending"
-    follow_up_status = "awaiting_acceptance"
-
-    patient_clinical_profile = _build_patient_clinical_profile_snapshot(db, user_id)
-    case_details = (
-        _build_pharmacist_case_details(
-            translated_messages=translated_messages,
-            ai_summary=ai_summary,
-            matched_drugs=matched_drugs,
-            final_matches=final_matches,
-            relevant_pdf_context=relevant_pdf_context,
-        )
-        + f" || Patient clinical profile for pharmacist review: {patient_clinical_profile}"
-    )
-
-    case = models.PrescriptionHistory(
-        user_id=user_id,
-        pharmacist_id=None,
-        drug_name="Pharmacist review required",
-        details=case_details,
-        patient_message=user_messages[-1] if user_messages else "",
-        case_summary=case_summary,
-        ai_summary=ai_summary[:1000],
-        urgency_level=_infer_urgency_level(f"{case_summary} {ai_summary}"),
-        follow_up_status=follow_up_status,
-        symptom_area=symptom_area,
-        symptom_type=symptom_type,
-        status=case_status,
-    )
-    _log_case_event(case, "system", "RxAI", "case_created", actor_note)
-    
-    db.add(case)
-    db.commit()
-    db.refresh(case)
-    return case
+def _create_case_record(*args, **kwargs):
+    return chat_engine.create_case_record(*args, **kwargs)
 
 
 def _ensure_db_migrations():
@@ -1131,19 +836,35 @@ def _serialize_case(rx: models.PrescriptionHistory) -> dict:
         "clinical_profile": "",
         "fast_delivery_note": "",
     }
-    for chunk in (rx.details or "").split(" || "):
-        section = chunk.strip()
-        lowered = section.lower()
-        if lowered.startswith("ai intake summary:"):
-            support_sections["ai_intake_summary"] = section.split(":", 1)[1].strip()
-        elif lowered.startswith("recent patient statements:"):
-            support_sections["recent_patient_statements"] = section.split(":", 1)[1].strip()
-        elif lowered.startswith("dataset guidance for pharmacist review only:"):
-            support_sections["dataset_guidance"] = section.split(":", 1)[1].strip()
-        elif lowered.startswith("pdf guidance for pharmacist review only:"):
-            support_sections["pdf_guidance"] = section.split(":", 1)[1].strip()
-        elif lowered.startswith("patient clinical profile for pharmacist review:"):
-            support_sections["clinical_profile"] = section.split(":", 1)[1].strip()
+    if "### AI CLINICAL INTAKE SUMMARY" in (rx.details or ""):
+        # Handling the new detailed Markdown format
+        details_text = rx.details or ""
+        support_sections["ai_intake_summary"] = (rx.ai_summary or "").strip()
+        
+        # Simple regex or split for the newer format
+        if "**Recent patient statements:**" in details_text:
+            support_sections["recent_patient_statements"] = details_text.split("**Recent patient statements:**")[1].split("\n")[0].strip()
+        if "**Dataset guidance for review:**" in details_text:
+            support_sections["dataset_guidance"] = details_text.split("**Dataset guidance for review:**")[1].split("\n")[0].strip()
+        if "**PDF guidance for review:**" in details_text:
+            support_sections["pdf_guidance"] = details_text.split("**PDF guidance for review:**")[1].split("\n")[0].strip()
+        if "Patient clinical profile for pharmacist review:" in details_text:
+            support_sections["clinical_profile"] = details_text.split("Patient clinical profile for pharmacist review:")[1].strip()
+    else:
+        # Legacy parsing
+        for chunk in (rx.details or "").split(" || "):
+            section = chunk.strip()
+            lowered = section.lower()
+            if lowered.startswith("ai intake summary:"):
+                support_sections["ai_intake_summary"] = section.split(":", 1)[1].strip()
+            elif lowered.startswith("recent patient statements:"):
+                support_sections["recent_patient_statements"] = section.split(":", 1)[1].strip()
+            elif lowered.startswith("dataset guidance for pharmacist review only:"):
+                support_sections["dataset_guidance"] = section.split(":", 1)[1].strip()
+            elif lowered.startswith("pdf guidance for pharmacist review only:"):
+                support_sections["pdf_guidance"] = section.split(":", 1)[1].strip()
+            elif lowered.startswith("patient clinical profile for pharmacist review:"):
+                support_sections["clinical_profile"] = section.split(":", 1)[1].strip()
 
     urgency_hint = {
         "urgent": "Prioritize immediate pharmacist action and rapid delivery or referral review.",

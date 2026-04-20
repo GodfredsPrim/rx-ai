@@ -52,24 +52,24 @@
   /* Simple Dashboard Styles */
   .pharmacist-queue {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    gap: 22px;
     padding: 20px 0;
   }
   .case-card {
-    background: #fff;
-    border: 1px solid var(--mist-200);
-    border-radius: 16px;
-    padding: 20px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(247,249,248,0.9));
+    border: 1px solid rgba(30,58,48,0.08);
+    border-radius: 24px;
+    padding: 22px;
+    box-shadow: 0 16px 40px rgba(16,24,40,0.08);
     transition: transform 0.2s;
   }
   .case-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 16px rgba(0,0,0,0.08);
+    box-shadow: 0 22px 44px rgba(16,24,40,0.12);
   }
   .dashboard-field {
-    margin-bottom: 12px;
+    margin-bottom: 14px;
   }
   .dashboard-field label {
     display: block;
@@ -81,11 +81,20 @@
   }
   .dashboard-field input, .dashboard-field textarea {
     width: 100%;
-    padding: 10px;
-    border: 1px solid var(--mist-200);
-    border-radius: 8px;
-    font-size: 0.9rem;
-    background: var(--mist-50);
+    padding: 12px 14px;
+    border: 1px solid rgba(30,58,48,0.1);
+    border-radius: 16px;
+    font-size: 0.95rem;
+    background: rgba(255,255,255,0.94);
+  }
+  .dashboard-field textarea {
+    min-height: 132px;
+    resize: vertical;
+  }
+  @media (max-width: 640px) {
+    .pharmacist-queue {
+      grid-template-columns: 1fr;
+    }
   }
 </style>
 

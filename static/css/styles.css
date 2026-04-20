@@ -790,6 +790,131 @@ img,svg { max-width:100%; height:auto; }
     inset 0 1px 0 rgba(255,255,255,0.9);
 }
 
+/* ── Welcome Hero (Fun2Learn Style) ── */
+.chat-welcome-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  margin: 20px 0;
+  border-radius: var(--r-xl);
+  background: 
+    radial-gradient(circle at 10% 20%, rgba(30,58,48,0.05) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(183,121,31,0.04) 0%, transparent 40%),
+    rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: var(--sh-lg);
+  animation: fadeUp .6s cubic-bezier(.16,1,.3,1) both;
+  transition: var(--t-slow);
+}
+
+#panel-chat:not(.chat-welcome-state) .chat-welcome-hero {
+  display: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hero-content {
+  max-width: 800px;
+  width: 100%;
+  text-align: center;
+}
+
+.hero-header {
+  margin-bottom: 40px;
+}
+
+.hero-kicker {
+  display: inline-block;
+  padding: 6px 14px;
+  margin-bottom: 16px;
+  background: var(--primary-glow);
+  color: var(--primary);
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  border-radius: var(--r-full);
+}
+
+.hero-header h1 {
+  font-size: clamp(1.8rem, 5vw, 2.6rem);
+  font-weight: 900;
+  color: var(--primary);
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  margin-bottom: 16px;
+}
+
+.hero-header p {
+  font-size: 1.1rem;
+  color: var(--mist-600);
+  max-width: 60ch;
+  margin: 0 auto;
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+  width: 100%;
+}
+
+.hero-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 24px;
+  background: white;
+  border: 1px solid var(--mist-100);
+  border-radius: var(--r-md);
+  text-align: left;
+  cursor: pointer;
+  transition: var(--t);
+  box-shadow: var(--sh-sm);
+}
+
+.hero-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--sh-md);
+  border-color: var(--primary-light);
+}
+
+.hero-card-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  border-radius: 16px;
+}
+
+.hero-card-text strong {
+  display: block;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--primary);
+  margin-bottom: 4px;
+}
+
+.hero-card-text p {
+  font-size: 0.85rem;
+  color: var(--mist-500);
+  line-height: 1.4;
+}
+
+/* Hide other clutter in welcome state */
+#panel-chat.chat-welcome-state .disclaimer-banner,
+#panel-chat.chat-welcome-state .quick-symptoms-bar,
+#panel-chat.chat-welcome-state .messages-container {
+  display: none;
+}
+
 /* ── Chat hero ── */
 .chat-hero {
   display:grid;
@@ -3657,5 +3782,345 @@ select:focus,
 
   #panel-chat .messages-container {
     padding-inline: 10px;
+  }
+}
+
+/* ============================================================
+   Patient Chat Composer Refresh
+   Cleaner ChatGPT-like composition area and calmer message lane
+   ============================================================ */
+
+#panel-chat {
+  background: transparent;
+}
+
+#panel-chat .panel-header,
+#panel-chat .disclaimer-banner,
+#panel-chat .quick-symptoms-bar,
+#panel-chat .voice-indicator,
+#panel-chat .quick-actions,
+#panel-chat #image-preview-container {
+  width: min(100%, 960px);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+#panel-chat .panel-header {
+  padding: 24px 24px 18px;
+}
+
+#panel-chat .messages-container {
+  width: 100%;
+  max-width: none;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 24px 0 144px;
+  gap: 18px;
+}
+
+#panel-chat .msg {
+  width: min(100%, 960px);
+  max-width: min(100%, 960px);
+  margin-left: auto;
+  margin-right: auto;
+  align-self: stretch;
+}
+
+#panel-chat .msg.ai {
+  gap: 14px;
+}
+
+#panel-chat .msg.u {
+  justify-content: flex-end;
+}
+
+#panel-chat .av {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  flex-shrink: 0;
+  font-size: 0.76rem;
+}
+
+#panel-chat .av.ai {
+  background: linear-gradient(180deg, #1f3c31, #173027);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(30, 58, 48, 0.18);
+}
+
+#panel-chat .av.u {
+  background: linear-gradient(180deg, #eceff3, #e1e7ec);
+  color: var(--text-2);
+  box-shadow: none;
+}
+
+#panel-chat .bub {
+  border-radius: 20px;
+  padding: 16px 18px;
+  box-shadow: none;
+}
+
+#panel-chat .bub.ai {
+  background: #ffffff;
+  border: 1px solid rgba(30, 58, 48, 0.08);
+}
+
+#panel-chat .bub.u {
+  background: #f0f4f8;
+  border: 1px solid rgba(30, 58, 48, 0.08);
+  color: var(--text-1);
+}
+
+#panel-chat .chat-input-container {
+  position: sticky;
+  bottom: 0;
+  width: 100%;
+  padding: 18px 24px calc(22px + env(safe-area-inset-bottom, 0px));
+  border: none;
+  background: linear-gradient(180deg, rgba(241, 246, 243, 0) 0%, rgba(241, 246, 243, 0.92) 20%, rgba(241, 246, 243, 0.98) 100%);
+  box-shadow: none;
+}
+
+#panel-chat .chat-pill {
+  width: min(100%, 960px);
+  margin: 0 auto;
+  min-height: 64px;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(30, 58, 48, 0.12);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+}
+
+#panel-chat .chat-pill:focus-within {
+  border-color: rgba(30, 58, 48, 0.22);
+  box-shadow: 0 20px 46px rgba(15, 23, 42, 0.1);
+}
+
+#panel-chat .chat-input {
+  min-height: 42px;
+  max-height: 180px;
+  padding: 10px 2px;
+  font-size: 1rem;
+  line-height: 1.55;
+  resize: none;
+}
+
+#panel-chat .pill-tools {
+  gap: 6px;
+  margin-bottom: 0;
+}
+
+#panel-chat .icon-btn {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  border-radius: 14px;
+  background: #f6f8fa;
+  border: 1px solid rgba(30, 58, 48, 0.08);
+  box-shadow: none;
+}
+
+#panel-chat .icon-btn:hover {
+  background: #eef3f6;
+  transform: none;
+}
+
+#panel-chat .send-btn.circular-btn {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 14px;
+  background: #1f3c31;
+  box-shadow: none;
+}
+
+#panel-chat .send-btn.circular-btn:hover {
+  transform: translateY(-1px);
+  background: #173027;
+  box-shadow: none;
+}
+
+#panel-chat .quick-actions {
+  width: min(100%, 960px);
+  margin: 0 auto 14px;
+}
+
+#panel-chat #image-preview-container {
+  margin-bottom: 12px;
+}
+
+/* ============================================================
+   Pharmacist Dashboard Refresh
+   More professional card spacing and roomier medication entry
+   ============================================================ */
+
+.pharmacist-queue {
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 22px;
+  align-content: start;
+}
+
+.pharmacist-case-card {
+  padding: 22px;
+  border-radius: 24px;
+}
+
+.case-field-text {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--text-1);
+}
+
+.case-summary-text,
+.case-feedback-text {
+  white-space: pre-line;
+}
+
+.pharma-review-divider {
+  height: 1px;
+  margin: 16px 0 18px;
+  background: rgba(30, 58, 48, 0.1);
+}
+
+.pharma-review-block {
+  display: grid;
+  gap: 16px;
+}
+
+.pharma-review-title {
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--primary);
+}
+
+.drug-rows {
+  display: grid;
+  gap: 14px;
+}
+
+.drug-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.95fr) minmax(280px, 1.8fr) auto;
+  gap: 14px;
+  align-items: start;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(248, 250, 249, 0.9);
+  border: 1px solid rgba(30, 58, 48, 0.08);
+}
+
+.drug-row .dashboard-field {
+  margin-bottom: 0;
+}
+
+.drug-name-field input,
+.drug-point-field textarea {
+  width: 100%;
+}
+
+.drug-name-field input {
+  min-height: 54px;
+}
+
+.drug-point-field textarea {
+  min-height: 132px;
+  resize: vertical;
+}
+
+.drug-row-remove {
+  min-width: 42px;
+  min-height: 42px;
+  padding: 0;
+  align-self: center;
+}
+
+.pharma-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pharma-submit-btn {
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .pharmacist-queue {
+    grid-template-columns: 1fr;
+  }
+
+  #panel-chat .panel-header,
+  #panel-chat .disclaimer-banner,
+  #panel-chat .quick-symptoms-bar,
+  #panel-chat .voice-indicator,
+  #panel-chat .quick-actions,
+  #panel-chat #image-preview-container,
+  #panel-chat .msg,
+  #panel-chat .chat-pill {
+    width: min(100%, 100%);
+  }
+}
+
+@media (max-width: 640px) {
+  #panel-chat .panel-header {
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+  }
+  
+  .chat-welcome-hero {
+    padding: 24px 16px;
+    margin: 10px 0;
+  }
+  
+  .hero-header h1 {
+    font-size: 1.8rem;
+  }
+  
+  .hero-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .hero-card {
+    padding: 16px;
+  }
+
+  #panel-chat .messages-container {
+    padding: 20px 16px 120px;
+    gap: 20px;
+  }
+
+  #panel-chat .chat-input-container {
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+
+  #panel-chat .chat-pill {
+    border-radius: 28px;
+    padding: 6px 14px;
+    gap: 8px;
+    background: white;
+    border: 1px solid rgba(30, 58, 48, 0.12);
+    box-shadow: 0 8px 24px rgba(30, 58, 48, 0.12);
+  }
+
+  #panel-chat .icon-btn,
+  #panel-chat .send-btn.circular-btn {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+  }
+  
+  #panel-chat .chat-input {
+    font-size: 1rem;
+    padding: 10px 0;
   }
 }

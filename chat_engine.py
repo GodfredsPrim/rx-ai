@@ -210,6 +210,42 @@ CONVERSATION RULES:
 BASE MEDICAL GUIDELINES CONTEXT:
 {pdf_context[:4000]}"""
 
+SUMMARY_PROMPT = """You are a senior clinical pharmacist specializing in emergency triage and primary care. 
+Your task is to generate a HIGHLY DETAILED, PROFESSIONAL, and CLINICALLY RIGOROUS intake report from a patient conversation.
+
+STRUCTURE YOUR REPORT AS FOLLOWS:
+
+1. CHIEF COMPLAINT
+   - Clear statement of the primary reason for the consultation.
+
+2. HISTORY OF PRESENT ILLNESS (HPI)
+   - Detailed chronological timeline of symptoms.
+   - Character of symptoms (stabbing, dull, burning, etc.).
+   - Exact location and radiation of symptoms.
+   - Severity (on a scale or descriptive).
+   - Aggravating and relieving factors.
+   - Impact on daily activities.
+
+3. ASSOCIATED SYMPTOMS & RELEVANT NEGATIVES
+   - Comprehensive list of secondary symptoms mentioned.
+   - Explicitly list relevant symptoms that the patient DENIES (e.g., "Patient denies fever or vomiting").
+
+4. CLINICAL RED FLAGS & URGENCY ASSESSMENT
+   - Explicitly state any life-threatening indicators (e.g., dyspnea, altered mental status, severe dehydration).
+   - If no red flags are present, state "No clinical red flags identified at this time."
+   - Provide a brief rationale for the assigned urgency level.
+
+5. PATIENT CLINICAL CONTEXT
+   - Summarize any mentioned chronic conditions, allergies, or current medications.
+
+6. CLINICAL IMPRESSION / PHARMACIST GUIDANCE
+   - Your professional summary of the likely clinical situation.
+   - Specific areas the reviewing pharmacist should focus on during the live assessment.
+
+Use formal clinical language (e.g., "presents with", "sequelae", "exacerbated by", "ambulatory"). 
+Be extremely thorough. Use Markdown formatting with bold headers and bullet points for maximum scanability.
+"""
+
 
 # ── context / search helpers ────────────────────────────────────────
 def get_relevant_medicine_context(messages: list[dict], limit: int = 5) -> str:
@@ -395,6 +431,39 @@ def search_medicine_dataset(symptom_summary: str, limit: int = 5) -> list[dict]:
         if len(results) >= max(limit, 4):
             break
     return results
+
+
+def generate_detailed_summary(translated_messages: list[dict]) -> str:
+    """Uses the LLM to generate a professional clinical summary from English-translated messages."""
+    try:
+        # We only need the user/assistant interaction history
+        history_text = "\n".join(
+            [f"{m['role'].upper()}: {m['content']}" for m in translated_messages if m['role'] in ['user', 'assistant']]
+        )
+        
+        response = openai_client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {"role": "system", "content": SUMMARY_PROMPT},
+                {"role": "user", "content": f"Please summarize this triage conversation with maximum clinical depth:\n\n{history_text}"}
+            ],
+            max_tokens=1500,
+            temperature=0.2,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"Failed to generate detailed summary: {e}")
+        # Improved fallback: Filter out unhelpful short responses like "no", "yes"
+        user_msgs = [
+            m['content'].strip() 
+            for m in translated_messages 
+            if m['role'] == 'user' and len(m['content'].strip()) > 3 and m['content'].strip().lower() not in {"no", "yes", "okay", "none"}
+        ]
+        if not user_msgs:
+            # If all are short, take the last one anyway but label it
+            user_msgs = [m['content'] for m in translated_messages if m['role'] == 'user'][-2:]
+        
+        return "Symptom history (Auto-concatenated): " + " | ".join(user_msgs)
 
 
 def search_final_dataset(symptom_summary: str, limit: int = 5) -> list[dict]:
@@ -681,13 +750,14 @@ def build_pharmacist_case_details(
         dataset_sections.append(f"medicine_dataset.csv: {', '.join(pharmacist_guidance)}")
     if final_guidance:
         dataset_sections.append(f"final.csv: {', '.join(final_guidance)}")
-    guidance_text = " | ".join(dataset_sections) if dataset_sections else "No dataset guidance matched."
-    pdf_text = relevant_pdf_context[:700] if relevant_pdf_context else "No PDF guidance matched."
+    guidance_text = " | ".join(dataset_sections) if dataset_sections else "No specific dataset guidance matched."
+    pdf_text = relevant_pdf_context[:1000] if relevant_pdf_context else "No specific PDF guidance matched."
     return (
-        f"AI intake summary: {ai_summary[:500]} || "
-        f"Recent patient statements: {symptom_history or 'Not captured'} || "
-        f"Dataset guidance for pharmacist review only: {guidance_text} || "
-        f"PDF guidance for pharmacist review only: {pdf_text}"
+        f"### AI CLINICAL INTAKE SUMMARY\n{ai_summary}\n\n"
+        f"--- \n"
+        f"**Recent patient statements:** {symptom_history or 'Not captured'} \n"
+        f"**Dataset guidance for review:** {guidance_text} \n"
+        f"**PDF guidance for review:** {pdf_text}"
     )
 
 
@@ -713,7 +783,10 @@ def create_case_record(
         if message.get("role") == "user" and message.get("content", "").strip()
     ]
     symptom_area, symptom_type = detect_symptom_metadata(user_messages)
-    case_summary = " | ".join(user_messages[-4:])[:1000]
+    
+    # Use the detailed AI summary for the main case summary
+    case_summary = ai_summary[:2000] 
+    
     patient_clinical_profile = build_patient_clinical_profile_snapshot(db, user_id)
     case_details = (
         build_pharmacist_case_details(
@@ -732,7 +805,7 @@ def create_case_record(
         details=case_details,
         patient_message=user_messages[-1] if user_messages else "",
         case_summary=case_summary,
-        ai_summary=ai_summary[:1000],
+        ai_summary=ai_summary[:2000],
         urgency_level=infer_urgency_level(f"{case_summary} {ai_summary}"),
         follow_up_status="awaiting_acceptance",
         symptom_area=symptom_area,
@@ -843,11 +916,14 @@ def process_chat(
             matched_drugs = search_medicine_dataset(search_text, limit=4)
             final_matches = search_final_dataset(search_text, limit=4)
 
+            # --- GENERATE DETAILED CLINICAL REPORT ---
+            detailed_report = generate_detailed_summary(translated_messages)
+
             case = create_case_record(
                 db=db,
                 user_id=user_id,
                 translated_messages=translated_messages,
-                ai_summary=reply,
+                ai_summary=detailed_report, # Use the detailed report as the primary summary
                 matched_drugs=matched_drugs,
                 final_matches=final_matches,
                 relevant_pdf_context=relevant_pdf_context,
