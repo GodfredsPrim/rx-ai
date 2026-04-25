@@ -615,8 +615,9 @@ def _analyze_conversation_state(translated_messages: list[dict]) -> dict:
 
 def _build_fallback_consult_summary(translated_messages: list[dict], input_language: str) -> str:
     analysis = _analyze_conversation_state(translated_messages)
-    summary_source = " ".join(analysis["user_messages"][-3:]).strip()
-    short_summary = summary_source[:220] if summary_source else "the reported symptoms"
+    summary_source = " ".join(analysis["user_messages"]).strip()
+    short_summary = summary_source[:1000] if summary_source else "the reported symptoms"
+
     if input_language == "twi":
         return (
             "Meda wo ase. Makaboa nsÃƒâ€°Ã¢â‚¬Âºm a wode ama no nyinaa ano. "
@@ -787,6 +788,13 @@ def _ensure_db_migrations():
                 conn.execute(text("ALTER TABLE prescription_history ADD COLUMN symptom_area VARCHAR DEFAULT ''"))
             if "symptom_type" not in columns:
                 conn.execute(text("ALTER TABLE prescription_history ADD COLUMN symptom_type VARCHAR DEFAULT ''"))
+            if "delivery_address" not in columns:
+                conn.execute(text("ALTER TABLE prescription_history ADD COLUMN delivery_address VARCHAR DEFAULT ''"))
+            if "delivery_phone" not in columns:
+                conn.execute(text("ALTER TABLE prescription_history ADD COLUMN delivery_phone VARCHAR DEFAULT ''"))
+            if "delivery_notes" not in columns:
+                conn.execute(text("ALTER TABLE prescription_history ADD COLUMN delivery_notes TEXT DEFAULT ''"))
+
 
 
 def _normalize_username(value: str) -> str:
@@ -844,6 +852,9 @@ def _serialize_case(rx: models.PrescriptionHistory) -> dict:
         # Simple regex or split for the newer format
         if "**Recent patient statements:**" in details_text:
             support_sections["recent_patient_statements"] = details_text.split("**Recent patient statements:**")[1].split("\n")[0].strip()
+        elif "**Full patient conversation history:**" in details_text:
+            support_sections["recent_patient_statements"] = details_text.split("**Full patient conversation history:**")[1].split("\n")[0].strip()
+
         if "**Dataset guidance for review:**" in details_text:
             support_sections["dataset_guidance"] = details_text.split("**Dataset guidance for review:**")[1].split("\n")[0].strip()
         if "**PDF guidance for review:**" in details_text:
@@ -890,6 +901,9 @@ def _serialize_case(rx: models.PrescriptionHistory) -> dict:
         "symptom_area": rx.symptom_area,
         "symptom_type": rx.symptom_type,
         "status": rx.status,
+        "delivery_address": rx.delivery_address,
+        "delivery_phone": rx.delivery_phone,
+        "delivery_notes": rx.delivery_notes,
         "created_at": rx.created_at.isoformat() if rx.created_at else None,
         "pharmacist_support": support_sections,
         "ai_medication_suggestions": ai_medication_suggestions,
@@ -1100,14 +1114,34 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 
 @app.post("/api/auth/pharmacist/login", response_model=schemas.Token)
 def pharmacist_login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    login_value = form_data.username.strip().lower()
-    pharmacist = db.query(models.Pharmacist).filter(
-        or_(models.Pharmacist.username == login_value, models.Pharmacist.email == login_value)
-    ).first()
-    if not pharmacist or not auth.verify_password(form_data.password, pharmacist.hashed_password):
-        raise HTTPException(status_code=400, detail="Incorrect pharmacist username or password")
-    access_token = auth.create_access_token(data={"sub": pharmacist.email, "role": "pharmacist"})
-    return {"access_token": access_token, "token_type": "bearer"}
+    try:
+        login_value = form_data.username.strip().lower()
+        pharmacist = db.query(models.Pharmacist).filter(
+            or_(
+                models.Pharmacist.username == login_value,
+                models.Pharmacist.email == login_value,
+                models.Pharmacist.license_number == login_value.upper()
+            )
+        ).first()
+
+        
+        if not pharmacist:
+            print(f"LOGIN FAIL: Pharmacist not found for '{login_value}'")
+            raise HTTPException(status_code=400, detail="Incorrect pharmacist username or password")
+            
+        if not auth.verify_password(form_data.password, pharmacist.hashed_password):
+            print(f"LOGIN FAIL: Password mismatch for pharmacist '{login_value}'")
+            raise HTTPException(status_code=400, detail="Incorrect pharmacist username or password")
+            
+        access_token = auth.create_access_token(data={"sub": pharmacist.email, "role": "pharmacist"})
+        return {"access_token": access_token, "token_type": "bearer"}
+    except Exception as e:
+        if not isinstance(e, HTTPException):
+            print(f"ERROR in pharmacist_login: {str(e)}")
+            import traceback
+            traceback.print_exc()
+        raise e
+
 
 
 @app.post("/api/auth/pharmacist/register", response_model=schemas.Token)
@@ -1181,8 +1215,67 @@ def get_profile(current_user: models.User = Depends(auth.get_current_user), db: 
 def get_profile_reports(current_user: models.User = Depends(auth.get_current_user)):
     return current_user.prescriptions
 
+def _background_generate_summary(case_id: int, translated_messages: list[dict]):
+
+    """Background task to generate and update a detailed AI clinical summary."""
+    db = SessionLocal()
+    try:
+        case = db.query(models.PrescriptionHistory).filter(models.PrescriptionHistory.id == case_id).first()
+        if not case:
+            return
+
+        # Generate the detailed report (this can take 5-15 seconds)
+        detailed_report = chat_engine.generate_detailed_summary(translated_messages)
+        
+        # Update the case record
+        case.ai_summary = detailed_report[:2000]
+        
+        # ALSO update the details field which is what the pharmacist primarily sees
+        # We rebuild the full clinical details block so it shows the AI analysis + history
+        patient_msgs = [m["content"] for m in translated_messages if m["role"] == "user"]
+        symptom_history = " | ".join(patient_msgs)
+        
+        case.details = (
+            f"### AI CLINICAL INTAKE SUMMARY\n{detailed_report}\n\n"
+            f"--- \n"
+            f"**Full patient conversation history:** {symptom_history or 'Not captured'} \n"
+            f"**Dataset guidance for review:** (Available in Intake) \n"
+            f"**PDF guidance for review:** (Available in Intake) \n"
+            f" || Patient clinical profile for pharmacist review: {chat_engine.build_patient_clinical_profile_snapshot(db, case.user_id)}"
+
+        )
+
+        # Update the queue summary to be more professional
+        # Try to find the "SUMMARY:" line we instructed the AI to provide
+        lines = detailed_report.split("\n")
+        new_case_summary = ""
+        for line in lines:
+            if line.upper().startswith("SUMMARY:"):
+                new_case_summary = line.split(":", 1)[1].strip()
+                break
+        
+        if not new_case_summary:
+            # Fallback to the patient msg summary if AI didn't provide the SUMMARY line
+            new_case_summary = "Professional review of " + ", ".join(patient_msgs[-2:])
+            
+        case.case_summary = new_case_summary[:500]
+
+        
+        # Update urgency based on full details
+        case.urgency_level = chat_engine.infer_urgency_level(f"{new_case_summary} {detailed_report}")
+
+        
+        db.commit()
+    except Exception as e:
+        print(f"Background summary generation failed for case {case_id}: {e}")
+    finally:
+        db.close()
+
+
 @app.post("/api/chat", response_model=schemas.ChatResponse)
 def chat(
+
+
     request: schemas.ChatRequest, 
     background_tasks: BackgroundTasks, 
     current_user: models.User = Depends(get_optional_user), 
@@ -1192,14 +1285,27 @@ def chat(
     user_id = current_user.id if current_user else None
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
 
-    result = chat_engine.process_chat(messages=messages, db=db, user_id=user_id, image_data=request.image_data)
+    # Use skip_summary=True to prevent freezing the request while the detailed clinical report is generated
+    result = chat_engine.process_chat(
+        messages=messages, 
+        db=db, 
+        user_id=user_id, 
+        image_data=request.image_data,
+        case_id=request.case_id,
+        skip_summary=True 
+    )
 
     if result.get("case_id"):
-        # Notify pharmacists of new case in background
+        case_id = result.get("case_id")
+        # Run detailed summary generation in the background to prevent UI freeze
+        background_tasks.add_task(_background_generate_summary, case_id, messages)
+        
+        # Notify pharmacists of new case
         background_tasks.add_task(
             ws_manager.notify_pharmacists, 
-            {"type": "case_created", "case_id": result.get("case_id")}
+            {"type": "case_created", "case_id": case_id}
         )
+
 
     return {
         "reply": result["reply"],
@@ -1618,6 +1724,7 @@ def admin_dashboard(
     }
 
 
+
 @app.get("/api/admin/insights")
 def admin_insights(
     current_admin: models.User = Depends(get_current_admin),
@@ -1802,6 +1909,7 @@ def admin_create_pharmacist(
     return {"status": "success", "pharmacist": _serialize_pharmacist(pharmacist)}
 
 
+
 @app.post("/api/admin/pharmacists/{pharmacist_id}/verify")
 def admin_verify_pharmacist(
     pharmacist_id: int,
@@ -1825,15 +1933,37 @@ def admin_delete_pharmacist(
     pharmacist = db.query(models.Pharmacist).filter(models.Pharmacist.id == pharmacist_id).first()
     if not pharmacist:
         raise HTTPException(status_code=404, detail="Pharmacist not found")
+    
     open_cases = db.query(models.PrescriptionHistory).filter(
         models.PrescriptionHistory.pharmacist_id == pharmacist_id,
         models.PrescriptionHistory.status.in_(["In Review", "Pending"]),
     ).count()
     if open_cases:
         raise HTTPException(status_code=400, detail="Reassign or close active cases before deleting this pharmacist")
+    
     db.delete(pharmacist)
     db.commit()
-    return {"status": "success"}
+    return {"status": "success", "detail": "Pharmacist deleted"}
+
+@app.post("/api/admin/pharmacists/{pharmacist_id}/reset-password")
+def admin_reset_pharmacist_password(
+    pharmacist_id: int,
+    data: dict, # Expecting {"password": "newpassword"}
+    current_admin: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    pharmacist = db.query(models.Pharmacist).filter(models.Pharmacist.id == pharmacist_id).first()
+    if not pharmacist:
+        raise HTTPException(status_code=404, detail="Pharmacist not found")
+    
+    new_password = data.get("password")
+    if not new_password or len(new_password) < 4:
+        raise HTTPException(status_code=400, detail="Password must be at least 4 characters")
+        
+    pharmacist.hashed_password = auth.get_password_hash(new_password)
+    db.commit()
+    return {"status": "success", "detail": "Password reset successfully"}
+
 
 
 @app.post("/api/admin/cases/{case_id}/assign")
@@ -1863,6 +1993,87 @@ def admin_assign_case(
         current_admin.username or current_admin.email,
         "case_assigned",
         f"Assigned to {pharmacist.full_name or pharmacist.username}",
+    )
+    db.commit()
+    db.refresh(case)
+    return {"status": "success", "case": _serialize_case(case)}
+
+
+@app.post("/api/cases/{case_id}/order")
+def order_prescription(
+    case_id: int,
+    order: schemas.OrderRequest,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    case = db.query(models.PrescriptionHistory).filter(
+        models.PrescriptionHistory.id == case_id,
+        models.PrescriptionHistory.user_id == current_user.id
+    ).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found or not owned by you")
+    
+    if case.status != "Reviewed":
+        raise HTTPException(status_code=400, detail="Only reviewed cases can be ordered")
+    
+    case.status = "Ordered"
+    case.delivery_address = order.delivery_address
+    case.delivery_phone = order.phone_number
+    case.delivery_notes = order.delivery_notes
+    
+    _log_case_event(
+        case,
+        "patient",
+        current_user.username,
+        "order_placed",
+        f"Order placed for delivery to {order.delivery_address}",
+    )
+    db.commit()
+    db.refresh(case)
+    return {"status": "success", "case": _serialize_case(case)}
+
+
+@app.post("/api/admin/cases/{case_id}/dispatch")
+def admin_dispatch_case(
+    case_id: int,
+    update: schemas.DeliveryUpdate,
+    current_admin: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    case = db.query(models.PrescriptionHistory).filter(models.PrescriptionHistory.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    
+    case.status = "Dispatched"
+    _log_case_event(
+        case,
+        "admin",
+        current_admin.username,
+        "case_dispatched",
+        f"Dispatched via {update.rider_name or 'Rider'}. Info: {update.tracking_info or 'N/A'}",
+    )
+    db.commit()
+    db.refresh(case)
+    return {"status": "success", "case": _serialize_case(case)}
+
+
+@app.post("/api/admin/cases/{case_id}/deliver")
+def admin_deliver_case(
+    case_id: int,
+    current_admin: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    case = db.query(models.PrescriptionHistory).filter(models.PrescriptionHistory.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    
+    case.status = "Delivered"
+    _log_case_event(
+        case,
+        "admin",
+        current_admin.username,
+        "case_delivered",
+        "Medication successfully delivered to patient.",
     )
     db.commit()
     db.refresh(case)
@@ -2332,7 +2543,8 @@ def submit_guest_case(
     )
     
     case.patient_message = case_data.message
-    case.case_summary = f"{case_data.first_name} {case_data.last_name} - {case_data.message[:200]}"
+    case.case_summary = f"{case_data.first_name} {case_data.last_name} - {case_data.message}"
+
     if case_data.symptoms:
         case.case_summary += f" | Symptoms: {case_data.symptoms}"
     case.follow_up_status = "awaiting_review"

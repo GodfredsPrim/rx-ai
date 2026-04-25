@@ -116,7 +116,10 @@ class PrescriptionHistory(Base):
     follow_up_status = Column(String, default="awaiting_review")
     symptom_area = Column(String, default="")
     symptom_type = Column(String, default="")
-    status = Column(String) # Pending, In Review, Reviewed, Ordered, Delivered
+    status = Column(String) # Pending, In Review, Reviewed, Ordered, Dispatched, Delivered
+    delivery_address = Column(String, nullable=True)
+    delivery_phone = Column(String, nullable=True)
+    delivery_notes = Column(String, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
 
     owner = relationship("User", back_populates="prescriptions")

@@ -237,7 +237,8 @@ function setLoginMode(mode = 'user', trigger = null) {
   // Always set the login mode on the input, even if some UI elements are missing
   if (input) input.dataset.loginMode = mode;
   if (!label || !input || !help || !submit) return;
-  if (mode === 'pharmacist') { label.textContent = 'Pharmacist ID'; input.placeholder = 'Enter pharmacist ID'; help.textContent = 'Use your allocated pharmacist credentials.'; submit.textContent = 'Sign In as Pharmacist'; }
+  if (mode === 'pharmacist') { label.textContent = 'Pharmacist ID'; input.placeholder = 'Username, Email or License #'; help.textContent = 'Use your allocated pharmacist credentials.'; submit.textContent = 'Sign In as Pharmacist'; }
+
   else if (mode === 'admin') { label.textContent = 'Admin ID'; input.placeholder = 'Enter admin identifier'; help.textContent = 'Access restricted to system administrators.'; submit.textContent = 'Sign In as Admin'; }
   else { label.textContent = 'Username or Email'; input.placeholder = 'Enter credentials'; help.textContent = 'Use your patient account.'; submit.textContent = 'Sign In'; }
   if (trigger) trigger.blur();
@@ -494,10 +495,35 @@ function renderPrescriptionHistory(rxArray = []) {
   const h = document.getElementById('history-content'); if (!h) return;
   if (!rxArray.length) { h.innerHTML = '<div class="empty">No clinical reports yet.</div>'; return; }
   h.innerHTML = rxArray.map(rx => `
-    <div class="rx-card ${rx.status.toLowerCase()}">
-      <div class="rx-head"><div class="rx-title">${rx.drug_name || 'Pharmacist Review'}</div><div class="rx-date">${new Date(rx.created_at).toLocaleDateString()}</div></div>
+    <div class="rx-card ${rx.status.toLowerCase().replace(' ', '-')}">
+      <div class="rx-head">
+        <div class="rx-title">${rx.drug_name || 'Pharmacist Review'}</div>
+        <div class="rx-date">${new Date(rx.created_at).toLocaleDateString()}</div>
+      </div>
       <div class="rx-body">
-        <div class="rx-meta"><span><strong>Status:</strong> ${rx.status}</span>${rx.pharmacist_feedback ? `<p>${rx.pharmacist_feedback}</p>` : '<p class="pending">Awaiting pharmacist assessment...</p>'}</div>
+        <div class="rx-meta">
+          <span class="rx-status-badge status-${rx.status.toLowerCase().replace(' ', '-')}">
+            <strong>Status:</strong> ${rx.status}
+          </span>
+          ${rx.pharmacist_feedback ? `<div class="rx-feedback">${window.marked ? marked.parse(rx.pharmacist_feedback) : rx.pharmacist_feedback}</div>` : '<p class="pending">Awaiting pharmacist assessment...</p>'}
+          
+          ${rx.status === 'Reviewed' ? `
+            <div class="rx-actions">
+              <button class="btn btn-primary btn-sm" onclick="showOrderModal(${rx.id})">📦 Order for Delivery</button>
+            </div>
+          ` : ''}
+
+          ${['Ordered', 'Dispatched', 'Delivered'].includes(rx.status) ? `
+            <div class="delivery-info">
+              <p>📍 <strong>Delivery Address:</strong> ${rx.delivery_address || 'N/A'}</p>
+              <div class="delivery-progress">
+                <div class="progress-step ${['Ordered', 'Dispatched', 'Delivered'].includes(rx.status) ? 'active' : ''}">Ordered</div>
+                <div class="progress-step ${['Dispatched', 'Delivered'].includes(rx.status) ? 'active' : ''}">Dispatched</div>
+                <div class="progress-step ${rx.status === 'Delivered' ? 'active' : ''}">Delivered</div>
+              </div>
+            </div>
+          ` : ''}
+        </div>
       </div>
     </div>
   `).join('');
@@ -627,7 +653,7 @@ function renderPharmaQueue(id, cases = [], mode = 'pending') {
   el.innerHTML = cases.length ? cases.map(cs => `
     <div class="case-card pharmacist-case-card" id="case-evaluation-${cs.id}">
       <div class="dashboard-field"><label>Patient</label><div class="case-field-text">${cs.patient_name || 'Guest'}</div></div>
-      <div class="dashboard-field"><label>Summary</label><div class="case-field-text case-summary-text">${cs.case_summary || 'No details'}</div></div>
+      <div class="dashboard-field"><label>Summary</label><div class="case-field-text case-summary-text">${window.marked ? marked.parse(cs.case_summary || 'No details') : (cs.case_summary || 'No details').replace(/\*\*/g, '').replace(/\*/g, '')}</div></div>
       <div class="dashboard-field"><label>Status</label><div><span class="badge badge-${cs.status === 'Pending' ? 'warning' : 'success'}">${cs.status}</span></div></div>
       ${mode === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="acceptCase(${cs.id})">Accept Case</button>` : ''}
       ${mode === 'assigned' ? `
@@ -657,7 +683,7 @@ function renderPharmaQueue(id, cases = [], mode = 'pending') {
       ${mode === 'completed' ? `
         <div class="pharma-review-divider"></div>
         <div class="dashboard-field"><label>Medication</label><div class="case-field-text">${cs.drug_name || 'N/A'}</div></div>
-        <div class="dashboard-field"><label>Counselling Points</label><div class="case-field-text case-feedback-text">${cs.pharmacist_feedback || 'N/A'}</div></div>
+        <div class="dashboard-field"><label>Counselling Points</label><div class="case-field-text case-feedback-text">${window.marked ? marked.parse(cs.pharmacist_feedback || 'N/A') : (cs.pharmacist_feedback || 'N/A').replace(/\*\*/g, '').replace(/\*/g, '')}</div></div>
       ` : ''}
     </div>
   `).join('') : '<div class="empty">No cases here.</div>';
@@ -775,6 +801,7 @@ function renderAdminPharmacists(list = []) {
       <div><strong>${p.full_name}</strong> (${p.username})<br><small>${p.email} | ${p.license_number || 'No License'}</small></div>
       <div style="display:flex; gap:8px;">
         ${!p.is_verified ? `<button class="btn btn-sm" onclick="verifyPharmacist(${p.id})">Verify</button>` : '<span class="badge badge-success">Verified</span>'}
+        <button class="btn btn-sm" onclick="resetPharmacistPassword(${p.id})">Reset Pw</button>
         <button class="btn btn-danger btn-sm" onclick="deletePharmacist(${p.id})">Delete</button>
       </div>
     </div>
@@ -789,7 +816,58 @@ function renderAdminUsers(list = []) {
 
 function renderAdminCases(cases = []) {
   const c = document.getElementById('admin-cases-list');
-  if (c) c.innerHTML = cases.length ? cases.map(cs => `<div class="ccard"><div class="cname">#${cs.id} | ${cs.patient_name}</div><div class="cdrug">Status: ${cs.status}</div></div>`).join('') : '<div class="empty">No cases found.</div>';
+  if (!c) return;
+  
+  if (!cases.length) {
+    c.innerHTML = '<div class="empty">No cases found.</div>';
+    return;
+  }
+  
+  c.innerHTML = cases.map(cs => `
+    <div class="ccard admin-case-card">
+      <div class="case-header">
+        <span class="case-id">#${cs.id}</span>
+        <span class="badge badge-${cs.status.toLowerCase().replace(' ', '-')}">${cs.status}</span>
+      </div>
+      <div class="case-body">
+        <div class="cname"><strong>Patient:</strong> ${cs.patient_name || 'Guest'}</div>
+        ${cs.drug_name ? `<div class="cdrug"><strong>Drug:</strong> ${cs.drug_name}</div>` : ''}
+        ${cs.delivery_address ? `
+          <div class="delivery-details">
+            <p>📍 ${cs.delivery_address}</p>
+            <p>📞 ${cs.delivery_phone || 'N/A'}</p>
+          </div>
+        ` : ''}
+      </div>
+      <div class="case-actions">
+        ${cs.status === 'Ordered' ? `
+          <button class="btn btn-primary btn-xs" onclick="dispatchOrder(${cs.id})">🚚 Dispatch</button>
+        ` : ''}
+        ${cs.status === 'Dispatched' ? `
+          <button class="btn btn-success btn-xs" onclick="deliverOrder(${cs.id})">✅ Mark Delivered</button>
+        ` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function dispatchOrder(id) {
+  const rider = prompt('Enter Rider Name:');
+  if (!rider) return;
+  try {
+    await callApi(`/admin/cases/${id}/dispatch`, 'POST', { status: 'Dispatched', rider_name: rider });
+    showToast('Order dispatched!', 'success');
+    refreshAdminDashboard();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function deliverOrder(id) {
+  if (!confirm('Mark as delivered?')) return;
+  try {
+    await callApi(`/admin/cases/${id}/deliver`, 'POST');
+    showToast('Order delivered!', 'success');
+    refreshAdminDashboard();
+  } catch (e) { showToast(e.message, 'error'); }
 }
 
 async function createPharmacist() {
@@ -814,6 +892,14 @@ async function createPharmacist() {
 }
 
 async function verifyPharmacist(id) { await callApi(`/admin/pharmacists/${id}/verify`, 'POST'); showToast('Pharmacist verified'); refreshAdminDashboard(); }
+async function resetPharmacistPassword(id) {
+  const newPw = prompt('Enter new password for this pharmacist:');
+  if (!newPw) return;
+  try {
+    await callApi(`/admin/pharmacists/${id}/reset-password`, 'POST', { password: newPw });
+    showToast('Password updated successfully');
+  } catch (e) { showToast(e.message, 'error'); }
+}
 async function deletePharmacist(id) { if (confirm('Delete this account?')) { await callApi(`/admin/pharmacists/${id}`, 'DELETE'); refreshAdminDashboard(); } }
 
 // Initialization
@@ -1071,3 +1157,66 @@ function autoResizeTextarea(el) {
 
 // Start
 window.addEventListener('DOMContentLoaded', initApp);
+
+// Delivery Ordering Logic
+let _currentOrderCaseId = null;
+
+function showOrderModal(caseId) {
+  _currentOrderCaseId = caseId;
+  const modal = document.getElementById('order-modal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeOrderModal() {
+  _currentOrderCaseId = null;
+  const modal = document.getElementById('order-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function submitOrder() {
+  if (!_currentOrderCaseId) return;
+  
+  const address = document.getElementById('order-address').value.trim();
+  const phone = document.getElementById('order-phone').value.trim();
+  const notes = document.getElementById('order-notes').value.trim();
+  
+  if (!address || !phone) {
+    showToast('Address and phone are required for delivery.', 'error');
+    return;
+  }
+  
+  const btn = document.getElementById('confirm-order-btn');
+  const oldText = btn.innerText;
+  btn.disabled = true;
+  btn.innerText = 'Processing...';
+  
+  try {
+    const res = await fetch(`/api/cases/${_currentOrderCaseId}/order`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({
+        delivery_address: address,
+        phone_number: phone,
+        delivery_notes: notes
+      })
+    });
+    
+    if (res.ok) {
+      showToast('Order placed successfully!', 'success');
+      closeOrderModal();
+      refreshHistory(); 
+    } else {
+      const err = await res.json();
+      showToast(err.detail || 'Failed to place order', 'error');
+    }
+  } catch (err) {
+    console.error(err);
+    showToast('Network error while placing order', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerText = oldText;
+  }
+}

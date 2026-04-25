@@ -937,6 +937,35 @@
     console.log('PWA install prompt deferred');
   });
 </script>
+  <!-- Delivery Order Modal -->
+  <div id="order-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>📦 Order for Delivery</h3>
+        <button class="modal-close" onclick="closeOrderModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>Please confirm your delivery details below.</p>
+        <div class="form-group">
+          <label>Delivery Address</label>
+          <textarea id="order-address" class="form-control" placeholder="Enter your full street address, house number, and landmarks" rows="3"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Contact Phone</label>
+          <input type="tel" id="order-phone" class="form-control" placeholder="e.g. +233 24 000 0000">
+        </div>
+        <div class="form-group">
+          <label>Delivery Notes (Optional)</label>
+          <input type="text" id="order-notes" class="form-control" placeholder="e.g. Leave at the gate">
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeOrderModal()">Cancel</button>
+        <button class="btn btn-primary" id="confirm-order-btn" onclick="submitOrder()">Confirm Order</button>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
 

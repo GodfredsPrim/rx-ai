@@ -118,6 +118,8 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     image_data: Optional[str] = None
+    case_id: Optional[int] = None
+
 
 class DrugMatch(BaseModel):
     name: str
@@ -203,3 +205,14 @@ class WaitlistPublicInfo(BaseModel):
     waitlist_url: str
     qr_image_url: str
     qr_page_url: str
+
+
+class OrderRequest(BaseModel):
+    delivery_address: str
+    phone_number: str
+    delivery_notes: Optional[str] = None
+
+class DeliveryUpdate(BaseModel):
+    status: str # Ordered, Dispatched, Delivered, Cancelled
+    rider_name: Optional[str] = None
+    tracking_info: Optional[str] = None

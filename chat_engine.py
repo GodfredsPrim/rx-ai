@@ -211,23 +211,28 @@ BASE MEDICAL GUIDELINES CONTEXT:
 {pdf_context[:4000]}"""
 
 SUMMARY_PROMPT = """You are a senior clinical pharmacist specializing in emergency triage and primary care. 
-Your task is to generate a HIGHLY DETAILED, PROFESSIONAL, and CLINICALLY RIGOROUS intake report from a patient conversation.
+Your task is to generate an EXHAUSTIVE, HIGHLY DETAILED, and CLINICALLY RIGOROUS intake report from a patient conversation.
+
+CRITICAL INSTRUCTION: Your output MUST START with a single line titled "SUMMARY:" containing a professional, one-sentence clinical summary of the case (e.g., "Patient reports moderate epigastric pain for 2 days without associated nausea.").
+
+Then, DO NOT OMIT ANY DETAILS. Every symptom mentioned, every duration, every severity level, and every concern raised by the patient MUST be captured in the appropriate sections below.
+
 
 STRUCTURE YOUR REPORT AS FOLLOWS:
 
 1. CHIEF COMPLAINT
-   - Clear statement of the primary reason for the consultation.
+   - Explicitly state EVERY primary reason mentioned for the consultation.
 
 2. HISTORY OF PRESENT ILLNESS (HPI)
-   - Detailed chronological timeline of symptoms.
-   - Character of symptoms (stabbing, dull, burning, etc.).
+   - FULL chronological timeline of symptoms from start to present.
+   - Specific character of symptoms (stabbing, dull, burning, etc.).
    - Exact location and radiation of symptoms.
-   - Severity (on a scale or descriptive).
-   - Aggravating and relieving factors.
+   - Severity (on a scale or descriptive) for EACH symptom.
+   - Aggravating and relieving factors mentioned.
    - Impact on daily activities.
 
 3. ASSOCIATED SYMPTOMS & RELEVANT NEGATIVES
-   - Comprehensive list of secondary symptoms mentioned.
+   - Comprehensive list of ALL secondary symptoms mentioned, no matter how minor.
    - Explicitly list relevant symptoms that the patient DENIES (e.g., "Patient denies fever or vomiting").
 
 4. CLINICAL RED FLAGS & URGENCY ASSESSMENT
@@ -236,15 +241,17 @@ STRUCTURE YOUR REPORT AS FOLLOWS:
    - Provide a brief rationale for the assigned urgency level.
 
 5. PATIENT CLINICAL CONTEXT
-   - Summarize any mentioned chronic conditions, allergies, or current medications.
+   - Summarize ALL mentioned chronic conditions, allergies, or current medications.
 
 6. CLINICAL IMPRESSION / PHARMACIST GUIDANCE
    - Your professional summary of the likely clinical situation.
    - Specific areas the reviewing pharmacist should focus on during the live assessment.
 
 Use formal clinical language (e.g., "presents with", "sequelae", "exacerbated by", "ambulatory"). 
-Be extremely thorough. Use Markdown formatting with bold headers and bullet points for maximum scanability.
+Be 100% thorough. If the patient said it, it MUST be in this report.
+Use Markdown formatting with bold headers and bullet points for maximum scanability.
 """
+
 
 
 # ── context / search helpers ────────────────────────────────────────
@@ -733,7 +740,8 @@ def build_pharmacist_case_details(
         for message in translated_messages
         if message.get("role") == "user" and message.get("content", "").strip()
     ]
-    symptom_history = " | ".join(user_points[-4:])[:500]
+    symptom_history = " | ".join(user_points)
+
     pharmacist_guidance: list[str] = []
     for drug in matched_drugs[:3]:
         name = drug.get("name") or "Unspecified option"
@@ -755,7 +763,8 @@ def build_pharmacist_case_details(
     return (
         f"### AI CLINICAL INTAKE SUMMARY\n{ai_summary}\n\n"
         f"--- \n"
-        f"**Recent patient statements:** {symptom_history or 'Not captured'} \n"
+        f"**Full patient conversation history:** {symptom_history or 'Not captured'} \n"
+
         f"**Dataset guidance for review:** {guidance_text} \n"
         f"**PDF guidance for review:** {pdf_text}"
     )
@@ -784,8 +793,35 @@ def create_case_record(
     ]
     symptom_area, symptom_type = detect_symptom_metadata(user_messages)
     
-    # Use the detailed AI summary for the main case summary
-    case_summary = ai_summary[:2000] 
+    # If the detailed report is pending (background generation), provide the full transcript immediately 
+    # so the pharmacist is never left with an empty or vague summary.
+    if not ai_summary or "[AI is preparing" in ai_summary:
+        ai_summary = "### CLINICAL INTAKE (TRANSCRIPT ONLY)\n\n"
+        ai_summary += "**The AI is currently generating a detailed clinical report in the background...**\n\n"
+        ai_summary += "**Full Patient Transcript:**\n"
+        ai_summary += "\n".join([f"- {m['content']}" for m in translated_messages if m['role'] == 'user'])
+    
+    # Build a professional clinical overview immediately while the background AI report is generated.
+    # This ensures the dashboard always looks professional.
+    analysis = analyze_conversation_state(translated_messages)
+    symptoms_list = analysis.get("observed_symptoms", [])
+    symptoms_text = ", ".join(symptoms_list) if symptoms_list else "reported clinical symptoms"
+    
+    duration_match = re.search(
+        r"\b(\d+\s*(hour|hours|day|days|week|weeks|month|months)|today|yesterday|since|for\s+\d+|this morning|last night)\b",
+        analysis["combined_text"],
+        re.IGNORECASE
+    )
+    duration_text = f"persisting {duration_match.group(0)}" if duration_match else "of current onset"
+    
+    case_summary = f"Clinical Intake: Patient presenting with {symptoms_text} {duration_text}."
+    if analysis["has_severity"]:
+        case_summary += " Significant severity or progression reported."
+
+
+
+
+
     
     patient_clinical_profile = build_patient_clinical_profile_snapshot(db, user_id)
     case_details = (
@@ -825,7 +861,10 @@ def process_chat(
     db: Session,
     user_id: int | None = None,
     image_data: str | None = None,
+    case_id: int | None = None,
+    skip_summary: bool = False,
 ) -> dict:
+
     """
     Process a list of chat messages through the full triage pipeline.
 
@@ -849,6 +888,39 @@ def process_chat(
     relevant_pdf_context = get_relevant_pdf_context(translated_messages)
 
     prompt_parts = [SYSTEM_PROMPT]
+    
+    # --- ADD CASE CONTEXT IF APPLICABLE ---
+    target_case_id = case_id
+    if not target_case_id and user_id:
+        # Fallback to last case if no case_id provided
+        last_case = db.query(models.PrescriptionHistory).filter(
+            models.PrescriptionHistory.user_id == user_id
+        ).order_by(models.PrescriptionHistory.id.desc()).first()
+        if last_case:
+            target_case_id = last_case.id
+
+    if target_case_id:
+        case = db.query(models.PrescriptionHistory).filter(models.PrescriptionHistory.id == target_case_id).first()
+        if case and case.status in ["Reviewed", "Dispatched", "Delivered"]:
+            # Inject pharmacist review into prompt so AI can talk about it
+            advice = case.pharmacist_feedback or "No specific advice provided."
+            drug = case.drug_name or "Prescription pending"
+            follow_up = case.follow_up_instructions or "Follow standard care."
+            
+            case_context = (
+                "\n\n--- PHARMACIST REVIEW CONTEXT ---\n"
+                "A licensed pharmacist has reviewed this case and issued the following:\n"
+                f"- PRESCRIBED TREATMENT: {drug}\n"
+                f"- CLINICAL ADVICE: {advice}\n"
+                f"- FOLLOW-UP INSTRUCTIONS: {follow_up}\n\n"
+                "You MUST acknowledge this review in your response. "
+                "You can now answer the patient's questions regarding this treatment, "
+                "how to use the medication, and what to expect. Keep your advice consistent "
+                "with the pharmacist's feedback. If the user asks for new medication, "
+                "remind them that only a pharmacist can change the prescription."
+            )
+            prompt_parts.append(case_context)
+
     if relevant_pdf_context:
         prompt_parts.append(
             "Use the following PDF guideline excerpts when they are relevant to the user question. "
@@ -882,23 +954,9 @@ def process_chat(
         )
         reply = response.choices[0].message.content
 
-        if input_language == "twi":
-            translation_response = openai_client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "Translate the following English medical advice to fluent Twi. "
-                            "Keep it natural, caring, and concise. Use simple terms for medical concepts. "
-                            "If the text contains [CONSULT_READY], keep that marker exactly as is."
-                        ),
-                    },
-                    {"role": "user", "content": reply},
-                ],
-                max_tokens=1000,
-            )
-            reply = translation_response.choices[0].message.content
+        # Redundant translation removed to speed up response. 
+        # The main prompt already instructs the model to respond in Twi if input_language is 'twi'.
+
 
         marker_handoff = "[CONSULT_READY]" in reply
         local_handoff = should_auto_handoff_to_pharmacist(translated_messages, reply)
@@ -917,9 +975,13 @@ def process_chat(
             final_matches = search_final_dataset(search_text, limit=4)
 
             # --- GENERATE DETAILED CLINICAL REPORT ---
-            detailed_report = generate_detailed_summary(translated_messages)
+            if skip_summary:
+                detailed_report = "[AI is preparing a detailed clinical report... please refresh in a moment]"
+            else:
+                detailed_report = generate_detailed_summary(translated_messages)
 
             case = create_case_record(
+
                 db=db,
                 user_id=user_id,
                 translated_messages=translated_messages,
@@ -956,16 +1018,22 @@ def process_chat(
             )
             matched_drugs = search_medicine_dataset(search_text, limit=4)
             final_matches = search_final_dataset(search_text, limit=4)
+            if skip_summary:
+                detailed_report = "[AI is preparing a detailed clinical report...]"
+            else:
+                detailed_report = generate_detailed_summary(translated_messages)
+
             case = create_case_record(
                 db=db,
                 user_id=user_id,
                 translated_messages=translated_messages,
-                ai_summary=fallback_reply,
+                ai_summary=detailed_report,
                 matched_drugs=matched_drugs,
                 final_matches=final_matches,
                 relevant_pdf_context=relevant_pdf_context,
                 actor_note="Case created from fallback triage handoff.",
             )
+
             case_id = case.id
             fallback_reply = f"{fallback_reply}\n\nYour case has been submitted for licensed pharmacist review."
         else:
