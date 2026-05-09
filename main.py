@@ -3,6 +3,7 @@ from io import BytesIO, StringIO
 import re
 import csv
 from typing import List
+from datetime import datetime
 
 import os
 from dotenv import load_dotenv
@@ -1012,6 +1013,11 @@ try:
     _ensure_admin_account(bootstrap_db)
 finally:
     bootstrap_db.close()
+
+
+@app.get("/api/health")
+async def health_check():
+    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
 
 @app.get("/api/auth/google/login")
