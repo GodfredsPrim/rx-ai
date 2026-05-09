@@ -29,6 +29,6 @@
       - key: GOOGLE_REDIRECT_URI
         sync: false
       - key: CORS_ORIGINS
-        sync: false
+        value: https://bisarx-8ym0.onrender.com,https://openpharmacy.online
       - key: DATABASE_URL
         sync: false
