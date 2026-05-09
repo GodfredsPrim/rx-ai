@@ -1,7 +1,7 @@
 (function() {
     // --- Widget Configuration ---
     const scriptTag = document.currentScript;
-    const API_BASE = scriptTag ? scriptTag.getAttribute('data-api-url') : 'https://rx-ai-7a8g.onrender.com';
+    const API_BASE = scriptTag ? scriptTag.getAttribute('data-api-url') : 'https://bisarx-8ym0.onrender.com';
     const CSS_URL = `${API_BASE}/css/bisarx-widget.css`;
 
     // --- State ---
