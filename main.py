@@ -36,6 +36,10 @@ CORS_ORIGINS = [
     for origin in os.getenv("CORS_ORIGINS", os.getenv("FRONTEND_URL", "http://127.0.0.1:8000")).split(",")
     if origin.strip()
 ]
+CORS_ALLOW_ORIGIN_REGEX = os.getenv(
+    "CORS_ALLOW_ORIGIN_REGEX",
+    r"https?://(www\.)?openpharmacy\.online$",
+)
 
 
 def _ensure_legacy_schema_updates():
@@ -63,6 +67,7 @@ app.add_middleware(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS or ["http://127.0.0.1:8000"],
+    allow_origin_regex=CORS_ALLOW_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
