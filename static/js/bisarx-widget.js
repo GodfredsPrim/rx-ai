@@ -14,7 +14,7 @@
     let caseWs = null;
 
     // --- DOM Elements (will be created) ---
-    let wrapper, fab, window, messagesContainer, textarea, sendBtn, micBtn, cameraBtn, imagePreview;
+    let wrapper, fab, chatWindow, messagesContainer, textarea, sendBtn, micBtn, cameraBtn, imagePreview;
 
     // --- Initialization ---
     function init() {
@@ -74,7 +74,7 @@
         document.body.appendChild(wrapper);
 
         fab = document.getElementById('bx-fab');
-        window = document.getElementById('bx-window');
+        chatWindow = document.getElementById('bx-window');
         messagesContainer = document.getElementById('bx-messages');
         textarea = wrapper.querySelector('.bx-textarea');
         sendBtn = document.getElementById('bx-send-btn');
@@ -124,7 +124,7 @@
 
     function toggleWindow() {
         isOpen = !isOpen;
-        window.classList.toggle('open', isOpen);
+        chatWindow.classList.toggle('open', isOpen);
     }
 
     async function handleSend() {
@@ -275,7 +275,7 @@
 
     function connectWebSocket(caseId) {
         const wsProto = API_BASE.startsWith('https') ? 'wss' : 'ws';
-        const wsUrl = `${API_BASE.replace(/^http/, wsProto)}/ws/case/${caseId}`;
+        const wsUrl = `${API_BASE.replace(/^https?/, wsProto)}/ws/case/${caseId}`;
         
         if (caseWs) try { caseWs.close(); } catch(e){}
         
