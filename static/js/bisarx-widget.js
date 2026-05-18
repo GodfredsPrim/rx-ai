@@ -1,7 +1,7 @@
 (function() {
     // --- Widget Configuration ---
     const scriptTag = document.currentScript;
-    const API_BASE = scriptTag ? scriptTag.getAttribute('data-api-url') : 'https://bisarx-8ym0.onrender.com';
+    const API_BASE = scriptTag ? scriptTag.getAttribute('data-api-url') : 'https://YOUR-RAILWAY-DOMAIN.up.railway.app';
     const CSS_URL = `${API_BASE}/css/bisarx-widget.css`;
 
     // --- State ---

@@ -1,4 +1,4 @@
-const API_URL = '/api';
+const API_URL = (window.BISARX_API_URL || '') + '/api';
 const PORTAL_MODE = window.BISARX_PORTAL || document.body?.dataset?.portal || 'patient';
 let _chatGreetingShown = false;
 let _patientWs = null;
@@ -1013,13 +1013,18 @@ async function loadProfileData(){
 
 function stopPatientReportSync() { if (patientReportSyncTimer) { clearInterval(patientReportSyncTimer); patientReportSyncTimer = null; } }
 
+function _wsBase() {
+  if (window.BISARX_API_URL) return window.BISARX_API_URL.replace(/^http/, 'ws');
+  return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`;
+}
+
 function _connectPatientWebSocket() {
   if (!isLoggedIn() || isPortalMode('pharmacist') || isPortalMode('admin')) return;
   if (_patientWs && _patientWs.readyState < 2) return;
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws', userId = currentSession.user_id || '';
+  const userId = currentSession.user_id || '';
   if (!userId) return;
   try {
-    _patientWs = new WebSocket(`${proto}://${location.host}/ws/patient/${userId}`);
+    _patientWs = new WebSocket(`${_wsBase()}/ws/patient/${userId}`);
     _patientWs.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
@@ -1098,9 +1103,8 @@ function generateEvaluationHTML(data) {
 function _connectCaseWebSocket(caseId) {
   if (isPortalMode('pharmacist') || isPortalMode('admin')) return;
   if (_caseWs && _caseWs.readyState < 2) return;
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   try {
-    _caseWs = new WebSocket(`${proto}://${location.host}/ws/case/${caseId}`);
+    _caseWs = new WebSocket(`${_wsBase()}/ws/case/${caseId}`);
     _caseWs.onopen = () => showToast('Connected to real-time pharmacist updates.', 'info', 2000);
     _caseWs.onmessage = (event) => {
       try {
@@ -1130,9 +1134,8 @@ function _connectCaseWebSocket(caseId) {
 function _connectPharmacistWebSocket() {
   if (currentSession.role !== 'pharmacist') return;
   if (_pharmacistWs && _pharmacistWs.readyState < 2) return;
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   try {
-    _pharmacistWs = new WebSocket(`${proto}://${location.host}/ws/pharmacist`);
+    _pharmacistWs = new WebSocket(`${_wsBase()}/ws/pharmacist`);
     _pharmacistWs.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
