@@ -8,6 +8,7 @@ pharmacist handoff → reply.
 
 import hashlib
 import hmac
+import json
 import os
 import time
 from typing import Any
@@ -26,6 +27,7 @@ WHATSAPP_APP_SECRET = os.getenv("WHATSAPP_APP_SECRET", "")
 WHATSAPP_API_VERSION = os.getenv("WHATSAPP_API_VERSION", "v21.0")
 
 GRAPH_API_BASE = f"https://graph.facebook.com/{WHATSAPP_API_VERSION}"
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://rx-ai-six.vercel.app").rstrip("/")
 
 # Conversation timeout in seconds (30 min)
 CONVERSATION_TTL = int(os.getenv("WHATSAPP_CONVERSATION_TTL", "1800"))
@@ -202,6 +204,17 @@ def _verify_signature(payload: bytes, signature_header: str) -> bool:
 
 
 # ── message extraction ──────────────────────────────────────────────
+def _extract_button_id(message: dict) -> str | None:
+    """Extract the button reply ID (more reliable than matching title text)."""
+    if message.get("type") == "interactive":
+        interactive = message.get("interactive") or {}
+        if interactive.get("type") == "button_reply":
+            return (interactive.get("button_reply") or {}).get("id")
+    if message.get("type") == "button":
+        return (message.get("button") or {}).get("payload")
+    return None
+
+
 def _extract_message_text(message: dict) -> str | None:
     """Extract the user‑readable text from any supported message type."""
     msg_type = message.get("type", "")
@@ -250,16 +263,14 @@ async def handle_webhook(request: Request):
     simplicity (acceptable for moderate traffic).
     """
     body = await request.body()
-    data = await request.json()
-    print("====================================", flush=True)
-    print(f"[[WEBHOOK RECEIVED]]: {data}", flush=True)
-    print("====================================", flush=True)
-
     signature = request.headers.get("X-Hub-Signature-256", "")
     if not _verify_signature(body, signature):
         raise HTTPException(status_code=403, detail="Invalid signature")
 
-    data = await request.json()
+    data = json.loads(body)
+    print("====================================", flush=True)
+    print(f"[[WEBHOOK RECEIVED]]: {data}", flush=True)
+    print("====================================", flush=True)
 
     # Extract messages from the webhook payload
     try:
@@ -313,6 +324,22 @@ async def _process_incoming_message(message: dict, value: dict):
 
     # Mark as read (blue ticks)
     await mark_as_read(message_id)
+
+    # Route interactive button replies by ID (more reliable than title matching)
+    button_id = _extract_button_id(message)
+    if button_id:
+        if button_id.startswith("btn_status_"):
+            try:
+                case_id = int(button_id.split("_")[-1])
+                await _handle_status_check(sender, case_id)
+            except (ValueError, IndexError):
+                await send_text_message(sender, "❌ Couldn't read that case number. Please start a new conversation.")
+            return
+        if button_id == "btn_new":
+            _conversations.pop(sender, None)
+            await send_text_message(sender, "🔄 Starting a new conversation. How can I help you?")
+            return
+        # btn_symptoms / btn_emergency / btn_info fall through to title-matching below
 
     # Extract text
     text = _extract_message_text(message)
@@ -402,11 +429,14 @@ async def _process_incoming_message(message: dict, value: dict):
         conversation.append({"role": "assistant", "content": reply})
 
         if is_consulting and case_id:
-            # Case was created and sent to pharmacist → send with buttons
+            # Case was created and sent to pharmacist → send with buttons + web link
             await send_text_message(sender, reply)
             await send_interactive_buttons(
                 to=sender,
-                body=f"📋 Your case #{case_id} has been submitted for pharmacist review.",
+                body=(
+                    f"📋 Your case #{case_id} has been submitted for pharmacist review.\n\n"
+                    f"🔗 Track it online: {FRONTEND_URL}/track.html?case={case_id}"
+                ),
                 buttons=[
                     {"id": f"btn_status_{case_id}", "title": "Check Status"},
                     {"id": "btn_new", "title": "New Conversation"},

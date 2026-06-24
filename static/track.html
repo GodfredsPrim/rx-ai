@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BisaRx — Track Your Case</title>
+  <script src="/js/config.js"></script>
+  <style>
+    :root {
+      --primary: #1e3a30;
+      --primary-light: #2d5a46;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --mist-50: #f7fafc;
+      --mist-100: #edf2f7;
+      --mist-200: #e2e8f0;
+      --mist-500: #718096;
+      --mist-700: #2d3748;
+      --mist-900: #1a202c;
+      --r: 16px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(135deg, #e8f4ee 0%, #f0f7f4 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 24px;
+      box-shadow: 0 20px 60px rgba(30,58,48,.12), 0 8px 24px rgba(30,58,48,.06);
+      padding: 36px 32px;
+      width: 100%;
+      max-width: 520px;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+    .logo-mark {
+      width: 40px; height: 40px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--primary-light), var(--primary));
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-weight: 800; font-size: 1rem;
+    }
+    .logo-text { font-size: 1.1rem; font-weight: 700; color: var(--mist-900); }
+    h1 { font-size: 1.5rem; font-weight: 800; color: var(--mist-900); margin-bottom: 6px; }
+    .sub { font-size: .9rem; color: var(--mist-500); margin-bottom: 28px; }
+    .field { margin-bottom: 18px; }
+    .field label {
+      display: block; font-size: .72rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .06em;
+      color: var(--mist-500); margin-bottom: 5px;
+    }
+    .field-val {
+      font-size: .95rem; color: var(--mist-700); line-height: 1.6;
+      background: var(--mist-50); border-radius: var(--r);
+      padding: 12px 14px; border: 1px solid var(--mist-200);
+    }
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 14px; border-radius: 999px;
+      font-size: .72rem; font-weight: 800; letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+    .s-pending  { background: #fef3c7; color: #92400e; }
+    .s-in-review { background: #dbeafe; color: #1e40af; }
+    .s-reviewed  { background: #d1fae5; color: #065f46; }
+    .s-ordered   { background: #ede9fe; color: #5b21b6; }
+    .s-delivered { background: #d1fae5; color: #065f46; }
+    .s-default   { background: var(--mist-100); color: var(--mist-700); }
+    .divider { height: 1px; background: var(--mist-200); margin: 22px 0; }
+    .error-msg { color: var(--danger); font-size: .9rem; text-align: center; padding: 16px 0; }
+    .loading { text-align: center; color: var(--mist-500); font-size: .9rem; padding: 24px 0; }
+    .dot-pulse { display: inline-block; }
+    .refresh-note {
+      font-size: .78rem; color: var(--mist-500); text-align: center;
+      margin-top: 20px;
+    }
+    .pill {
+      display: inline-block; background: var(--primary); color: #fff;
+      border-radius: 999px; font-size: .82rem; font-weight: 600;
+      padding: 4px 12px; margin-right: 6px; margin-bottom: 4px;
+    }
+    @media (max-width: 540px) {
+      .card { padding: 24px 18px; }
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <div class="logo-mark">Rx</div>
+    <span class="logo-text">BisaRx</span>
+  </div>
+
+  <h1>Case Status</h1>
+  <p class="sub" id="case-subtitle">Loading your case…</p>
+
+  <div id="content"><div class="loading">Fetching case details…</div></div>
+
+  <p class="refresh-note" id="refresh-note" style="display:none">
+    Auto-refreshing every 15 seconds until your case is reviewed.
+  </p>
+</div>
+
+<script>
+(function () {
+  const params  = new URLSearchParams(location.search);
+  const caseId  = parseInt(params.get('case') || '0', 10);
+  const API     = (window.BISARX_API_URL || '').replace(/\/$/, '');
+  const content = document.getElementById('content');
+  const subtitle = document.getElementById('case-subtitle');
+  const refreshNote = document.getElementById('refresh-note');
+
+  if (!caseId) {
+    subtitle.textContent = '';
+    content.innerHTML = '<div class="error-msg">No case ID provided. Check your link and try again.</div>';
+    return;
+  }
+
+  subtitle.textContent = `Case #${caseId}`;
+
+  let pollTimer = null;
+
+  function statusClass(s) {
+    const m = { Pending: 's-pending', 'In Review': 's-in-review', Reviewed: 's-reviewed', Ordered: 's-ordered', Delivered: 's-delivered' };
+    return m[s] || 's-default';
+  }
+
+  function statusEmoji(s) {
+    const m = { Pending: '⏳', 'In Review': '🔍', Reviewed: '✅', Ordered: '📦', Delivered: '🚚' };
+    return m[s] || '📋';
+  }
+
+  function render(d) {
+    const isDone = ['Reviewed', 'Ordered', 'Delivered', 'Completed'].includes(d.status);
+
+    let html = `
+      <div class="field">
+        <label>Status</label>
+        <div>
+          <span class="status-badge ${statusClass(d.status)}">${statusEmoji(d.status)} ${d.status}</span>
+        </div>
+      </div>`;
+
+    if (d.drug_name) {
+      html += `
+        <div class="divider"></div>
+        <div class="field">
+          <label>Prescribed Medication</label>
+          <div class="field-val"><span class="pill">💊 ${d.drug_name}</span></div>
+        </div>`;
+    }
+
+    if (d.pharmacist_feedback) {
+      html += `
+        <div class="field">
+          <label>Pharmacist Instructions</label>
+          <div class="field-val">${d.pharmacist_feedback.replace(/\n/g, '<br>')}</div>
+        </div>`;
+    }
+
+    if (d.referral_advice) {
+      html += `
+        <div class="field">
+          <label>Referral / Critical Action</label>
+          <div class="field-val" style="border-color:#fca5a5;background:#fff5f5;color:#991b1b">${d.referral_advice}</div>
+        </div>`;
+    }
+
+    if (d.follow_up_instructions) {
+      html += `
+        <div class="field">
+          <label>Follow-up Instructions</label>
+          <div class="field-val">${d.follow_up_instructions.replace(/\n/g, '<br>')}</div>
+        </div>`;
+    }
+
+    if (!isDone) {
+      html += `<div class="divider"></div><div class="loading" style="padding:10px 0">A pharmacist will review your case shortly.</div>`;
+    }
+
+    content.innerHTML = html;
+
+    if (isDone) {
+      refreshNote.style.display = 'none';
+      if (pollTimer) clearInterval(pollTimer);
+    } else {
+      refreshNote.style.display = 'block';
+    }
+  }
+
+  async function fetch_case() {
+    try {
+      const res = await fetch(`${API}/api/cases/guest/${caseId}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        content.innerHTML = `<div class="error-msg">${err.detail || 'Case not found. The case ID may be wrong or the case may have been removed.'}</div>`;
+        if (pollTimer) clearInterval(pollTimer);
+        return;
+      }
+      const data = await res.json();
+      render(data);
+
+      const isDone = ['Reviewed', 'Ordered', 'Delivered', 'Completed'].includes(data.status);
+      if (isDone && pollTimer) clearInterval(pollTimer);
+    } catch (e) {
+      content.innerHTML = '<div class="error-msg">Could not reach the server. Please check your connection.</div>';
+    }
+  }
+
+  fetch_case();
+  pollTimer = setInterval(fetch_case, 15000);
+})();
+</script>
+</body>
+</html>

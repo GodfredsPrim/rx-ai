@@ -38,7 +38,7 @@ CORS_ORIGINS = [
 ]
 CORS_ALLOW_ORIGIN_REGEX = os.getenv(
     "CORS_ALLOW_ORIGIN_REGEX",
-    r"https?://(www\.)?openpharmacy\.online$",
+    r"https?://(www\.)?openpharmacy\.online|https://rx-ai-[a-z0-9-]*\.vercel\.app",
 )
 
 
