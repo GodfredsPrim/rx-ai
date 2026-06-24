@@ -49,52 +49,65 @@
     gap:12px;
     flex-wrap:wrap;
   }
-  /* Simple Dashboard Styles */
+  /* Dashboard layout — mobile-safe grid */
   .pharmacist-queue {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
     gap: 22px;
     padding: 20px 0;
+    min-width: 0;
+    width: 100%;
   }
   .case-card {
     background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(247,249,248,0.9));
     border: 1px solid rgba(30,58,48,0.08);
     border-radius: 24px;
-    padding: 22px;
+    padding: clamp(14px, 2.5vw, 22px);
     box-shadow: 0 16px 40px rgba(16,24,40,0.08);
-    transition: transform 0.2s;
+    transition: transform 0.25s cubic-bezier(.16,1,.3,1), box-shadow 0.25s;
+    min-width: 0;
+    overflow: hidden;
+    word-wrap: break-word;
   }
   .case-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 22px 44px rgba(16,24,40,0.12);
+    transform: translateY(-3px);
+    box-shadow: 0 24px 48px rgba(16,24,40,0.14);
   }
   .dashboard-field {
     margin-bottom: 14px;
+    min-width: 0;
   }
   .dashboard-field label {
     display: block;
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 700;
     color: var(--mist-500);
     text-transform: uppercase;
+    letter-spacing: .06em;
     margin-bottom: 4px;
   }
   .dashboard-field input, .dashboard-field textarea {
     width: 100%;
     padding: 12px 14px;
     border: 1px solid rgba(30,58,48,0.1);
-    border-radius: 16px;
-    font-size: 0.95rem;
+    border-radius: 14px;
+    font-size: 0.92rem;
     background: rgba(255,255,255,0.94);
+    transition: box-shadow .2s, border-color .2s;
+  }
+  .dashboard-field input:focus, .dashboard-field textarea:focus {
+    outline: none;
+    border-color: rgba(30,58,48,0.3);
+    box-shadow: 0 0 0 3px rgba(30,58,48,0.1);
   }
   .dashboard-field textarea {
-    min-height: 132px;
+    min-height: 120px;
     resize: vertical;
   }
   @media (max-width: 640px) {
-    .pharmacist-queue {
-      grid-template-columns: 1fr;
-    }
+    .pharmacist-queue { grid-template-columns: 1fr !important; }
+    .drug-row { grid-template-columns: 1fr !important; }
+    .case-card { padding: 14px; }
   }
 </style>
 

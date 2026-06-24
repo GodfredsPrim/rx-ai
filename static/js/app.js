@@ -494,6 +494,7 @@ function buildLang() {
 function renderPrescriptionHistory(rxArray = []) {
   const h = document.getElementById('history-content'); if (!h) return;
   if (!rxArray.length) { h.innerHTML = '<div class="empty">No clinical reports yet.</div>'; return; }
+  // (revealStagger called at end of the map/join below)
   h.innerHTML = rxArray.map(rx => `
     <div class="rx-card ${rx.status.toLowerCase().replace(' ', '-')}">
       <div class="rx-head">
@@ -527,6 +528,41 @@ function renderPrescriptionHistory(rxArray = []) {
       </div>
     </div>
   `).join('');
+  revealStagger(h);
+}
+
+function _ensureTypingKeyframes() {
+  if (document.getElementById('typing-keyframes')) return;
+  const style = document.createElement('style');
+  style.id = 'typing-keyframes';
+  style.textContent = `
+    @keyframes typing-dot {
+      0%, 60%, 100% { transform: translateY(0); opacity: .4; }
+      30% { transform: translateY(-6px); opacity: 1; }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function _addTypingIndicator() {
+  const g = document.getElementById('msgs');
+  if (!g) return null;
+  _ensureTypingKeyframes();
+  const el = document.createElement('div');
+  el.className = 'msg ai';
+  el.innerHTML = `
+    <div class="av ai">Rx</div>
+    <div class="bub ai" style="min-width:64px">
+      <div style="display:flex;gap:5px;align-items:center;padding:4px 0">
+        <span style="width:8px;height:8px;background:var(--mist-400);border-radius:50%;display:inline-block;animation:typing-dot 1.2s infinite ease-in-out 0s"></span>
+        <span style="width:8px;height:8px;background:var(--mist-400);border-radius:50%;display:inline-block;animation:typing-dot 1.2s infinite ease-in-out .2s"></span>
+        <span style="width:8px;height:8px;background:var(--mist-400);border-radius:50%;display:inline-block;animation:typing-dot 1.2s infinite ease-in-out .4s"></span>
+      </div>
+    </div>
+  `;
+  g.appendChild(el);
+  g.scrollTop = g.scrollHeight;
+  return el;
 }
 
 async function send() {
@@ -535,8 +571,10 @@ async function send() {
   if (!text) return;
 
   input.value = '';
+  input.style.height = 'auto';
   addMsg('user', text);
 
+  const typingEl = _addTypingIndicator();
   const messages = [...history, { role: 'user', content: text }];
 
   try {
@@ -544,15 +582,15 @@ async function send() {
     if (currentImageData) {
       payload.image_data = currentImageData;
     }
-    
+
     const res = await callApi('/chat', 'POST', payload);
     const reply = res.reply || res.response || '';
-    
+
     // Clear image immediately after sending
     clearImagePreview();
-    
+
     history.push({ role: 'user', content: text }, { role: 'assistant', content: reply });
-    
+
     const drugTags = (res.drugs || []).map(d => ({ t: d.name, c: 'g' }));
     addMsg('ai', reply, [
       { t: 'BisaRx AI', c: 'b' },
@@ -563,6 +601,8 @@ async function send() {
     }
   } catch (e) {
     addMsg('ai', 'Error connecting to brain. Please try again.');
+  } finally {
+    if (typingEl) typingEl.remove();
   }
 }
 
@@ -647,15 +687,75 @@ async function refreshPharmacistDashboard() {
   } catch (e) { console.warn('Refresh failed', e); }
 }
 
+function _urgencyBadgeClass(level) {
+  if (level === 'urgent') return 'badge-danger';
+  if (level === 'priority') return 'badge-warning';
+  return 'badge-secondary';
+}
+
+function _renderPatientName(cs) {
+  return cs.patient?.full_name || cs.patient?.username || cs.patient?.email || 'Guest';
+}
+
+function _renderMarkdown(text) {
+  if (!text) return '';
+  return window.marked ? marked.parse(text) : text.replace(/\*\*/g, '<strong>').replace(/\n/g, '<br>');
+}
+
+/**
+ * Apply staggered entrance animation to direct children of `container`.
+ * Uses the `.reveal` + `.reveal-d1..d8` CSS utility classes.
+ * Call this after innerHTML has been set on any list/grid container.
+ */
+function revealStagger(container) {
+  if (!container) return;
+  const delays = ['reveal-d1','reveal-d2','reveal-d3','reveal-d4','reveal-d5','reveal-d6','reveal-d7','reveal-d8'];
+  Array.from(container.children).forEach((el, i) => {
+    el.classList.add('reveal');
+    if (i < delays.length) el.classList.add(delays[i]);
+  });
+}
+
 function renderPharmaQueue(id, cases = [], mode = 'pending') {
   const el = document.getElementById(id);
   if (!el) return;
-  el.innerHTML = cases.length ? cases.map(cs => `
+  el.innerHTML = cases.length ? cases.map(cs => {
+    const patientName = _renderPatientName(cs);
+    const patientPhone = cs.patient?.phone ? `<span style="color:var(--mist-500);font-size:.8rem">📞 ${cs.patient.phone}</span>` : '';
+    const aiSummary = cs.pharmacist_support?.ai_intake_summary || cs.ai_summary || '';
+    const clinicalProfile = cs.pharmacist_support?.clinical_profile || '';
+    const datasetGuidance = cs.pharmacist_support?.dataset_guidance || '';
+    const urgency = cs.urgency_level || 'routine';
+
+    return `
     <div class="case-card pharmacist-case-card" id="case-evaluation-${cs.id}">
-      <div class="dashboard-field"><label>Patient</label><div class="case-field-text">${cs.patient_name || 'Guest'}</div></div>
-      <div class="dashboard-field"><label>Summary</label><div class="case-field-text case-summary-text">${window.marked ? marked.parse(cs.case_summary || 'No details') : (cs.case_summary || 'No details').replace(/\*\*/g, '').replace(/\*/g, '')}</div></div>
-      <div class="dashboard-field"><label>Status</label><div><span class="badge badge-${cs.status === 'Pending' ? 'warning' : 'success'}">${cs.status}</span></div></div>
-      ${mode === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="acceptCase(${cs.id})">Accept Case</button>` : ''}
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap;gap:6px">
+        <div>
+          <div class="case-field-text" style="font-weight:600">${patientName}</div>
+          ${patientPhone}
+        </div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <span class="badge ${_urgencyBadgeClass(urgency)}">${urgency.toUpperCase()}</span>
+          <span class="badge badge-${cs.status === 'Pending' ? 'warning' : cs.status === 'In Review' ? 'info' : 'success'}">${cs.status}</span>
+        </div>
+      </div>
+      <div class="dashboard-field"><label>Case Summary</label><div class="case-field-text case-summary-text">${_renderMarkdown(cs.case_summary || 'No details')}</div></div>
+      ${aiSummary ? `
+      <details class="case-collapse">
+        <summary>📋 Full AI Clinical Report</summary>
+        <div class="collapse-body">${_renderMarkdown(aiSummary)}</div>
+      </details>` : ''}
+      ${clinicalProfile ? `
+      <details class="case-collapse">
+        <summary>👤 Patient Clinical Profile</summary>
+        <div class="collapse-body">${clinicalProfile.split(' | ').map(s => `<div>${s}</div>`).join('')}</div>
+      </details>` : ''}
+      ${datasetGuidance && datasetGuidance !== 'No dataset guidance matched.' ? `
+      <details class="case-collapse accent">
+        <summary>💊 Dataset Drug Guidance</summary>
+        <div class="collapse-body">${datasetGuidance}</div>
+      </details>` : ''}
+      ${mode === 'pending' ? `<button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="acceptCase(${cs.id})">Accept Case</button>` : ''}
       ${mode === 'assigned' ? `
         <div class="pharma-review-divider"></div>
         <div class="pharma-review-block">
@@ -675,7 +775,7 @@ function renderPharmaQueue(id, cases = [], mode = 'pending') {
           </div>
           <div class="pharma-review-actions">
             <button class="btn btn-sm btn-secondary" onclick="addDrugRow(${cs.id})">+ Add Drug</button>
-            <button class="btn btn-sm btn-magic" onclick="fillAiSuggestion(${cs.id}, this)">AI Suggest</button>
+            <button class="btn btn-sm btn-magic" onclick="fillAiSuggestion(${cs.id}, this)">✨ AI Suggest</button>
           </div>
           <button class="btn btn-primary btn-sm pharma-submit-btn" onclick="submitReview(${cs.id})">Submit to Patient</button>
         </div>
@@ -683,10 +783,11 @@ function renderPharmaQueue(id, cases = [], mode = 'pending') {
       ${mode === 'completed' ? `
         <div class="pharma-review-divider"></div>
         <div class="dashboard-field"><label>Medication</label><div class="case-field-text">${cs.drug_name || 'N/A'}</div></div>
-        <div class="dashboard-field"><label>Counselling Points</label><div class="case-field-text case-feedback-text">${window.marked ? marked.parse(cs.pharmacist_feedback || 'N/A') : (cs.pharmacist_feedback || 'N/A').replace(/\*\*/g, '').replace(/\*/g, '')}</div></div>
+        <div class="dashboard-field"><label>Counselling Points</label><div class="case-field-text case-feedback-text">${_renderMarkdown(cs.pharmacist_feedback || 'N/A')}</div></div>
       ` : ''}
     </div>
-  `).join('') : '<div class="empty">No cases here.</div>';
+  `}).join('') : '<div class="empty">No cases here.</div>';
+  revealStagger(el);
 }
 
 function addDrugRow(caseId) {
@@ -812,6 +913,7 @@ function renderAdminUsers(list = []) {
   const el = document.getElementById('admin-users-list');
   if (!el) return;
   el.innerHTML = list.length ? list.map(u => `<div class="ccard"><div><strong>${u.username}</strong><br><small>${u.email}</small></div></div>`).join('') : '<div class="empty">No users found.</div>';
+  revealStagger(el);
 }
 
 function renderAdminCases(cases = []) {
@@ -827,11 +929,16 @@ function renderAdminCases(cases = []) {
     <div class="ccard admin-case-card">
       <div class="case-header">
         <span class="case-id">#${cs.id}</span>
-        <span class="badge badge-${cs.status.toLowerCase().replace(' ', '-')}">${cs.status}</span>
+        <div style="display:flex;gap:5px">
+          <span class="badge ${_urgencyBadgeClass(cs.urgency_level)}">${(cs.urgency_level || 'routine').toUpperCase()}</span>
+          <span class="badge badge-${cs.status.toLowerCase().replace(' ', '-')}">${cs.status}</span>
+        </div>
       </div>
       <div class="case-body">
-        <div class="cname"><strong>Patient:</strong> ${cs.patient_name || 'Guest'}</div>
+        <div class="cname"><strong>Patient:</strong> ${_renderPatientName(cs)}</div>
+        ${cs.patient?.phone ? `<div style="font-size:.8rem;color:var(--mist-500)">📞 ${cs.patient.phone}</div>` : ''}
         ${cs.drug_name ? `<div class="cdrug"><strong>Drug:</strong> ${cs.drug_name}</div>` : ''}
+        ${cs.case_summary ? `<div style="font-size:.82rem;color:var(--mist-600);margin-top:4px">${cs.case_summary}</div>` : ''}
         ${cs.delivery_address ? `
           <div class="delivery-details">
             <p>📍 ${cs.delivery_address}</p>
@@ -849,6 +956,7 @@ function renderAdminCases(cases = []) {
       </div>
     </div>
   `).join('');
+  revealStagger(c);
 }
 
 async function dispatchOrder(id) {
@@ -1210,7 +1318,7 @@ async function submitOrder() {
     if (res.ok) {
       showToast('Order placed successfully!', 'success');
       closeOrderModal();
-      refreshHistory(); 
+      loadProfileData();
     } else {
       const err = await res.json();
       showToast(err.detail || 'Failed to place order', 'error');

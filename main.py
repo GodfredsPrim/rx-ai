@@ -2593,11 +2593,6 @@ def admin_portal():
     return FileResponse(STATIC_DIR / "admin.html")
 
 
-# -- WhatsApp webhook --
-from whatsapp_bot import router as wa_router
-app.include_router(wa_router)
-
-
 if STATIC_DIR.exists():
     app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
 

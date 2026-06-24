@@ -74,6 +74,22 @@
   /* Timing */
   --t: all .28s cubic-bezier(.16,1,.3,1);
   --t-slow: all .45s cubic-bezier(.16,1,.3,1);
+  --t-fast: all .15s cubic-bezier(.16,1,.3,1);
+
+  /* Spring easings (Framer-style) */
+  --ease-spring:   cubic-bezier(.34,1.56,.64,1);
+  --ease-out-soft: cubic-bezier(.22,1,.36,1);
+  --ease-in-out:   cubic-bezier(.65,0,.35,1);
+
+  /* Spacing scale */
+  --sp-1:  4px;
+  --sp-2:  8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 32px;
+  --sp-8: 48px;
 }
 
 /* ── Reset ── */
@@ -651,38 +667,43 @@ img,svg { max-width:100%; height:auto; }
   flex-shrink:0;
 }
 .panel-info h2 {
-  font-size:1.6rem;
-  font-weight:800;
-  letter-spacing:-0.04em;
-  color:var(--mist-900);
-  line-height:1.15;
+  font-size: clamp(1.25rem, 2.5vw, 1.65rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: var(--mist-900);
+  line-height: 1.15;
 }
 .panel-info p {
-  margin-top:6px;
-  color:var(--mist-500);
-  font-size:.9rem;
-  font-weight:500;
+  margin-top: 5px;
+  color: var(--mist-600);
+  font-size: clamp(.82rem, 1.2vw, .92rem);
+  font-weight: 500;
+  line-height: 1.55;
 }
 .panel-badges { display:flex; align-items:center; gap:10px; flex-shrink:0; }
 
 /* ── Badges ── */
 .badge {
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  padding:5px 11px;
-  border-radius:var(--r-full);
-  font-size:.65rem;
-  font-weight:800;
-  letter-spacing:.1em;
-  text-transform:uppercase;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.2), 0 4px 12px rgba(15,23,42,.1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 12px;
+  border-radius: var(--r-full);
+  font-size: .62rem;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 3px 10px rgba(15,23,42,.1);
+  transition: var(--t-fast);
 }
 .badge-success,.badge.g { color:var(--white); background:linear-gradient(135deg,#4bb978,var(--success)); }
 .badge-primary,.badge.b { color:var(--white); background:linear-gradient(135deg,var(--primary-light),var(--primary)); }
 .badge-danger,.badge.r  { color:var(--white); background:linear-gradient(135deg,#ef6a6a,var(--danger)); }
 .badge.a                { color:var(--white); background:linear-gradient(135deg,#cf9b4d,var(--accent)); }
 .badge-warning          { color:#7a4f00; background:linear-gradient(135deg,#fde68a,#f59e0b); }
+.badge-info             { color:var(--white); background:linear-gradient(135deg,#63b3ed,#3182ce); }
+.badge-secondary        { color:var(--mist-700); background:var(--mist-200); }
 
 /* AI Magic Button */
 .btn-magic {
@@ -1199,12 +1220,16 @@ img,svg { max-width:100%; height:auto; }
   transition:var(--t);
 }
 .chip:hover {
-  transform:translateY(-3px) scale(1.02);
-  border-color:rgba(30,58,48,0.25);
-  box-shadow: 
-    0 12px 28px rgba(30,58,48,0.12),
-    0 6px 14px rgba(30,58,48,0.06),
-    inset 0 1px 0 rgba(255,255,255,0.9);
+  transform: translateY(-3px) scale(1.02);
+  border-color: rgba(30,58,48,.25);
+  box-shadow:
+    0 12px 28px rgba(30,58,48,.12),
+    0 6px  14px rgba(30,58,48,.06),
+    inset 0 1px 0 rgba(255,255,255,.9);
+}
+.chip:active {
+  transform: scale(.97);
+  transition: transform .1s ease;
 }
 
 /* ── Chat input ── */
@@ -1282,12 +1307,16 @@ img,svg { max-width:100%; height:auto; }
   transition:var(--t);
 }
 .icon-btn:hover,.msg-voice-btn:hover {
-  transform:translateY(-2px);
-  box-shadow: 
-    0 10px 24px rgba(30,58,48,0.1),
-    0 4px 12px rgba(30,58,48,0.05),
-    inset 0 1px 0 rgba(255,255,255,0.9);
-  border-color:rgba(30,58,48,0.18);
+  transform: translateY(-2px);
+  box-shadow:
+    0 10px 24px rgba(30,58,48,.10),
+    0 4px  12px rgba(30,58,48,.05),
+    inset 0 1px 0 rgba(255,255,255,.9);
+  border-color: rgba(30,58,48,.18);
+}
+.icon-btn:active, .msg-voice-btn:active {
+  transform: scale(.93);
+  transition: transform .1s ease;
 }
 .icon-btn.on,.icon-btn.rec,.msg-voice-btn.speaking {
   color:var(--white);
@@ -1380,11 +1409,33 @@ img,svg { max-width:100%; height:auto; }
   background: linear-gradient(180deg, rgba(255,255,255,0.1) 0%, transparent 100%);
   pointer-events: none;
 }
-.btn:hover { 
-  transform:translateY(-3px); 
-  box-shadow: 
-    0 16px 32px rgba(30,58,48,0.15),
-    0 8px 16px rgba(30,58,48,0.08);
+.btn:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 16px 32px rgba(30,58,48,.15),
+    0 8px  16px rgba(30,58,48,.08);
+}
+.btn:active {
+  transform: translateY(0) scale(.97);
+  transition: transform .1s ease, box-shadow .1s ease;
+  box-shadow:
+    0 4px 12px rgba(30,58,48,.12),
+    0 2px 6px  rgba(30,58,48,.06);
+}
+/* Global keyboard focus ring — green glow */
+:focus-visible {
+  outline: 2px solid var(--primary-light);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--primary-glow);
+  border-radius: inherit;
+}
+/* Inputs get a clean inset glow instead */
+input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--primary-light),
+    0 0 0 5px var(--primary-glow),
+    var(--sh-sm);
 }
 .btn-primary {
   color:var(--white);
@@ -2264,6 +2315,36 @@ input:focus,textarea:focus,select:focus {
   to   { transform:rotate(360deg); }
 }
 
+/* ── Entrance animations (Framer-style) ── */
+@keyframes reveal-up {
+  from { opacity:0; transform:translateY(22px) scale(.98); }
+  to   { opacity:1; transform:translateY(0)    scale(1);   }
+}
+@keyframes scale-in {
+  from { opacity:0; transform:scale(.9); }
+  to   { opacity:1; transform:scale(1);  }
+}
+@keyframes slide-right {
+  from { opacity:0; transform:translateX(-16px); }
+  to   { opacity:1; transform:translateX(0);     }
+}
+
+/* ── Reveal utility classes (used by revealStagger() in app.js) ── */
+.reveal {
+  animation: reveal-up .42s var(--ease-out-soft) both;
+}
+.reveal.from-right { animation-name: slide-right; }
+.reveal.pop        { animation-name: scale-in; }
+
+.reveal-d1 { animation-delay:.05s; }
+.reveal-d2 { animation-delay:.10s; }
+.reveal-d3 { animation-delay:.16s; }
+.reveal-d4 { animation-delay:.22s; }
+.reveal-d5 { animation-delay:.28s; }
+.reveal-d6 { animation-delay:.34s; }
+.reveal-d7 { animation-delay:.40s; }
+.reveal-d8 { animation-delay:.46s; }
+
 .loading-spinner {
   width:48px; height:48px;
   border:4px solid rgba(30,58,48,.15);
@@ -2819,6 +2900,14 @@ body.sidebar-open {
     animation-iteration-count:1 !important;
     transition-duration:.01ms !important;
     scroll-behavior:auto !important;
+  }
+  /* Ensure entrance-animation classes don't hold elements invisible */
+  .reveal,
+  .reveal.from-right,
+  .reveal.pop {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
   }
 }
 
@@ -3959,14 +4048,28 @@ select:focus,
    ============================================================ */
 
 .pharmacist-queue {
-  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
   gap: 22px;
   align-content: start;
+  min-width: 0;
+  width: 100%;
 }
 
 .pharmacist-case-card {
-  padding: 22px;
+  padding: clamp(14px, 2.5vw, 24px);
   border-radius: 24px;
+  transition: var(--t);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  word-wrap: break-word;
+}
+.pharmacist-case-card:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 20px 48px rgba(30,58,48,.10),
+    0  8px 20px rgba(30,58,48,.06),
+    inset 0 1px 0 rgba(255,255,255,.9);
 }
 
 .case-field-text {
@@ -4136,6 +4239,42 @@ select:focus,
   color: #999;
 }
 
+/* ── Case collapsible sections (details/summary in pharmacist cards) ── */
+.case-collapse {
+  margin: var(--sp-2) 0;
+  border: 1px solid var(--mist-200);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  transition: var(--t-fast);
+}
+.case-collapse > summary {
+  padding: var(--sp-2) var(--sp-3);
+  cursor: pointer;
+  background: var(--mist-50);
+  font-weight: 600;
+  font-size: .82rem;
+  color: var(--primary);
+  user-select: none;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background var(--t-fast);
+}
+.case-collapse > summary:hover   { background: var(--mist-100); }
+.case-collapse > summary::-webkit-details-marker { display: none; }
+.case-collapse[open] > summary   { border-bottom: 1px solid var(--mist-200); }
+.case-collapse > .collapse-body {
+  padding: var(--sp-3);
+  font-size: .82rem;
+  max-height: 320px;
+  overflow-y: auto;
+  line-height: 1.65;
+  color: var(--mist-700);
+}
+.case-collapse.accent > summary  { color: var(--accent); }
+.case-collapse.accent            { border-color: rgba(183,121,31,.2); }
+
 .pharma-review-divider {
   height: 1px;
   margin: 16px 0 18px;
@@ -4223,6 +4362,31 @@ select:focus,
 }
 
 @media (max-width: 640px) {
+  /* Prevent any panel from overflowing viewport */
+  .panel { padding: 14px; margin: 6px; border-radius: 20px; min-width: 0; overflow-x: hidden; }
+  .panel > * { min-width: 0; }
+
+  /* Stack drug-row columns vertically */
+  .drug-row {
+    grid-template-columns: 1fr;
+  }
+  .drug-row-remove {
+    justify-self: flex-end;
+  }
+  /* Wrap pharmacist card badge area */
+  .pharmacist-case-card [style*="display:flex"][style*="justify-content:space-between"] {
+    flex-direction: column;
+    gap: 8px;
+  }
+  /* Stack form-row */
+  .form-row, .form-row.three {
+    grid-template-columns: 1fr;
+  }
+  /* Single-column queue on narrow screens */
+  .pharmacist-queue { grid-template-columns: 1fr !important; }
+  /* Keep case-summary text from overflowing */
+  .case-summary-text, .case-field-text { overflow-wrap: break-word; word-break: break-word; }
+
   #panel-chat .panel-header {
     margin-bottom: 12px;
     padding-bottom: 12px;

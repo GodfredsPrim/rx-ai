@@ -543,6 +543,7 @@ def analyze_conversation_state(translated_messages: list[dict]) -> dict:
         "has_duration": has_duration,
         "has_severity": has_severity,
         "has_multiple_symptoms": len(observed_symptoms) >= 2,
+        "observed_symptoms": list(observed_symptoms),
     }
 
 
@@ -934,7 +935,7 @@ def process_chat(
             "rules and use [CONSULT_READY] when ready."
         )
 
-    case_id: int | None = None
+    new_case_id: int | None = None
 
     final_messages = [{"role": "system", "content": "\n\n".join(prompt_parts)}] + translated_messages
     
@@ -991,7 +992,7 @@ def process_chat(
                 relevant_pdf_context=relevant_pdf_context,
                 actor_note="Case created from model-driven triage handoff.",
             )
-            case_id = case.id
+            new_case_id = case.id
             reply = (
                 f"{reply}\n\n"
                 "I have prepared your case summary and sent it for licensed pharmacist review. "
@@ -1003,7 +1004,7 @@ def process_chat(
             "drugs": None,
             "consulting": is_consulting,
             "error": None,
-            "case_id": case_id,
+            "case_id": new_case_id,
         }
     except Exception as e:
         should_handoff = should_auto_handoff_to_pharmacist(translated_messages)
@@ -1034,7 +1035,7 @@ def process_chat(
                 actor_note="Case created from fallback triage handoff.",
             )
 
-            case_id = case.id
+            new_case_id = case.id
             fallback_reply = f"{fallback_reply}\n\nYour case has been submitted for licensed pharmacist review."
         else:
             fallback_reply = build_local_chat_fallback(
@@ -1047,7 +1048,7 @@ def process_chat(
             "drugs": None,
             "consulting": should_handoff,
             "error": str(e),
-            "case_id": case_id,
+            "case_id": new_case_id,
         }
 
 
