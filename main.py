@@ -68,17 +68,32 @@ app = FastAPI(title="RxAI Ghana API")
 
 @app.on_event("startup")
 def _init_database() -> None:
-    """Create tables and run legacy migrations.
+    """Run all DB schema + seed work after uvicorn is up.
 
-    Wrapped in try/except so a transient DB failure (e.g. Neon suspended at
-    cold-start) does not crash uvicorn.  /api/health stays up; DB-backed
-    routes recover automatically once the connection is restored.
+    Kept out of import scope and retried with backoff so a Neon cold-start
+    (free-tier auto-suspend, ~5 s wake-up) can't crash uvicorn on boot.
+    Always returns; /api/health stays up and DB-backed routes recover once
+    Neon is awake.
     """
-    try:
-        models.Base.metadata.create_all(bind=engine)
-        _ensure_legacy_schema_updates()
-    except Exception:
-        logger.exception("DB init failed at startup — will retry on next request")
+    import time as _time
+    last_err = None
+    for attempt in range(1, 6):
+        try:
+            models.Base.metadata.create_all(bind=engine)
+            _ensure_legacy_schema_updates()
+            _ensure_db_migrations()
+            db = SessionLocal()
+            try:
+                _ensure_admin_account(db)
+            finally:
+                db.close()
+            logger.info("DB init complete (attempt %s)", attempt)
+            return
+        except Exception as exc:
+            last_err = exc
+            logger.warning("DB init attempt %s failed: %s", attempt, exc)
+            _time.sleep(min(2 * attempt, 8))
+    logger.error("DB init failed after all retries; app stays up. Last error: %s", last_err)
 
 app.include_router(whatsapp_bot.router)
 
@@ -848,9 +863,6 @@ def _build_unique_username(db: Session, base_value: str, exclude_user_id: int | 
         candidate = f"{base_username}{suffix}"
 
 
-_ensure_db_migrations()
-
-
 def _ensure_user_profile_records(db: Session, user_id: int, first_name: str = "", last_name: str = ""):
     if not db.query(models.Profile).filter(models.Profile.user_id == user_id).first():
         db.add(models.Profile(user_id=user_id, first_name=first_name, last_name=last_name))
@@ -1034,13 +1046,6 @@ def _ensure_admin_account(db: Session):
         updated = True
     if updated:
         db.commit()
-
-
-bootstrap_db = SessionLocal()
-try:
-    _ensure_admin_account(bootstrap_db)
-finally:
-    bootstrap_db.close()
 
 
 @app.get("/api/health")
