@@ -1,5 +1,6 @@
 from pathlib import Path
 from io import BytesIO, StringIO
+import logging
 import re
 import csv
 from typing import List
@@ -60,11 +61,25 @@ def _ensure_legacy_schema_updates():
                 connection.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0"))
 
 
-# Create DB tables
-models.Base.metadata.create_all(bind=engine)
-_ensure_legacy_schema_updates()
+logger = logging.getLogger("rxai")
 
 app = FastAPI(title="RxAI Ghana API")
+
+
+@app.on_event("startup")
+def _init_database() -> None:
+    """Create tables and run legacy migrations.
+
+    Wrapped in try/except so a transient DB failure (e.g. Neon suspended at
+    cold-start) does not crash uvicorn.  /api/health stays up; DB-backed
+    routes recover automatically once the connection is restored.
+    """
+    try:
+        models.Base.metadata.create_all(bind=engine)
+        _ensure_legacy_schema_updates()
+    except Exception:
+        logger.exception("DB init failed at startup — will retry on next request")
+
 app.include_router(whatsapp_bot.router)
 
 app.add_middleware(
