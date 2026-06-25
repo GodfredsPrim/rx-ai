@@ -26,8 +26,14 @@ load_dotenv(BASE_DIR / ".env", override=True, verbose=True)
 # ── LLM client ──────────────────────────────────────────────────────
 api_key = os.getenv("DEEPSEEK_API_KEY", os.getenv("OPENAI_API_KEY", "dummy_key"))
 configured_base_url = os.getenv("DEEPSEEK_BASE_URL", "").strip()
-LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS", "45"))
-LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "2"))
+try:
+    LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS", "45"))
+except (ValueError, TypeError):
+    LLM_TIMEOUT_SECONDS = 45.0
+try:
+    LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "2"))
+except (ValueError, TypeError):
+    LLM_MAX_RETRIES = 2
 
 if configured_base_url:
     base_url = configured_base_url

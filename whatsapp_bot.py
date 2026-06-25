@@ -31,7 +31,10 @@ GRAPH_API_BASE = f"https://graph.facebook.com/{WHATSAPP_API_VERSION}"
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://rx-ai-six.vercel.app").rstrip("/")
 
 # Conversation timeout in seconds (30 min)
-CONVERSATION_TTL = int(os.getenv("WHATSAPP_CONVERSATION_TTL", "1800"))
+try:
+    CONVERSATION_TTL = int(os.getenv("WHATSAPP_CONVERSATION_TTL", "1800"))
+except (ValueError, TypeError):
+    CONVERSATION_TTL = 1800
 
 router = APIRouter(prefix="/webhook", tags=["whatsapp"])
 

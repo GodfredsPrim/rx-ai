@@ -67,24 +67,24 @@ app = FastAPI(title="RxAI Ghana API")
 
 
 @app.on_event("startup")
-def _init_database() -> None:
+async def _init_database() -> None:
     """Run all DB schema + seed work after uvicorn is up.
 
-    Kept out of import scope and retried with backoff so a Neon cold-start
-    (free-tier auto-suspend, ~5 s wake-up) can't crash uvicorn on boot.
-    Always returns; /api/health stays up and DB-backed routes recover once
-    Neon is awake.
+    Kept out of import scope and retried with async backoff so a Neon
+    cold-start (free-tier auto-suspend, ~5 s wake-up) can't crash uvicorn
+    on boot and never blocks the event loop. Always returns; /api/health
+    stays up and DB-backed routes recover once Neon is awake.
     """
-    import time as _time
+    import asyncio as _asyncio
     last_err = None
     for attempt in range(1, 6):
         try:
-            models.Base.metadata.create_all(bind=engine)
-            _ensure_legacy_schema_updates()
-            _ensure_db_migrations()
+            await _asyncio.to_thread(models.Base.metadata.create_all, bind=engine)
+            await _asyncio.to_thread(_ensure_legacy_schema_updates)
+            await _asyncio.to_thread(_ensure_db_migrations)
             db = SessionLocal()
             try:
-                _ensure_admin_account(db)
+                await _asyncio.to_thread(_ensure_admin_account, db)
             finally:
                 db.close()
             logger.info("DB init complete (attempt %s)", attempt)
@@ -92,7 +92,7 @@ def _init_database() -> None:
         except Exception as exc:
             last_err = exc
             logger.warning("DB init attempt %s failed: %s", attempt, exc)
-            _time.sleep(min(2 * attempt, 8))
+            await _asyncio.sleep(min(2 * attempt, 8))
     logger.error("DB init failed after all retries; app stays up. Last error: %s", last_err)
 
 app.include_router(whatsapp_bot.router)
@@ -111,10 +111,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+def _env_float(name: str, default: float) -> float:
+    try:
+        return float(os.getenv(name, str(default)))
+    except (ValueError, TypeError):
+        logger.warning("Invalid value for %s; using default %s", name, default)
+        return default
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except (ValueError, TypeError):
+        logger.warning("Invalid value for %s; using default %s", name, default)
+        return default
+
+
 api_key = os.getenv("DEEPSEEK_API_KEY", os.getenv("OPENAI_API_KEY", "dummy_key"))
 configured_base_url = os.getenv("DEEPSEEK_BASE_URL", "").strip()
-LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS", "45"))
-LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "2"))
+LLM_TIMEOUT_SECONDS = _env_float("LLM_TIMEOUT_SECONDS", 45.0)
+LLM_MAX_RETRIES = _env_int("LLM_MAX_RETRIES", 2)
 
 if configured_base_url:
     base_url = configured_base_url
