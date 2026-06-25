@@ -6,6 +6,7 @@ conversation lifecycle over WhatsApp:  incoming message → triage →
 pharmacist handoff → reply.
 """
 
+import asyncio
 import hashlib
 import hmac
 import json
@@ -259,8 +260,7 @@ async def verify_webhook(request: Request):
 async def handle_webhook(request: Request):
     """
     Receives incoming WhatsApp messages and status updates from Meta.
-    Must return 200 quickly – heavy processing is done inline for
-    simplicity (acceptable for moderate traffic).
+    Returns 200 immediately (as Meta requires) and processes in the background.
     """
     body = await request.body()
     signature = request.headers.get("X-Hub-Signature-256", "")
@@ -272,7 +272,13 @@ async def handle_webhook(request: Request):
     print(f"[[WEBHOOK RECEIVED]]: {data}", flush=True)
     print("====================================", flush=True)
 
-    # Extract messages from the webhook payload
+    # Fire-and-forget: return 200 to Meta immediately, process async in background
+    asyncio.create_task(_process_webhook_payload(data))
+    return Response(status_code=200)
+
+
+async def _process_webhook_payload(data: dict):
+    """Process all messages in a webhook payload (runs in background)."""
     try:
         entries = data.get("entry", [])
         for entry in entries:
@@ -289,9 +295,6 @@ async def handle_webhook(request: Request):
                     await _process_incoming_message(message, value)
     except Exception as exc:
         print(f"[WA] Error processing webhook: {exc}")
-
-    # Always return 200 quickly
-    return Response(status_code=200)
 
 
 # ── message processing ──────────────────────────────────────────────
@@ -415,7 +418,8 @@ async def _process_incoming_message(message: dict, value: dict):
     # Process through the chat engine
     db = SessionLocal()
     try:
-        result = chat_engine.process_chat(
+        result = await asyncio.to_thread(
+            chat_engine.process_chat,
             messages=conversation,
             db=db,
             user_id=None,  # WhatsApp users are guests
