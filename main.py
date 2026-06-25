@@ -31,11 +31,19 @@ from database import SessionLocal, engine, get_db
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / '.env', override=True, verbose=True)
 STATIC_DIR = BASE_DIR / "static"
-CORS_ORIGINS = [
-    origin.strip()
-    for origin in os.getenv("CORS_ORIGINS", os.getenv("FRONTEND_URL", "http://127.0.0.1:8000")).split(",")
-    if origin.strip()
+_ALWAYS_ALLOWED_ORIGINS = [
+    "https://rx-ai-six.vercel.app",
+    "https://openpharmacy.online",
+    "https://www.openpharmacy.online",
 ]
+CORS_ORIGINS = list({
+    *[
+        origin.strip()
+        for origin in os.getenv("CORS_ORIGINS", os.getenv("FRONTEND_URL", "http://127.0.0.1:8000")).split(",")
+        if origin.strip()
+    ],
+    *_ALWAYS_ALLOWED_ORIGINS,
+})
 CORS_ALLOW_ORIGIN_REGEX = os.getenv(
     "CORS_ALLOW_ORIGIN_REGEX",
     r"https?://(www\.)?openpharmacy\.online|https://rx-ai-[a-z0-9-]*\.vercel\.app",
