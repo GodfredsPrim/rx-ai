@@ -68,6 +68,11 @@ The backend now exposes pass-through routes that inject `X-APIKey` using `SNWOLL
 - `POST /api/snwolley/tts` → `https://v1.snwolley.ai/api/v1/hackathon/tts`
 - `POST /api/snwolley/vision` → `https://v1.snwolley.ai/api/v1/hackathon/vision`
 
+## Frontend + Backend Hosting Alignment
+
+- The frontend is configured to call same-origin API routes by default (`/api` and `/ws`).
+- `vercel.json` rewrites proxy those requests to the live backend (`https://rx-ai-production.up.railway.app`), so frontend and backend work together from one public frontend domain without exposing backend hostnames in client code.
+
 ## Security & Ethics
 
 - BisaRx does NOT prescribe medication directly.

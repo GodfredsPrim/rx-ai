@@ -4,6 +4,14 @@
   "buildCommand": null,
   "installCommand": null,
   "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://rx-ai-production.up.railway.app/api/$1"
+    },
+    {
+      "source": "/ws/(.*)",
+      "destination": "https://rx-ai-production.up.railway.app/ws/$1"
+    },
     { "source": "/(.*)", "destination": "/$1" }
   ],
   "headers": [
