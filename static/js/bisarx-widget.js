@@ -3,11 +3,16 @@
     const scriptTag = document.currentScript;
     const API_BASE = scriptTag ? scriptTag.getAttribute('data-api-url') : 'https://rx-ai-production.up.railway.app';
     const CSS_URL = `${API_BASE}/css/bisarx-widget.css`;
+    const SNWOLLEY_BASE = `${API_BASE}/api/snwolley`;
+    const SNWOLLEY_CHAT_MODEL = (window.BISARX_SNWOLLEY_MODEL || 'gpt-4o-mini');
 
     // --- State ---
     let isOpen = false;
     let isRecording = false;
     let recognition = null;
+    let mediaRecorder = null;
+    let mediaStream = null;
+    let mediaChunks = [];
     let selectedImage = null;
     let currentCaseId = null;
     let chatHistory = [];
@@ -122,6 +127,98 @@
         micBtn.onclick = toggleVoice;
     }
 
+    function extractText(payload) {
+        if (!payload) return '';
+        if (typeof payload === 'string') return payload;
+        if (Array.isArray(payload)) {
+            for (const item of payload) {
+                const result = extractText(item);
+                if (result) return result;
+            }
+            return '';
+        }
+        if (typeof payload === 'object') {
+            if (typeof payload.reply === 'string') return payload.reply;
+            if (typeof payload.text === 'string') return payload.text;
+            if (typeof payload.transcript === 'string') return payload.transcript;
+            const choiceText = payload?.choices?.[0]?.message?.content || payload?.choices?.[0]?.text;
+            if (typeof choiceText === 'string') return choiceText;
+            for (const value of Object.values(payload)) {
+                const nested = extractText(value);
+                if (nested) return nested;
+            }
+        }
+        return '';
+    }
+
+    async function postSnwolley(endpoint, body) {
+        const response = await fetch(`${SNWOLLEY_BASE}${endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body || {}),
+        });
+        const contentType = response.headers.get('content-type') || '';
+        const payload = contentType.includes('application/json') ? await response.json() : await response.text();
+        if (!response.ok) {
+            throw new Error(typeof payload === 'string' ? payload : (extractText(payload) || payload?.detail || 'Snwolley request failed'));
+        }
+        return payload;
+    }
+
+    async function requestSnwolleyChat(messages) {
+        const payload = await postSnwolley('/chat/completions', {
+            model: SNWOLLEY_CHAT_MODEL,
+            messages,
+        });
+        const text = extractText(payload);
+        if (!text) throw new Error('Empty Snwolley chat response');
+        return text;
+    }
+
+    async function requestSnwolleyVision(imageData, prompt) {
+        const payload = await postSnwolley('/vision', {
+            image_data: imageData,
+            prompt: prompt || 'Describe medically relevant findings in this image.',
+        });
+        return extractText(payload);
+    }
+
+    async function requestSnwolleyStt(blob) {
+        const base64Audio = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const result = String(reader.result || '');
+                resolve(result.includes(',') ? result.split(',')[1] : result);
+            };
+            reader.onerror = () => reject(new Error('Failed to read captured audio'));
+            reader.readAsDataURL(blob);
+        });
+        const payload = await postSnwolley('/stt', {
+            audio_base64: base64Audio,
+            mime_type: blob.type || 'audio/webm',
+        });
+        return extractText(payload);
+    }
+
+    async function requestSnwolleyTts(text) {
+        if (!text) return;
+        try {
+            const payload = await postSnwolley('/tts', { text });
+            if (payload?.audio_url) {
+                const audio = new Audio(payload.audio_url);
+                await audio.play();
+                return;
+            }
+            if (payload?.audio_base64) {
+                const mimeType = payload?.mime_type || 'audio/mpeg';
+                const audio = new Audio(`data:${mimeType};base64,${payload.audio_base64}`);
+                await audio.play();
+            }
+        } catch (e) {
+            console.warn('Widget TTS failed', e);
+        }
+    }
+
     function toggleWindow() {
         isOpen = !isOpen;
         chatWindow.classList.toggle('open', isOpen);
@@ -143,19 +240,42 @@
         chatHistory.push({ role: 'user', content: text });
         
         try {
-            const response = await fetch(`${API_BASE}/api/chat`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    messages: chatHistory,
-                    image_data: currentSelectedImage
-                })
-            });
-            const data = await response.json();
+            let enrichedText = text;
+            if (currentSelectedImage) {
+                try {
+                    const visionContext = await requestSnwolleyVision(currentSelectedImage, text);
+                    if (visionContext) {
+                        enrichedText = `${text}\n\n[Vision context]\n${visionContext}`;
+                    }
+                } catch (visionErr) {
+                    console.warn('Widget vision call failed, continuing without vision context', visionErr);
+                }
+            }
+
+            let data = { reply: '' };
+            try {
+                const reply = await requestSnwolleyChat([
+                    ...chatHistory.slice(0, -1),
+                    { role: 'user', content: enrichedText },
+                ]);
+                data.reply = reply;
+            } catch (snErr) {
+                console.warn('Snwolley chat failed; falling back to /api/chat', snErr);
+                const fallbackResponse = await fetch(`${API_BASE}/api/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        messages: chatHistory,
+                        image_data: currentSelectedImage,
+                    }),
+                });
+                data = await fallbackResponse.json();
+            }
             
             if (data.reply) {
                 addBotMessage(data.reply);
                 chatHistory.push({ role: 'assistant', content: data.reply });
+                requestSnwolleyTts(data.reply);
             }
 
             if (data.case_id && !currentCaseId) {
@@ -187,41 +307,78 @@
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
-    function toggleVoice() {
+    async function toggleVoice() {
+        if (isRecording) {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            } else if (recognition) {
+                recognition.stop();
+            }
+            return;
+        }
+
+        if (navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== 'undefined') {
+            try {
+                mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaChunks = [];
+                mediaRecorder = new MediaRecorder(mediaStream, { mimeType: 'audio/webm' });
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data?.size) mediaChunks.push(event.data);
+                };
+                mediaRecorder.onstop = async () => {
+                    try {
+                        const blob = new Blob(mediaChunks, { type: 'audio/webm' });
+                        const transcript = await requestSnwolleyStt(blob);
+                        if (transcript) {
+                            textarea.value = transcript;
+                            textarea.style.height = 'auto';
+                            textarea.style.height = textarea.scrollHeight + 'px';
+                        }
+                    } catch (sttErr) {
+                        console.warn('Snwolley STT failed in widget', sttErr);
+                    } finally {
+                        if (mediaStream) {
+                            mediaStream.getTracks().forEach(track => track.stop());
+                            mediaStream = null;
+                        }
+                        mediaChunks = [];
+                        isRecording = false;
+                        micBtn.classList.remove('active');
+                    }
+                };
+                mediaRecorder.start();
+                isRecording = true;
+                micBtn.classList.add('active');
+                return;
+            } catch (err) {
+                console.warn('Widget MediaRecorder unavailable, trying browser speech API', err);
+            }
+        }
+
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition) {
             alert("Voice input is not supported in this browser.");
             return;
         }
-
-        if (isRecording) {
-            recognition.stop();
-            return;
-        }
-
         isRecording = true;
         micBtn.classList.add('active');
         recognition = new SpeechRecognition();
         recognition.lang = 'en-US';
         recognition.interimResults = false;
-
         recognition.onresult = (event) => {
             const transcript = event.results[0][0].transcript;
             textarea.value = transcript;
             textarea.style.height = 'auto';
             textarea.style.height = textarea.scrollHeight + 'px';
         };
-
         recognition.onend = () => {
             isRecording = false;
             micBtn.classList.remove('active');
         };
-
         recognition.onerror = () => {
             isRecording = false;
             micBtn.classList.remove('active');
         };
-
         recognition.start();
     }
 
