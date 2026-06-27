@@ -396,8 +396,8 @@ async function toggleVoice() {
 function openLoginModal() {
   const modal = document.getElementById('login-modal');
   if (modal) modal.style.display = 'flex';
-  document.getElementById('login-err').innerHTML = '';
-  document.getElementById('reg-err').innerHTML = '';
+  const loginErr = document.getElementById('login-err'); if (loginErr) loginErr.innerHTML = '';
+  const regErr = document.getElementById('reg-err'); if (regErr) regErr.innerHTML = '';
   const roleSwitch = document.querySelector('.auth-role-switch');
   const registerTab = document.getElementById('tab-reg');
   const googleBtn = document.getElementById('btn-google-login');
