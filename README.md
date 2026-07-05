@@ -29,6 +29,10 @@ Copy `.env.example` to `.env` (already done if `.env` exists) and set your keys:
 - `LLM_TIMEOUT_SECONDS`: Timeout for model API calls (default `45`).
 - `LLM_MAX_RETRIES`: Number of automatic retries for transient API failures (default `2`).
 - `VERIFY_SSL`: Keep `true` for normal use. For local SSL troubleshooting only, set `false`.
+- `MOOLRE_BASE_URL` / `MOOLRE_API_KEY`: Enables MOOLRE SMS and payment integrations.
+- `MOOLRE_SMS_PATH`: SMS endpoint path (default `/sms/send`).
+- `MOOLRE_PAYMENT_PATH`: Payment initialization endpoint path (default `/payments/initialize`).
+- `MOOLRE_TIMEOUT_SECONDS`: Timeout for MOOLRE API calls (default `20`).
 
 ## 3) Run the Application
 
@@ -58,6 +62,13 @@ Open: [http://localhost:8000](http://localhost:8000)
 
 - The frontend is configured to call same-origin API routes by default (`/api` and `/ws`).
 - `vercel.json` rewrites proxy those requests to the live backend (`https://rx-ai-production.up.railway.app`), so frontend and backend work together from one public frontend domain without exposing backend hostnames in client code.
+
+## Guest SMS + Payment Integration
+
+- Guests can now submit a phone number after AI intake using:
+  - `POST /api/cases/{case_id}/guest-contact`
+- When pharmacists complete a guest review, the backend can send SMS updates via MOOLRE.
+- When a patient orders a reviewed prescription, the backend attempts MOOLRE payment initialization and returns payment checkout information in the order response.
 
 ## Security & Ethics
 

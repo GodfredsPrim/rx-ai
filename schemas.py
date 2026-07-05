@@ -38,6 +38,8 @@ class PharmacistReviewRequest(BaseModel):
     drugs_list: Optional[List[dict]] = None # List of {name: str, point: str}
     referral_advice: Optional[str] = None
     follow_up_instructions: Optional[str] = None
+    total_price: Optional[float] = None
+    currency: Optional[str] = "GHS"
     status: str = "Reviewed"
 
 class ProfileBase(BaseModel):
@@ -211,6 +213,12 @@ class OrderRequest(BaseModel):
     delivery_address: str
     phone_number: str
     delivery_notes: Optional[str] = None
+
+
+class GuestContactUpdate(BaseModel):
+    phone: str
+    full_name: Optional[str] = None
+    preferred_channel: Optional[str] = "sms"
 
 class DeliveryUpdate(BaseModel):
     status: str # Ordered, Dispatched, Delivered, Cancelled

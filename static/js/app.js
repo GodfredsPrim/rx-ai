@@ -298,7 +298,11 @@ async function doLogin() {
   try {
     btn.disabled = true; btn.innerHTML = 'Signing in...';
     const body = new URLSearchParams(); body.append('username', username); body.append('password', pass);
-    const endpoint = loginMode === 'pharmacist' ? '/auth/pharmacist/login' : '/auth/login';
+    const endpoint = loginMode === 'pharmacist'
+      ? '/auth/pharmacist/login'
+      : loginMode === 'admin'
+        ? '/auth/admin/login'
+        : '/auth/login';
     const data = await callApi(endpoint, 'POST', body);
     localStorage.setItem('token', data.access_token);
     currentUser = username;
@@ -644,11 +648,23 @@ async function send() {
     }
     if (res.case_id && !isLoggedIn()) {
       _connectCaseWebSocket(res.case_id);
+      promptGuestContact(res.case_id);
     }
   } catch (e) {
     addMsg('ai', 'Error connecting to brain. Please try again.');
   } finally {
     if (typingEl) typingEl.remove();
+  }
+}
+
+async function promptGuestContact(caseId) {
+  const provided = prompt('To receive SMS updates if you go offline, enter your phone number:');
+  if (!provided || !provided.trim()) return;
+  try {
+    await callApi(`/cases/${caseId}/guest-contact`, 'POST', { phone: provided.trim() });
+    showToast('Phone number saved. We will send SMS updates.', 'success');
+  } catch (err) {
+    showToast(err.message || 'Failed to save phone number', 'error');
   }
 }
 
@@ -1362,7 +1378,12 @@ async function submitOrder() {
     });
     
     if (res.ok) {
+      const payload = await res.json();
       showToast('Order placed successfully!', 'success');
+      if (payload?.payment?.payment_url) {
+        showToast('Redirecting to payment checkout...', 'info');
+        window.open(payload.payment.payment_url, '_blank', 'noopener');
+      }
       closeOrderModal();
       loadProfileData();
     } else {

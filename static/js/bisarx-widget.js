@@ -161,6 +161,7 @@
             if (data.case_id && !currentCaseId) {
                 currentCaseId = data.case_id;
                 addBotMessage(`Your case has been sent to a licensed pharmacist (Case ID: ${data.case_id}). I'll notify you here when they respond.`);
+                promptGuestPhone(data.case_id);
                 connectWebSocket(data.case_id);
             }
         } catch (err) {
@@ -217,6 +218,21 @@
             micBtn.classList.remove('active');
         };
         recognition.start();
+    }
+
+    async function promptGuestPhone(caseId) {
+        const phone = window.prompt('Enter your phone number to receive SMS updates if you go offline:');
+        if (!phone || !phone.trim()) return;
+        try {
+            await fetch(`${API_BASE}/api/cases/${caseId}/guest-contact`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: phone.trim() }),
+            });
+            addBotMessage('Phone number saved. We will send SMS updates for your case.');
+        } catch (e) {
+            console.warn('Failed to save guest phone', e);
+        }
     }
 
     function playLoudNotification() {

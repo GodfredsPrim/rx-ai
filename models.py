@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text, DateTime
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text, DateTime, Float
 from sqlalchemy.orm import relationship
 import datetime
 from database import Base
@@ -120,6 +120,12 @@ class PrescriptionHistory(Base):
     delivery_address = Column(String, nullable=True)
     delivery_phone = Column(String, nullable=True)
     delivery_notes = Column(String, nullable=True)
+    guest_phone = Column(String, default="")
+    payment_status = Column(String, default="unpaid")
+    payment_reference = Column(String, default="")
+    payment_url = Column(String, default="")
+    payment_amount = Column(Float, nullable=True)
+    payment_currency = Column(String, default="GHS")
     created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
 
     owner = relationship("User", back_populates="prescriptions")

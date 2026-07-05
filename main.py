@@ -7,6 +7,7 @@ from typing import List
 from datetime import datetime
 
 import os
+import httpx
 from dotenv import load_dotenv
 import pypdf
 from authlib.integrations.starlette_client import OAuth
@@ -17,7 +18,7 @@ from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
-from sqlalchemy import inspect, or_, text
+from sqlalchemy import inspect, or_, text, func
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -154,6 +155,11 @@ openai_client = OpenAI(
 # Can always be overridden with MODEL_NAME env variable
 _default_model = "gpt-4o-mini" if api_key.startswith("sk-") and not configured_base_url else "deepseek-chat"
 MODEL_NAME = os.getenv("MODEL_NAME", _default_model)
+MOOLRE_BASE_URL = os.getenv("MOOLRE_BASE_URL", "").strip().rstrip("/")
+MOOLRE_API_KEY = os.getenv("MOOLRE_API_KEY", "").strip()
+MOOLRE_SMS_PATH = os.getenv("MOOLRE_SMS_PATH", "/sms/send").strip()
+MOOLRE_PAYMENT_PATH = os.getenv("MOOLRE_PAYMENT_PATH", "/payments/initialize").strip()
+MOOLRE_TIMEOUT_SECONDS = _env_float("MOOLRE_TIMEOUT_SECONDS", 20.0)
 
 oauth = OAuth()
 oauth.register(
@@ -854,6 +860,18 @@ def _ensure_db_migrations():
                 conn.execute(text("ALTER TABLE prescription_history ADD COLUMN delivery_phone VARCHAR DEFAULT ''"))
             if "delivery_notes" not in columns:
                 conn.execute(text("ALTER TABLE prescription_history ADD COLUMN delivery_notes TEXT DEFAULT ''"))
+            if "guest_phone" not in columns:
+                conn.execute(text("ALTER TABLE prescription_history ADD COLUMN guest_phone VARCHAR DEFAULT ''"))
+            if "payment_status" not in columns:
+                conn.execute(text("ALTER TABLE prescription_history ADD COLUMN payment_status VARCHAR DEFAULT 'unpaid'"))
+            if "payment_reference" not in columns:
+                conn.execute(text("ALTER TABLE prescription_history ADD COLUMN payment_reference VARCHAR DEFAULT ''"))
+            if "payment_url" not in columns:
+                conn.execute(text("ALTER TABLE prescription_history ADD COLUMN payment_url VARCHAR DEFAULT ''"))
+            if "payment_amount" not in columns:
+                conn.execute(text("ALTER TABLE prescription_history ADD COLUMN payment_amount FLOAT"))
+            if "payment_currency" not in columns:
+                conn.execute(text("ALTER TABLE prescription_history ADD COLUMN payment_currency VARCHAR DEFAULT 'GHS'"))
 
 
 
@@ -961,6 +979,12 @@ def _serialize_case(rx: models.PrescriptionHistory) -> dict:
         "delivery_address": rx.delivery_address,
         "delivery_phone": rx.delivery_phone,
         "delivery_notes": rx.delivery_notes,
+        "guest_phone": rx.guest_phone,
+        "payment_status": rx.payment_status,
+        "payment_reference": rx.payment_reference,
+        "payment_url": rx.payment_url,
+        "payment_amount": rx.payment_amount,
+        "payment_currency": rx.payment_currency,
         "created_at": rx.created_at.isoformat() if rx.created_at else None,
         "pharmacist_support": support_sections,
         "ai_medication_suggestions": ai_medication_suggestions,
@@ -972,7 +996,7 @@ def _serialize_case(rx: models.PrescriptionHistory) -> dict:
                 f"{patient_profile.first_name} {patient_profile.last_name}".strip()
                 if patient_profile else ""
             ),
-            "phone": patient_profile.phone if patient_profile else "",
+            "phone": patient_profile.phone if patient_profile else (rx.guest_phone or rx.delivery_phone or ""),
             "city": patient_profile.city if patient_profile else "",
         },
         "pharmacist": {
@@ -1069,6 +1093,88 @@ async def health_check():
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
 
+def _normalize_phone(raw_phone: str) -> str:
+    cleaned = re.sub(r"[^\d+]", "", (raw_phone or "").strip())
+    if cleaned.startswith("00"):
+        cleaned = f"+{cleaned[2:]}"
+    return cleaned
+
+
+def _moolre_enabled() -> bool:
+    return bool(MOOLRE_BASE_URL and MOOLRE_API_KEY)
+
+
+def _moolre_headers() -> dict[str, str]:
+    return {
+        "Authorization": f"Bearer {MOOLRE_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+
+def _send_moolre_sms(phone: str, message: str) -> dict:
+    phone_number = _normalize_phone(phone)
+    if not phone_number or not message.strip():
+        return {"status": "skipped", "reason": "missing_phone_or_message"}
+    if not _moolre_enabled():
+        logger.info("MOOLRE SMS skipped (not configured). To=%s", phone_number)
+        return {"status": "skipped", "reason": "not_configured"}
+    try:
+        with httpx.Client(timeout=MOOLRE_TIMEOUT_SECONDS) as client:
+            response = client.post(
+                f"{MOOLRE_BASE_URL}{MOOLRE_SMS_PATH}",
+                json={"to": phone_number, "message": message},
+                headers=_moolre_headers(),
+            )
+        body = response.json() if "application/json" in response.headers.get("content-type", "") else {"raw": response.text}
+        if response.is_success:
+            return {"status": "sent", "provider_response": body}
+        logger.warning("MOOLRE SMS failed: status=%s body=%s", response.status_code, body)
+        return {"status": "failed", "provider_response": body, "status_code": response.status_code}
+    except Exception as exc:
+        logger.exception("MOOLRE SMS request error: %s", exc)
+        return {"status": "error", "error": str(exc)}
+
+
+def _init_moolre_payment(case: models.PrescriptionHistory, payer_phone: str, payer_email: str = "", payer_name: str = "") -> dict:
+    if not _moolre_enabled():
+        return {"status": "skipped", "reason": "not_configured"}
+    amount = case.payment_amount if case.payment_amount is not None else 0.0
+    if amount <= 0:
+        return {"status": "skipped", "reason": "missing_amount"}
+    try:
+        payload = {
+            "amount": amount,
+            "currency": case.payment_currency or "GHS",
+            "reference": f"RX-{case.id}-{int(datetime.utcnow().timestamp())}",
+            "customer": {
+                "name": payer_name or "BisaRx Patient",
+                "email": payer_email,
+                "phone": _normalize_phone(payer_phone),
+            },
+            "metadata": {
+                "case_id": case.id,
+                "drug_name": case.drug_name or "",
+                "source": "bisarx-pharmacist-order",
+            },
+        }
+        with httpx.Client(timeout=MOOLRE_TIMEOUT_SECONDS) as client:
+            response = client.post(
+                f"{MOOLRE_BASE_URL}{MOOLRE_PAYMENT_PATH}",
+                json=payload,
+                headers=_moolre_headers(),
+            )
+        body = response.json() if "application/json" in response.headers.get("content-type", "") else {"raw": response.text}
+        if not response.is_success:
+            logger.warning("MOOLRE payment init failed: status=%s body=%s", response.status_code, body)
+            return {"status": "failed", "provider_response": body, "status_code": response.status_code}
+        payment_url = body.get("payment_url") or body.get("checkout_url") or body.get("url")
+        reference = body.get("reference") or payload["reference"]
+        return {"status": "initialized", "payment_url": payment_url, "reference": reference, "provider_response": body}
+    except Exception as exc:
+        logger.exception("MOOLRE payment init error: %s", exc)
+        return {"status": "error", "error": str(exc)}
+
+
 @app.get("/api/auth/google/login")
 async def google_login(request: Request):
     if not os.getenv("GOOGLE_CLIENT_ID") or not os.getenv("GOOGLE_CLIENT_SECRET"):
@@ -1156,7 +1262,7 @@ def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     login_value = form_data.username.strip().lower()
     user = db.query(models.User).filter(
-        or_(models.User.username == login_value, models.User.email == login_value)
+        or_(func.lower(models.User.username) == login_value, func.lower(models.User.email) == login_value)
     ).first()
     if not user or not auth.verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect username or password")
@@ -1167,14 +1273,27 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     return {"access_token": access_token, "token_type": "bearer"}
 
 
+@app.post("/api/auth/admin/login", response_model=schemas.Token)
+def admin_login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    login_value = form_data.username.strip().lower()
+    admin = db.query(models.User).filter(
+        models.User.is_admin == True,
+        or_(func.lower(models.User.username) == login_value, func.lower(models.User.email) == login_value),
+    ).first()
+    if not admin or not auth.verify_password(form_data.password, admin.hashed_password):
+        raise HTTPException(status_code=400, detail="Incorrect admin username or password")
+    access_token = auth.create_access_token(data={"sub": admin.email, "role": "admin"})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
 @app.post("/api/auth/pharmacist/login", response_model=schemas.Token)
 def pharmacist_login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     try:
         login_value = form_data.username.strip().lower()
         pharmacist = db.query(models.Pharmacist).filter(
             or_(
-                models.Pharmacist.username == login_value,
-                models.Pharmacist.email == login_value,
+                func.lower(models.Pharmacist.username) == login_value,
+                func.lower(models.Pharmacist.email) == login_value,
                 models.Pharmacist.license_number == login_value.upper()
             )
         ).first()
@@ -1652,6 +1771,10 @@ def pharmacist_review_case(
 
     case.referral_advice = (review.referral_advice or "").strip()
     case.follow_up_instructions = (review.follow_up_instructions or "").strip()
+    if review.total_price is not None and review.total_price > 0:
+        case.payment_amount = float(review.total_price)
+    if (review.currency or "").strip():
+        case.payment_currency = review.currency.strip().upper()
     case.follow_up_status = "feedback_sent"
     case.details = (
         f"{case.details}\n\n"
@@ -1685,6 +1808,13 @@ def pharmacist_review_case(
         background_tasks.add_task(ws_manager.notify_user, case.user_id, notification)
     # Always notify by case_id (covers guests)
     background_tasks.add_task(ws_manager.notify_case, case.id, notification)
+    if not case.user_id and (case.guest_phone or case.delivery_phone):
+        guest_phone = case.guest_phone or case.delivery_phone
+        sms_text = (
+            f"BisaRx update (Case #{case.id}): Pharmacist review is ready. "
+            f"Medication: {case.drug_name or 'See pharmacist guidance'}."
+        )
+        background_tasks.add_task(_send_moolre_sms, guest_phone, sms_text)
 
     return {"status": "success", "case": serialized}
 
@@ -2075,6 +2205,20 @@ def order_prescription(
     case.delivery_address = order.delivery_address
     case.delivery_phone = order.phone_number
     case.delivery_notes = order.delivery_notes
+    payment_result = _init_moolre_payment(
+        case=case,
+        payer_phone=order.phone_number,
+        payer_email=current_user.email,
+        payer_name=current_user.username,
+    )
+    if payment_result.get("status") == "initialized":
+        case.payment_status = "pending"
+        case.payment_reference = payment_result.get("reference", "")
+        case.payment_url = payment_result.get("payment_url", "") or ""
+    elif payment_result.get("status") == "skipped":
+        case.payment_status = "not_configured"
+    else:
+        case.payment_status = "failed"
     
     _log_case_event(
         case,
@@ -2085,7 +2229,7 @@ def order_prescription(
     )
     db.commit()
     db.refresh(case)
-    return {"status": "success", "case": _serialize_case(case)}
+    return {"status": "success", "case": _serialize_case(case), "payment": payment_result}
 
 
 @app.post("/api/admin/cases/{case_id}/dispatch")
@@ -2564,6 +2708,7 @@ def update_emergency(emergency: schemas.EmergencyUpdate, current_user: models.Us
 @app.post("/api/cases/guest", response_model=schemas.GuestCaseResponse)
 def submit_guest_case(
     case_data: schemas.GuestCaseSubmit,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     """Allow non-logged-in users to submit cases directly to pharmacist queue."""
@@ -2599,18 +2744,58 @@ def submit_guest_case(
     
     case.patient_message = case_data.message
     case.case_summary = f"{case_data.first_name} {case_data.last_name} - {case_data.message}"
+    case.guest_phone = _normalize_phone(case_data.phone)
+    case.delivery_phone = case.guest_phone
 
     if case_data.symptoms:
         case.case_summary += f" | Symptoms: {case_data.symptoms}"
     case.follow_up_status = "awaiting_review"
     db.commit()
     db.refresh(case)
+    if case.guest_phone:
+        background_tasks.add_task(
+            _send_moolre_sms,
+            case.guest_phone,
+            f"BisaRx: Your case #{case.id} was received. A licensed pharmacist will review it soon.",
+        )
     
     return schemas.GuestCaseResponse(
         case_id=case.id,
         message="Your case has been submitted to the pharmacy. A licensed pharmacist will review it shortly.",
         case_summary=case.case_summary,
     )
+
+
+@app.post("/api/cases/{case_id}/guest-contact")
+def update_guest_contact(
+    case_id: int,
+    contact: schemas.GuestContactUpdate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    case = db.query(models.PrescriptionHistory).filter(models.PrescriptionHistory.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    if case.user_id:
+        raise HTTPException(status_code=400, detail="Guest contact updates are only supported for guest cases")
+    normalized_phone = _normalize_phone(contact.phone)
+    if not normalized_phone:
+        raise HTTPException(status_code=400, detail="Valid phone number is required")
+    case.guest_phone = normalized_phone
+    if not (case.delivery_phone or "").strip():
+        case.delivery_phone = normalized_phone
+    if contact.full_name and contact.full_name.strip():
+        if case.case_summary:
+            case.case_summary = f"{contact.full_name.strip()} - {case.case_summary}"
+    _log_case_event(case, "patient", "Guest", "guest_contact_updated", f"Phone updated to {normalized_phone}")
+    db.commit()
+    db.refresh(case)
+    background_tasks.add_task(
+        _send_moolre_sms,
+        normalized_phone,
+        f"BisaRx: Contact received for case #{case.id}. We will text you once pharmacist feedback is ready.",
+    )
+    return {"status": "success", "case": _serialize_case(case)}
 
 
 @app.get("/waitlist", include_in_schema=False)
