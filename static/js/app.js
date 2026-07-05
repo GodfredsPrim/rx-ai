@@ -298,12 +298,23 @@ async function doLogin() {
   try {
     btn.disabled = true; btn.innerHTML = 'Signing in...';
     const body = new URLSearchParams(); body.append('username', username); body.append('password', pass);
-    const endpoint = loginMode === 'pharmacist'
+    let endpoint = loginMode === 'pharmacist'
       ? '/auth/pharmacist/login'
       : loginMode === 'admin'
         ? '/auth/admin/login'
         : '/auth/login';
-    const data = await callApi(endpoint, 'POST', body);
+    let data;
+    try {
+      data = await callApi(endpoint, 'POST', body);
+    } catch (primaryErr) {
+      // Backward compatibility: older deployments may not have /auth/admin/login yet.
+      if (loginMode === 'admin' && /Method Not Allowed|Not Found/i.test(primaryErr?.message || '')) {
+        endpoint = '/auth/login';
+        data = await callApi(endpoint, 'POST', body);
+      } else {
+        throw primaryErr;
+      }
+    }
     localStorage.setItem('token', data.access_token);
     currentUser = username;
     closeLoginModal();
