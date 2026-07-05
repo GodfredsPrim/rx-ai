@@ -20,7 +20,7 @@ pip install -r requirements.txt
 
 ## 2) Configure Environment
 
-Copy `.env.example` to `.env` (already done if `.env` exists) and set your keys:
+Edit `.env` and set your keys:
 
 - `DEEPSEEK_API_KEY`: Your model API key.
 - `SECRET_KEY`: A long random string for JWT security.
@@ -29,9 +29,16 @@ Copy `.env.example` to `.env` (already done if `.env` exists) and set your keys:
 - `LLM_TIMEOUT_SECONDS`: Timeout for model API calls (default `45`).
 - `LLM_MAX_RETRIES`: Number of automatic retries for transient API failures (default `2`).
 - `VERIFY_SSL`: Keep `true` for normal use. For local SSL troubleshooting only, set `false`.
-- `MOOLRE_BASE_URL` / `MOOLRE_API_KEY`: Enables MOOLRE SMS and payment integrations.
-- `MOOLRE_SMS_PATH`: SMS endpoint path (default `/sms/send`).
-- `MOOLRE_PAYMENT_PATH`: Payment initialization endpoint path (default `/payments/initialize`).
+- `MOOLRE_BASE_URL`: MOOLRE API base URL (default `https://api.moolre.com`).
+- `MOOLRE_API_USER`: API username header value (`X-API-USER`) for payments.
+- `MOOLRE_API_PUBKEY`: Public key header value (`X-API-PUBKEY`) for payment link initialization.
+- `MOOLRE_API_VASKEY`: VAS key header value (`X-API-VASKEY`) for SMS sending.
+- `MOOLRE_ACCOUNT_NUMBER`: Merchant account number used to create payment links.
+- `MOOLRE_SMS_SENDER_ID`: Sender ID registered on your MOOLRE account.
+- `MOOLRE_SMS_PATH`: SMS endpoint path (default `/open/sms/send`).
+- `MOOLRE_PAYMENT_PATH`: Payment-link endpoint path (default `/embed/link`).
+- `MOOLRE_PAYMENT_CALLBACK_URL`: Public backend webhook URL for MOOLRE callbacks.
+- `MOOLRE_PAYMENT_REDIRECT_URL`: Frontend URL to return to after checkout.
 - `MOOLRE_TIMEOUT_SECONDS`: Timeout for MOOLRE API calls (default `20`).
 
 ## 3) Run the Application

@@ -5,6 +5,7 @@ import re
 import csv
 from typing import List
 from datetime import datetime
+from uuid import uuid4
 
 import os
 import httpx
@@ -155,10 +156,18 @@ openai_client = OpenAI(
 # Can always be overridden with MODEL_NAME env variable
 _default_model = "gpt-4o-mini" if api_key.startswith("sk-") and not configured_base_url else "deepseek-chat"
 MODEL_NAME = os.getenv("MODEL_NAME", _default_model)
-MOOLRE_BASE_URL = os.getenv("MOOLRE_BASE_URL", "").strip().rstrip("/")
-MOOLRE_API_KEY = os.getenv("MOOLRE_API_KEY", "").strip()
-MOOLRE_SMS_PATH = os.getenv("MOOLRE_SMS_PATH", "/sms/send").strip()
-MOOLRE_PAYMENT_PATH = os.getenv("MOOLRE_PAYMENT_PATH", "/payments/initialize").strip()
+MOOLRE_BASE_URL = os.getenv("MOOLRE_BASE_URL", "https://api.moolre.com").strip().rstrip("/")
+MOOLRE_API_USER = os.getenv("MOOLRE_API_USER", "").strip()
+MOOLRE_API_KEY = os.getenv("MOOLRE_API_KEY", "").strip()  # Private key
+MOOLRE_API_PUBKEY = os.getenv("MOOLRE_API_PUBKEY", "").strip()
+MOOLRE_API_VASKEY = os.getenv("MOOLRE_API_VASKEY", "").strip()
+MOOLRE_ACCOUNT_NUMBER = os.getenv("MOOLRE_ACCOUNT_NUMBER", "").strip()
+MOOLRE_SMS_SENDER_ID = os.getenv("MOOLRE_SMS_SENDER_ID", "").strip()
+MOOLRE_BUSINESS_EMAIL = os.getenv("MOOLRE_BUSINESS_EMAIL", "").strip()
+MOOLRE_SMS_PATH = os.getenv("MOOLRE_SMS_PATH", "/open/sms/send").strip()
+MOOLRE_PAYMENT_PATH = os.getenv("MOOLRE_PAYMENT_PATH", "/embed/link").strip()
+MOOLRE_PAYMENT_CALLBACK_URL = os.getenv("MOOLRE_PAYMENT_CALLBACK_URL", "").strip()
+MOOLRE_PAYMENT_REDIRECT_URL = os.getenv("MOOLRE_PAYMENT_REDIRECT_URL", "").strip()
 MOOLRE_TIMEOUT_SECONDS = _env_float("MOOLRE_TIMEOUT_SECONDS", 20.0)
 
 oauth = OAuth()
@@ -1100,34 +1109,62 @@ def _normalize_phone(raw_phone: str) -> str:
     return cleaned
 
 
-def _moolre_enabled() -> bool:
-    return bool(MOOLRE_BASE_URL and MOOLRE_API_KEY)
+def _moolre_sms_enabled() -> bool:
+    return bool(MOOLRE_BASE_URL and MOOLRE_API_VASKEY and MOOLRE_SMS_SENDER_ID)
 
 
-def _moolre_headers() -> dict[str, str]:
+def _moolre_payment_enabled() -> bool:
+    return bool(MOOLRE_BASE_URL and MOOLRE_API_USER and MOOLRE_API_PUBKEY and MOOLRE_ACCOUNT_NUMBER)
+
+
+def _moolre_vas_headers() -> dict[str, str]:
     return {
-        "Authorization": f"Bearer {MOOLRE_API_KEY}",
+        "X-API-VASKEY": MOOLRE_API_VASKEY,
         "Content-Type": "application/json",
     }
+
+
+def _moolre_payment_headers() -> dict[str, str]:
+    headers = {
+        "X-API-USER": MOOLRE_API_USER,
+        "X-API-PUBKEY": MOOLRE_API_PUBKEY,
+        "Content-Type": "application/json",
+    }
+    if MOOLRE_API_KEY:
+        headers["X-API-KEY"] = MOOLRE_API_KEY
+    return headers
 
 
 def _send_moolre_sms(phone: str, message: str) -> dict:
     phone_number = _normalize_phone(phone)
     if not phone_number or not message.strip():
         return {"status": "skipped", "reason": "missing_phone_or_message"}
-    if not _moolre_enabled():
+    if not _moolre_sms_enabled():
         logger.info("MOOLRE SMS skipped (not configured). To=%s", phone_number)
         return {"status": "skipped", "reason": "not_configured"}
     try:
+        sms_ref = f"RX-SMS-{uuid4().hex[:12]}"
+        payload = {
+            "type": 1,
+            "senderid": MOOLRE_SMS_SENDER_ID,
+            "messages": [
+                {
+                    "recipient": phone_number,
+                    "message": message.strip(),
+                    "ref": sms_ref,
+                }
+            ],
+        }
         with httpx.Client(timeout=MOOLRE_TIMEOUT_SECONDS) as client:
             response = client.post(
                 f"{MOOLRE_BASE_URL}{MOOLRE_SMS_PATH}",
-                json={"to": phone_number, "message": message},
-                headers=_moolre_headers(),
+                json=payload,
+                headers=_moolre_vas_headers(),
             )
         body = response.json() if "application/json" in response.headers.get("content-type", "") else {"raw": response.text}
-        if response.is_success:
-            return {"status": "sent", "provider_response": body}
+        is_ok = response.is_success and str(body.get("status", "0")) in {"1", "true", "True"}
+        if is_ok:
+            return {"status": "sent", "reference": sms_ref, "provider_response": body}
         logger.warning("MOOLRE SMS failed: status=%s body=%s", response.status_code, body)
         return {"status": "failed", "provider_response": body, "status_code": response.status_code}
     except Exception as exc:
@@ -1136,39 +1173,52 @@ def _send_moolre_sms(phone: str, message: str) -> dict:
 
 
 def _init_moolre_payment(case: models.PrescriptionHistory, payer_phone: str, payer_email: str = "", payer_name: str = "") -> dict:
-    if not _moolre_enabled():
+    if not _moolre_payment_enabled():
         return {"status": "skipped", "reason": "not_configured"}
     amount = case.payment_amount if case.payment_amount is not None else 0.0
     if amount <= 0:
         return {"status": "skipped", "reason": "missing_amount"}
+    payment_phone = _normalize_phone(payer_phone)
+    if not payment_phone:
+        return {"status": "skipped", "reason": "missing_phone"}
     try:
+        external_ref = f"RX-{case.id}-{int(datetime.utcnow().timestamp())}"
+        callback_url = MOOLRE_PAYMENT_CALLBACK_URL or f"{_get_public_base_url()}/api/payments/moolre/webhook"
+        redirect_url = MOOLRE_PAYMENT_REDIRECT_URL or f"{_get_public_base_url()}/dashboard.html"
         payload = {
-            "amount": amount,
+            "accountnumber": MOOLRE_ACCOUNT_NUMBER,
+            "amount": str(round(float(amount), 2)),
+            "externalref": external_ref,
+            "callbackurl": callback_url,
+            "redirecturl": redirect_url,
+            "description": f"BisaRx payment for case #{case.id}",
+            "customerphone": payment_phone,
+            "customername": payer_name or "BisaRx Patient",
+            "customeremail": payer_email or MOOLRE_BUSINESS_EMAIL,
             "currency": case.payment_currency or "GHS",
-            "reference": f"RX-{case.id}-{int(datetime.utcnow().timestamp())}",
-            "customer": {
-                "name": payer_name or "BisaRx Patient",
-                "email": payer_email,
-                "phone": _normalize_phone(payer_phone),
-            },
-            "metadata": {
-                "case_id": case.id,
-                "drug_name": case.drug_name or "",
-                "source": "bisarx-pharmacist-order",
-            },
         }
         with httpx.Client(timeout=MOOLRE_TIMEOUT_SECONDS) as client:
             response = client.post(
                 f"{MOOLRE_BASE_URL}{MOOLRE_PAYMENT_PATH}",
                 json=payload,
-                headers=_moolre_headers(),
+                headers=_moolre_payment_headers(),
             )
         body = response.json() if "application/json" in response.headers.get("content-type", "") else {"raw": response.text}
         if not response.is_success:
             logger.warning("MOOLRE payment init failed: status=%s body=%s", response.status_code, body)
             return {"status": "failed", "provider_response": body, "status_code": response.status_code}
-        payment_url = body.get("payment_url") or body.get("checkout_url") or body.get("url")
-        reference = body.get("reference") or payload["reference"]
+        data = body.get("data") if isinstance(body.get("data"), dict) else {}
+        payment_url = (
+            data.get("paymentlink")
+            or data.get("authorization_url")
+            or body.get("payment_url")
+            or body.get("checkout_url")
+            or body.get("url")
+        )
+        if not payment_url:
+            logger.warning("MOOLRE payment initialized without payment URL: body=%s", body)
+            return {"status": "failed", "provider_response": body, "reason": "missing_payment_url"}
+        reference = data.get("externalref") or body.get("reference") or external_ref
         return {"status": "initialized", "payment_url": payment_url, "reference": reference, "provider_response": body}
     except Exception as exc:
         logger.exception("MOOLRE payment init error: %s", exc)
@@ -2230,6 +2280,41 @@ def order_prescription(
     db.commit()
     db.refresh(case)
     return {"status": "success", "case": _serialize_case(case), "payment": payment_result}
+
+
+@app.post("/api/payments/moolre/webhook")
+async def moolre_payment_webhook(payload: dict, db: Session = Depends(get_db)):
+    """Accept MOOLRE webhook callbacks and reconcile local payment state."""
+    data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+    external_ref = (
+        data.get("externalref")
+        or data.get("reference")
+        or payload.get("externalref")
+        or payload.get("reference")
+    )
+    if not external_ref:
+        return {"status": "ignored", "reason": "missing_reference"}
+
+    case = db.query(models.PrescriptionHistory).filter(
+        models.PrescriptionHistory.payment_reference == external_ref
+    ).first()
+    if not case:
+        logger.info("MOOLRE webhook received for unknown reference: %s", external_ref)
+        return {"status": "ignored", "reason": "unknown_reference"}
+
+    provider_ok = str(payload.get("status", "0")) in {"1", "true", "True"}
+    tx_ok = str(data.get("txstatus", "0")) in {"1", "success", "SUCCESS"}
+    case.payment_status = "paid" if provider_ok and tx_ok else "failed"
+    case.payment_url = case.payment_url or data.get("paymentlink", "")
+    _log_case_event(
+        case,
+        "system",
+        "moolre-webhook",
+        "payment_update",
+        f"Payment {case.payment_status} (ref={external_ref})",
+    )
+    db.commit()
+    return {"status": "ok", "payment_status": case.payment_status}
 
 
 @app.post("/api/admin/cases/{case_id}/dispatch")
