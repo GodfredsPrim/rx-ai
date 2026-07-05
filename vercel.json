@@ -3,6 +3,7 @@
   "framework": null,
   "buildCommand": null,
   "installCommand": null,
+  "cleanUrls": true,
   "rewrites": [
     {
       "source": "/api/(.*)",
@@ -12,7 +13,11 @@
       "source": "/ws/(.*)",
       "destination": "https://rx-ai-production.up.railway.app/ws/$1"
     },
-    { "source": "/(.*)", "destination": "/$1" }
+    { "source": "/admin", "destination": "/admin.html" },
+    { "source": "/pharmacist", "destination": "/pharmacist.html" },
+    { "source": "/track", "destination": "/track.html" },
+    { "source": "/waitlist", "destination": "/waitlist.html" },
+    { "source": "/verification", "destination": "/verification.html" }
   ],
   "headers": [
     {
