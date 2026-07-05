@@ -7,14 +7,13 @@ from typing import List
 from datetime import datetime
 
 import os
-import httpx
 from dotenv import load_dotenv
 import pypdf
 from authlib.integrations.starlette_client import OAuth
 import json
 from fastapi import FastAPI, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect, status, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
@@ -155,16 +154,6 @@ openai_client = OpenAI(
 # Can always be overridden with MODEL_NAME env variable
 _default_model = "gpt-4o-mini" if api_key.startswith("sk-") and not configured_base_url else "deepseek-chat"
 MODEL_NAME = os.getenv("MODEL_NAME", _default_model)
-SNWOLLEY_API_KEY = os.getenv("SNWOLLEY_API_KEY", "").strip()
-SNWOLLEY_CHAT_COMPLETIONS_URL = os.getenv(
-    "SNWOLLEY_CHAT_COMPLETIONS_URL",
-    "https://v1.snwolley.ai/v1/chat/completions",
-).strip()
-SNWOLLEY_HACKATHON_BASE_URL = os.getenv(
-    "SNWOLLEY_HACKATHON_BASE_URL",
-    "https://v1.snwolley.ai/api/v1/hackathon",
-).strip().rstrip("/")
-SNWOLLEY_TIMEOUT_SECONDS = _env_float("SNWOLLEY_TIMEOUT_SECONDS", 90.0)
 
 oauth = OAuth()
 oauth.register(
@@ -1078,68 +1067,6 @@ def _ensure_admin_account(db: Session):
 @app.get("/api/health")
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
-
-
-def _build_snwolley_headers(content_type: str | None = None) -> dict[str, str]:
-    if not SNWOLLEY_API_KEY:
-        raise HTTPException(
-            status_code=500,
-            detail="SNWOLLEY_API_KEY is not configured on the server.",
-        )
-    headers = {"X-APIKey": SNWOLLEY_API_KEY}
-    if content_type:
-        headers["Content-Type"] = content_type
-    return headers
-
-
-async def _proxy_snwolley_post(request: Request, target_url: str) -> Response:
-    try:
-        payload = await request.body()
-        async with httpx.AsyncClient(timeout=SNWOLLEY_TIMEOUT_SECONDS) as client:
-            upstream_response = await client.post(
-                target_url,
-                content=payload,
-                params=request.query_params.multi_items(),
-                headers=_build_snwolley_headers(request.headers.get("content-type")),
-            )
-    except httpx.RequestError as exc:
-        logger.exception("Snwolley upstream request failed: %s", exc)
-        raise HTTPException(status_code=502, detail=f"Snwolley request failed: {exc}") from exc
-
-    response_headers = {}
-    upstream_content_type = upstream_response.headers.get("content-type")
-    if upstream_content_type:
-        response_headers["Content-Type"] = upstream_content_type
-    return Response(
-        content=upstream_response.content,
-        status_code=upstream_response.status_code,
-        headers=response_headers,
-    )
-
-
-@app.post("/api/snwolley/chat/completions")
-async def snwolley_chat_completions(request: Request):
-    return await _proxy_snwolley_post(request, SNWOLLEY_CHAT_COMPLETIONS_URL)
-
-
-@app.post("/api/snwolley/hackathon")
-async def snwolley_hackathon(request: Request):
-    return await _proxy_snwolley_post(request, SNWOLLEY_HACKATHON_BASE_URL)
-
-
-@app.post("/api/snwolley/stt")
-async def snwolley_stt(request: Request):
-    return await _proxy_snwolley_post(request, f"{SNWOLLEY_HACKATHON_BASE_URL}/stt")
-
-
-@app.post("/api/snwolley/tts")
-async def snwolley_tts(request: Request):
-    return await _proxy_snwolley_post(request, f"{SNWOLLEY_HACKATHON_BASE_URL}/tts")
-
-
-@app.post("/api/snwolley/vision")
-async def snwolley_vision(request: Request):
-    return await _proxy_snwolley_post(request, f"{SNWOLLEY_HACKATHON_BASE_URL}/vision")
 
 
 @app.get("/api/auth/google/login")

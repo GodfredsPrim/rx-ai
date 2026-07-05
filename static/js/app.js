@@ -1,6 +1,4 @@
 const API_URL = (window.BISARX_API_URL || '') + '/api';
-const SNWOLLEY_API_URL = `${API_URL}/snwolley`;
-const SNWOLLEY_CHAT_MODEL = window.BISARX_SNWOLLEY_MODEL || 'gpt-4o-mini';
 const PORTAL_MODE = window.BISARX_PORTAL || document.body?.dataset?.portal || 'patient';
 let _chatGreetingShown = false;
 let _patientWs = null;
@@ -10,9 +8,6 @@ let currentSession = { role: 'guest' };
 let currentUser = null;
 let lang = 'en', history = [], ttsOn = false, isRecording = false, recognition = null;
 const synth = window.speechSynthesis;
-let _voiceMediaRecorder = null;
-let _voiceStream = null;
-let _voiceChunks = [];
 let pendingConditionSelection = null;
 let patientReportSignatures = new Map();
 let patientReportStatePrimed = false;
@@ -192,103 +187,6 @@ async function callApi(endpoint, method = 'GET', body = null, retries = 2) {
   throw lastError;
 }
 
-function _extractSnwolleyText(payload) {
-  if (!payload) return '';
-  if (typeof payload === 'string') return payload;
-  if (Array.isArray(payload)) {
-    for (const item of payload) {
-      const text = _extractSnwolleyText(item);
-      if (text) return text;
-    }
-    return '';
-  }
-  if (typeof payload === 'object') {
-    const directKeys = ['reply', 'text', 'message', 'output_text', 'transcript', 'content'];
-    for (const key of directKeys) {
-      if (typeof payload[key] === 'string' && payload[key].trim()) return payload[key];
-    }
-    if (Array.isArray(payload.choices) && payload.choices.length) {
-      const first = payload.choices[0];
-      const fromChoice = first?.message?.content || first?.text;
-      if (typeof fromChoice === 'string' && fromChoice.trim()) return fromChoice;
-    }
-    for (const value of Object.values(payload)) {
-      const nested = _extractSnwolleyText(value);
-      if (nested) return nested;
-    }
-  }
-  return '';
-}
-
-async function callSnwolley(endpoint, body) {
-  const url = `${SNWOLLEY_API_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body || {}),
-  });
-
-  const contentType = res.headers.get('content-type') || '';
-  const data = contentType.includes('application/json') ? await res.json() : await res.text();
-  if (!res.ok) {
-    const detail = typeof data === 'string' ? data : (_extractSnwolleyText(data) || data?.detail || 'Snwolley request failed');
-    throw new Error(detail);
-  }
-  return data;
-}
-
-async function requestSnwolleyChat(messages) {
-  const payload = { model: SNWOLLEY_CHAT_MODEL, messages };
-  const response = await callSnwolley('/chat/completions', payload);
-  const reply = _extractSnwolleyText(response);
-  if (!reply) throw new Error('Empty response from Snwolley chat completions');
-  return reply;
-}
-
-async function requestSnwolleyVision(imageData, promptText) {
-  const response = await callSnwolley('/vision', {
-    image_data: imageData,
-    prompt: promptText || 'Describe clinically relevant observations in this image.',
-  });
-  return _extractSnwolleyText(response);
-}
-
-async function requestSnwolleyStt(audioBlob) {
-  const base64Audio = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result || '');
-      resolve(result.includes(',') ? result.split(',')[1] : result);
-    };
-    reader.onerror = () => reject(new Error('Failed to read recorded audio'));
-    reader.readAsDataURL(audioBlob);
-  });
-  const response = await callSnwolley('/stt', {
-    audio_base64: base64Audio,
-    mime_type: audioBlob.type || 'audio/webm',
-  });
-  return _extractSnwolleyText(response);
-}
-
-async function requestSnwolleyTts(text) {
-  if (!text) return;
-  try {
-    const response = await callSnwolley('/tts', { text });
-    if (response?.audio_url) {
-      const audio = new Audio(response.audio_url);
-      await audio.play();
-      return;
-    }
-    if (response?.audio_base64) {
-      const mimeType = response?.mime_type || 'audio/mpeg';
-      const audio = new Audio(`data:${mimeType};base64,${response.audio_base64}`);
-      await audio.play();
-    }
-  } catch (err) {
-    console.warn('Snwolley TTS unavailable:', err);
-  }
-}
-
 function _setVoiceStatus(text) {
   const statusBar = document.getElementById('vstatus-bar');
   const statusText = document.getElementById('vstatus-text');
@@ -296,26 +194,24 @@ function _setVoiceStatus(text) {
   if (statusBar) statusBar.classList.toggle('active', isRecording);
 }
 
-function _stopVoiceCapture() {
-  if (_voiceMediaRecorder && _voiceMediaRecorder.state !== 'inactive') {
-    _voiceMediaRecorder.stop();
-  }
-  if (_voiceStream) {
-    _voiceStream.getTracks().forEach(track => track.stop());
-    _voiceStream = null;
-  }
-  isRecording = false;
-  const micBtn = document.getElementById('mic-btn');
-  if (micBtn) micBtn.classList.remove('rec');
-}
-
-function _startBrowserSpeechFallback() {
+async function toggleVoice() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) throw new Error('Voice input is not supported in this browser.');
+  const micBtn = document.getElementById('mic-btn');
+  if (!SpeechRecognition) {
+    showToast('Voice input is not supported in this browser.', 'error');
+    return;
+  }
+  if (isRecording && recognition) {
+    recognition.stop();
+    return;
+  }
   recognition = new SpeechRecognition();
   recognition.lang = lang === 'tw' ? 'en-US' : `${lang}-US`;
   recognition.interimResults = false;
   recognition.maxAlternatives = 1;
+  isRecording = true;
+  if (micBtn) micBtn.classList.add('rec');
+  _setVoiceStatus('Listening…');
   recognition.onresult = (event) => {
     const transcript = event.results?.[0]?.[0]?.transcript || '';
     const input = document.getElementById('tinput');
@@ -324,73 +220,15 @@ function _startBrowserSpeechFallback() {
   };
   recognition.onend = () => {
     isRecording = false;
-    const micBtn = document.getElementById('mic-btn');
     if (micBtn) micBtn.classList.remove('rec');
+    _setVoiceStatus('Listening…');
   };
-  recognition.start();
-}
-
-async function toggleVoice() {
-  const micBtn = document.getElementById('mic-btn');
-  if (isRecording) {
-    _setVoiceStatus('Transcribing…');
-    _stopVoiceCapture();
-    return;
-  }
-
-  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
-    try {
-      _startBrowserSpeechFallback();
-      isRecording = true;
-      if (micBtn) micBtn.classList.add('rec');
-      return;
-    } catch (err) {
-      showToast(err.message || 'Voice input unavailable', 'error');
-      return;
-    }
-  }
-
-  try {
-    _voiceStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    _voiceChunks = [];
-    _voiceMediaRecorder = new MediaRecorder(_voiceStream, { mimeType: 'audio/webm' });
-    _voiceMediaRecorder.ondataavailable = (event) => {
-      if (event.data?.size) _voiceChunks.push(event.data);
-    };
-    _voiceMediaRecorder.onstop = async () => {
-      try {
-        if (!_voiceChunks.length) return;
-        const audioBlob = new Blob(_voiceChunks, { type: 'audio/webm' });
-        const transcript = await requestSnwolleyStt(audioBlob);
-        const input = document.getElementById('tinput');
-        if (input && transcript) {
-          input.value = transcript.trim();
-          autoResizeTextarea(input);
-        }
-        _setVoiceStatus('Listening…');
-      } catch (err) {
-        console.warn('Snwolley STT failed, using browser fallback', err);
-        try {
-          _startBrowserSpeechFallback();
-          _setVoiceStatus('Listening…');
-        } catch {
-          showToast('Unable to transcribe audio right now.', 'error');
-          _setVoiceStatus('Voice unavailable');
-        }
-      } finally {
-        _voiceChunks = [];
-      }
-    };
-    _voiceMediaRecorder.start();
-    isRecording = true;
-    if (micBtn) micBtn.classList.add('rec');
-    _setVoiceStatus('Recording… tap mic to stop');
-  } catch (err) {
-    console.error(err);
-    showToast('Microphone permission denied or unavailable.', 'error');
+  recognition.onerror = () => {
     isRecording = false;
     if (micBtn) micBtn.classList.remove('rec');
-  }
+    _setVoiceStatus('Listening…');
+  };
+  recognition.start();
 }
 
 function openLoginModal() {
@@ -784,29 +622,9 @@ async function send() {
   const messages = [...history, { role: 'user', content: text }];
 
   try {
-    let enrichedText = text;
-    if (currentImageData) {
-      try {
-        const visionSummary = await requestSnwolleyVision(currentImageData, text);
-        if (visionSummary) {
-          enrichedText = `${text}\n\n[Vision context]\n${visionSummary}`;
-        }
-      } catch (visionErr) {
-        console.warn('Snwolley vision unavailable, continuing without image analysis', visionErr);
-      }
-    }
-
-    let res = { reply: '', drugs: [], case_id: null };
-    try {
-      const snwolleyReply = await requestSnwolleyChat([...history, { role: 'user', content: enrichedText }]);
-      res.reply = snwolleyReply;
-    } catch (snwolleyErr) {
-      console.warn('Snwolley chat failed, falling back to internal /api/chat', snwolleyErr);
-      const payload = { messages };
-      if (currentImageData) payload.image_data = currentImageData;
-      res = await callApi('/chat', 'POST', payload);
-    }
-
+    const payload = { messages };
+    if (currentImageData) payload.image_data = currentImageData;
+    const res = await callApi('/chat', 'POST', payload);
     const reply = res.reply || res.response || '';
 
     // Clear image immediately after sending
@@ -819,7 +637,11 @@ async function send() {
       { t: 'BisaRx AI', c: 'b' },
       ...drugTags
     ]);
-    if (ttsOn) requestSnwolleyTts(reply);
+    if (ttsOn && synth) {
+      const utterance = new SpeechSynthesisUtterance(reply);
+      synth.cancel();
+      synth.speak(utterance);
+    }
     if (res.case_id && !isLoggedIn()) {
       _connectCaseWebSocket(res.case_id);
     }
