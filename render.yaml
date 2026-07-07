@@ -34,3 +34,27 @@
         value: https?://(www\.)?openpharmacy\.online$
       - key: DATABASE_URL
         sync: false
+      - key: MOOLRE_BASE_URL
+        value: https://api.moolre.com
+      - key: MOOLRE_SMS_PATH
+        value: /open/sms/send
+      - key: MOOLRE_PAYMENT_PATH
+        value: /embed/link
+      - key: MOOLRE_API_USER
+        sync: false
+      - key: MOOLRE_API_KEY
+        sync: false
+      - key: MOOLRE_API_PUBKEY
+        sync: false
+      - key: MOOLRE_API_VASKEY
+        sync: false
+      - key: MOOLRE_ACCOUNT_NUMBER
+        sync: false
+      - key: MOOLRE_SMS_SENDER_ID
+        sync: false
+      - key: MOOLRE_BUSINESS_EMAIL
+        sync: false
+      - key: MOOLRE_PAYMENT_CALLBACK_URL
+        sync: false
+      - key: MOOLRE_PAYMENT_REDIRECT_URL
+        sync: false

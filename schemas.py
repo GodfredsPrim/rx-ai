@@ -25,6 +25,11 @@ class PharmacistCreate(BaseModel):
     full_name: str
     license_number: str
     location: str = ""
+    phone: str = ""
+
+
+class PharmacistAvailabilityUpdate(BaseModel):
+    accepting_cases: bool
 
 
 class AssignCaseRequest(BaseModel):

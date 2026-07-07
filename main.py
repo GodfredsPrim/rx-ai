@@ -790,6 +790,10 @@ def _ensure_db_migrations():
                 conn.execute(text("ALTER TABLE pharmacists ADD COLUMN location VARCHAR DEFAULT ''"))
             if "is_verified" not in columns:
                 conn.execute(text("ALTER TABLE pharmacists ADD COLUMN is_verified BOOLEAN DEFAULT 0"))
+            if "phone" not in columns:
+                conn.execute(text("ALTER TABLE pharmacists ADD COLUMN phone VARCHAR DEFAULT ''"))
+            if "accepting_cases" not in columns:
+                conn.execute(text("ALTER TABLE pharmacists ADD COLUMN accepting_cases BOOLEAN DEFAULT 1"))
 
     if inspector.has_table("prescription_history"):
         columns = {column["name"] for column in inspector.get_columns("prescription_history")}
@@ -985,7 +989,9 @@ def _serialize_pharmacist(pharmacist: models.Pharmacist) -> dict:
         "full_name": pharmacist.full_name,
         "license_number": pharmacist.license_number,
         "location": pharmacist.location,
+        "phone": pharmacist.phone,
         "is_verified": pharmacist.is_verified,
+        "accepting_cases": pharmacist.accepting_cases,
     }
 
 
@@ -1172,6 +1178,38 @@ def _init_moolre_payment(case: models.PrescriptionHistory, payer_phone: str, pay
     except Exception as exc:
         logger.exception("MOOLRE payment init error: %s", exc)
         return {"status": "error", "error": str(exc)}
+
+
+def _notify_pharmacists_of_new_case(case_id: int) -> None:
+    """SMS every verified, on-duty pharmacist that a new case is waiting.
+
+    Decentralized by design: no admin dispatch step, every pharmacist who has
+    opted into accepting_cases is alerted at once and can pick it up first.
+    Runs as a background task with its own DB session.
+    """
+    if not _moolre_sms_enabled():
+        return
+    db = SessionLocal()
+    try:
+        case = db.query(models.PrescriptionHistory).filter(models.PrescriptionHistory.id == case_id).first()
+        if not case:
+            return
+        pharmacists = db.query(models.Pharmacist).filter(
+            models.Pharmacist.is_verified == True,
+            models.Pharmacist.accepting_cases == True,
+            models.Pharmacist.phone != "",
+        ).all()
+        if not pharmacists:
+            return
+        urgency = (case.urgency_level or "routine").upper()
+        message = (
+            f"BisaRx: New {urgency} case #{case.id} is waiting for pharmacist review. "
+            f"Log in to the dashboard to review."
+        )
+        for pharmacist in pharmacists:
+            _send_moolre_sms(pharmacist.phone, message)
+    finally:
+        db.close()
 
 
 @app.get("/api/auth/google/login")
@@ -1480,9 +1518,10 @@ def chat(
         
         # Notify pharmacists of new case
         background_tasks.add_task(
-            ws_manager.notify_pharmacists, 
+            ws_manager.notify_pharmacists,
             {"type": "case_created", "case_id": case_id}
         )
+        background_tasks.add_task(_notify_pharmacists_of_new_case, case_id)
 
 
     return {
@@ -1581,6 +1620,8 @@ async def chat_stream(
                     })
                 except Exception:
                     pass
+                import asyncio as _asyncio
+                _asyncio.create_task(_asyncio.to_thread(_notify_pharmacists_of_new_case, case_id))
 
             yield f"data: {json.dumps({'done': True, 'full': full_reply, 'consulting': is_consulting, 'case_id': case_id})}\n\n"
 
@@ -1658,6 +1699,11 @@ def get_guest_case_status(case_id: int, db: Session = Depends(get_db)):
         "referral_advice": case.referral_advice,
         "follow_up_instructions": case.follow_up_instructions,
         "created_at": case.created_at.isoformat() if case.created_at else None,
+        "is_guest_case": case.user_id is None,
+        "payment_status": case.payment_status,
+        "payment_url": case.payment_url,
+        "payment_amount": case.payment_amount,
+        "payment_currency": case.payment_currency,
     }
 
 
@@ -2090,12 +2136,27 @@ def admin_create_pharmacist(
         full_name=pharmacist_in.full_name.strip(),
         license_number=license_number,
         location=pharmacist_in.location.strip(),
+        phone=_normalize_phone(pharmacist_in.phone),
         is_verified=True,
+        accepting_cases=True,
     )
     db.add(pharmacist)
     db.commit()
     db.refresh(pharmacist)
     return {"status": "success", "pharmacist": _serialize_pharmacist(pharmacist)}
+
+
+@app.patch("/api/pharmacist/availability")
+def update_pharmacist_availability(
+    update: schemas.PharmacistAvailabilityUpdate,
+    current_pharmacist: models.Pharmacist = Depends(get_current_pharmacist),
+    db: Session = Depends(get_db),
+):
+    """Let a pharmacist toggle whether they currently want to receive new-case alerts."""
+    current_pharmacist.accepting_cases = update.accepting_cases
+    db.commit()
+    db.refresh(current_pharmacist)
+    return {"status": "success", "pharmacist": _serialize_pharmacist(current_pharmacist)}
 
 
 
@@ -2188,6 +2249,49 @@ def admin_assign_case(
     return {"status": "success", "case": _serialize_case(case)}
 
 
+def _fulfill_case_order(
+    db: Session,
+    case: models.PrescriptionHistory,
+    order: schemas.OrderRequest,
+    actor_role: str,
+    actor_name: str,
+    payer_email: str = "",
+) -> dict:
+    """Shared order+payment fulfillment for both logged-in and guest checkout."""
+    if case.status != "Reviewed":
+        raise HTTPException(status_code=400, detail="Only reviewed cases can be ordered")
+
+    case.status = "Ordered"
+    case.delivery_address = order.delivery_address
+    case.delivery_phone = order.phone_number
+    case.delivery_notes = order.delivery_notes
+    payment_result = _init_moolre_payment(
+        case=case,
+        payer_phone=order.phone_number,
+        payer_email=payer_email,
+        payer_name=actor_name,
+    )
+    if payment_result.get("status") == "initialized":
+        case.payment_status = "pending"
+        case.payment_reference = payment_result.get("reference", "")
+        case.payment_url = payment_result.get("payment_url", "") or ""
+    elif payment_result.get("status") == "skipped":
+        case.payment_status = "not_configured"
+    else:
+        case.payment_status = "failed"
+
+    _log_case_event(
+        case,
+        actor_role,
+        actor_name,
+        "order_placed",
+        f"Order placed for delivery to {order.delivery_address}",
+    )
+    db.commit()
+    db.refresh(case)
+    return {"status": "success", "case": _serialize_case(case), "payment": payment_result}
+
+
 @app.post("/api/cases/{case_id}/order")
 def order_prescription(
     case_id: int,
@@ -2201,39 +2305,47 @@ def order_prescription(
     ).first()
     if not case:
         raise HTTPException(status_code=404, detail="Case not found or not owned by you")
-    
-    if case.status != "Reviewed":
-        raise HTTPException(status_code=400, detail="Only reviewed cases can be ordered")
-    
-    case.status = "Ordered"
-    case.delivery_address = order.delivery_address
-    case.delivery_phone = order.phone_number
-    case.delivery_notes = order.delivery_notes
-    payment_result = _init_moolre_payment(
+
+    return _fulfill_case_order(
+        db=db,
         case=case,
-        payer_phone=order.phone_number,
+        order=order,
+        actor_role="patient",
+        actor_name=current_user.username,
         payer_email=current_user.email,
-        payer_name=current_user.username,
     )
-    if payment_result.get("status") == "initialized":
-        case.payment_status = "pending"
-        case.payment_reference = payment_result.get("reference", "")
-        case.payment_url = payment_result.get("payment_url", "") or ""
-    elif payment_result.get("status") == "skipped":
-        case.payment_status = "not_configured"
-    else:
-        case.payment_status = "failed"
-    
-    _log_case_event(
-        case,
-        "patient",
-        current_user.username,
-        "order_placed",
-        f"Order placed for delivery to {order.delivery_address}",
+
+
+@app.post("/api/cases/{case_id}/guest-order")
+def guest_order_prescription(
+    case_id: int,
+    order: schemas.OrderRequest,
+    db: Session = Depends(get_db),
+):
+    """Order + pay for a reviewed guest case, without login.
+
+    The submitted phone number must match the phone already on file for the
+    case (set at guest submission or via /guest-contact) so a stranger who
+    only knows the case number can't place an order on someone else's case.
+    """
+    case = db.query(models.PrescriptionHistory).filter(
+        models.PrescriptionHistory.id == case_id,
+        models.PrescriptionHistory.user_id.is_(None),
+    ).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    on_file_phone = case.guest_phone or case.delivery_phone
+    if not on_file_phone or _normalize_phone(order.phone_number) != on_file_phone:
+        raise HTTPException(status_code=403, detail="Phone number does not match this case")
+
+    return _fulfill_case_order(
+        db=db,
+        case=case,
+        order=order,
+        actor_role="patient",
+        actor_name="Guest",
     )
-    db.commit()
-    db.refresh(case)
-    return {"status": "success", "case": _serialize_case(case), "payment": payment_result}
 
 
 @app.post("/api/payments/moolre/webhook")
@@ -2797,7 +2909,15 @@ def submit_guest_case(
             case.guest_phone,
             f"BisaRx: Your case #{case.id} was received. A licensed pharmacist will review it soon.",
         )
-    
+
+    # Guest cases previously never notified pharmacists in real time (only chat-created
+    # cases did) — wire them into the same WebSocket + SMS alert path.
+    background_tasks.add_task(
+        ws_manager.notify_pharmacists,
+        {"type": "case_created", "case_id": case.id}
+    )
+    background_tasks.add_task(_notify_pharmacists_of_new_case, case.id)
+
     return schemas.GuestCaseResponse(
         case_id=case.id,
         message="Your case has been submitted to the pharmacy. A licensed pharmacist will review it shortly.",

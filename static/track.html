@@ -90,6 +90,17 @@
       border-radius: 999px; font-size: .82rem; font-weight: 600;
       padding: 4px 12px; margin-right: 6px; margin-bottom: 4px;
     }
+    .order-form input, .order-form textarea {
+      width: 100%; font: inherit; padding: 10px 12px; margin-bottom: 10px;
+      border: 1px solid var(--mist-200); border-radius: 10px; background: var(--mist-50);
+    }
+    .btn-order {
+      width: 100%; padding: 12px; border: none; border-radius: 999px;
+      background: var(--primary); color: #fff; font-weight: 700; font-size: .95rem;
+      cursor: pointer;
+    }
+    .btn-order:disabled { opacity: .6; cursor: not-allowed; }
+    .order-error { color: var(--danger); font-size: .82rem; margin-top: 8px; text-align: center; }
     @media (max-width: 540px) {
       .card { padding: 24px 18px; }
     }
@@ -191,6 +202,12 @@
 
     content.innerHTML = html;
 
+    if (d.is_guest_case && d.status === 'Reviewed') {
+      content.insertAdjacentHTML('beforeend', orderSectionHtml(d));
+    } else if (d.is_guest_case && d.status === 'Ordered') {
+      content.insertAdjacentHTML('beforeend', orderStatusHtml(d));
+    }
+
     if (isDone) {
       refreshNote.style.display = 'none';
       if (pollTimer) clearInterval(pollTimer);
@@ -198,6 +215,71 @@
       refreshNote.style.display = 'block';
     }
   }
+
+  function orderStatusHtml(d) {
+    const amount = d.payment_amount ? `${d.payment_currency || 'GHS'} ${Number(d.payment_amount).toFixed(2)}` : '';
+    if (d.payment_status === 'paid') {
+      return `<div class="divider"></div><div class="field-val" style="color:#065f46;background:#d1fae5;border-color:#a7f3d0">✅ Payment received${amount ? ' (' + amount + ')' : ''}. Your order is being prepared for delivery.</div>`;
+    }
+    if (d.payment_status === 'pending' && d.payment_url) {
+      return `<div class="divider"></div><div class="field-val">Order placed${amount ? ' — ' + amount : ''}. <a href="${d.payment_url}" target="_blank" rel="noopener">Complete your payment</a> to finish checkout.</div>`;
+    }
+    if (d.payment_status === 'not_configured') {
+      return `<div class="divider"></div><div class="field-val">Order placed${amount ? ' — ' + amount : ''}. The pharmacy will contact you to arrange payment.</div>`;
+    }
+    return `<div class="divider"></div><div class="field-val">Order placed${amount ? ' — ' + amount : ''}. We'll update you here once payment is confirmed.</div>`;
+  }
+
+  function orderSectionHtml(d) {
+    const amount = d.payment_amount ? `${d.payment_currency || 'GHS'} ${Number(d.payment_amount).toFixed(2)}` : 'to be confirmed';
+    return `
+      <div class="divider"></div>
+      <div class="field">
+        <label>Order &amp; Pay${d.payment_amount ? ' — ' + amount : ''}</label>
+        <div class="order-form">
+          <input type="text" id="order-address" placeholder="Delivery address" required>
+          <input type="tel" id="order-phone" placeholder="Phone number (same as used at intake)" required>
+          <textarea id="order-notes" rows="2" placeholder="Delivery notes (optional)"></textarea>
+          <button class="btn-order" id="order-submit-btn" onclick="submitGuestOrder(${d.case_id})">Order &amp; Pay</button>
+          <div class="order-error" id="order-error" style="display:none"></div>
+        </div>
+      </div>`;
+  }
+
+  window.submitGuestOrder = async function (caseId) {
+    const btn = document.getElementById('order-submit-btn');
+    const errEl = document.getElementById('order-error');
+    const address = document.getElementById('order-address').value.trim();
+    const phone = document.getElementById('order-phone').value.trim();
+    const notes = document.getElementById('order-notes').value.trim();
+    errEl.style.display = 'none';
+    if (!address || !phone) {
+      errEl.textContent = 'Please fill in your delivery address and phone number.';
+      errEl.style.display = 'block';
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = 'Placing order…';
+    try {
+      const res = await fetch(`${API}/api/cases/${caseId}/guest-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ delivery_address: address, phone_number: phone, delivery_notes: notes }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Could not place order.');
+      if (data.payment && data.payment.status === 'initialized' && data.payment.payment_url) {
+        window.location.href = data.payment.payment_url;
+        return;
+      }
+      fetch_case();
+    } catch (e) {
+      errEl.textContent = e.message || 'Something went wrong. Please try again.';
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Order & Pay';
+    }
+  };
 
   async function fetch_case() {
     try {

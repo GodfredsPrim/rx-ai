@@ -211,7 +211,13 @@
             <h2>Pharmacist Dashboard</h2>
             <p>Review and fulfill prescription requests</p>
           </div>
-          <div class="panel-badges"><span class="badge badge-success">Online</span></div>
+          <div class="panel-badges">
+            <span class="badge badge-success">Online</span>
+            <label style="display:inline-flex; align-items:center; gap:6px; font-size:.85rem; cursor:pointer;">
+              <input type="checkbox" id="ph-accepting-cases" checked onchange="toggleAcceptingCases(this)">
+              Accepting new cases
+            </label>
+          </div>
         </div>
 
         <div class="profile-tabs">
@@ -242,6 +248,6 @@
 
 <script>window.BISARX_PORTAL = "pharmacist";</script>
 <script src="js/config.js"></script>
-<script src="js/app.js?v=20260417-tabfix1"></script>
+<script src="js/app.js?v=20260707-oauth-tabs-fix"></script>
 </body>
 </html>

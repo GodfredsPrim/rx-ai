@@ -95,8 +95,10 @@ class Pharmacist(Base):
     full_name = Column(String, default="")
     license_number = Column(String, unique=True, index=True)
     location = Column(String, default="")
+    phone = Column(String, default="")
     is_verified = Column(Boolean, default=False)
-    
+    accepting_cases = Column(Boolean, default=True)
+
     reviews = relationship("PrescriptionHistory", back_populates="reviewer")
 
 class PrescriptionHistory(Base):
