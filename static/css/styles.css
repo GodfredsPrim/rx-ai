@@ -162,8 +162,8 @@ img,svg { max-width:100%; height:auto; }
   position:relative;
   display:flex;
   width:100%;
-  min-height:100vh;
-  min-height:100dvh;
+  height:100vh;
+  height:100dvh;
   overflow:hidden;
   align-items:stretch;
 }
@@ -1790,6 +1790,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   transition:var(--t);
 }
 .body-zone:hover { fill:rgba(183,121,31,.18); stroke:rgba(183,121,31,.7); }
+.body-zone.selected { fill:rgba(183,121,31,.32); stroke:rgba(183,121,31,1); stroke-width:2.5; }
 .zone-info { display:flex; align-items:center; justify-content:center; }
 .zone-card {
   width:100%;
@@ -2389,7 +2390,6 @@ input:focus,textarea:focus,select:focus {
   html { font-size:15px; }
   body::before,
   body::after { opacity:.65; }
-  .app-container { flex-direction:column; overflow:visible; }
 .mobile-header {
   display: flex;
   position: fixed;
@@ -2462,12 +2462,10 @@ body.sidebar-open {
   display: block;
   opacity: 1;
 }
-  .main-content { 
+  .main-content {
     min-height:100dvh;
-    padding:12px; 
-    padding-top:calc(var(--mobile-header-h) + 12px); 
-    overflow-y:auto;
-    -webkit-overflow-scrolling:touch;
+    padding:12px;
+    padding-top:calc(var(--mobile-header-h) + 12px);
   }
   #panel-chat { max-width:100%; }
   #panel-chat {
@@ -2565,14 +2563,12 @@ body.sidebar-open {
     min-width: 44px;
   }
   .main-content > * { min-height:auto; }
-  .panel { 
-    padding:16px; 
-    border-radius:20px; 
+  .panel {
+    padding:16px;
+    border-radius:20px;
     min-height:calc(100dvh - var(--mobile-header-h) - 24px);
-    overflow-y:auto;
-    -webkit-overflow-scrolling:touch;
   }
-  .panel.on { display:flex; flex-direction:column; overflow-y:auto; }
+  .panel.on { display:flex; flex-direction:column; }
   .panel-header,.case-header,.med-item,.pharmacist-card { flex-direction:column; align-items:stretch; }
   .dashboard-toolbar,.dashboard-inline { grid-template-columns:1fr; }
   .msg { max-width:100%; }
@@ -3660,7 +3656,6 @@ select:focus,
   }
 
   .app-container {
-    display: block;
     min-height: 100dvh;
   }
 
@@ -3684,7 +3679,6 @@ select:focus,
   .main-content {
     min-height: 100dvh;
     padding-top: calc(var(--mobile-header-h) + 10px);
-    overflow: visible;
   }
 
   .panel {

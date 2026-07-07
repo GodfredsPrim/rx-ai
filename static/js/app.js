@@ -388,7 +388,7 @@ function clearImagePreview() {
 // Navigation & Global UI
 function go(name, el) {
   const isGuest = currentSession.role === 'guest';
-  const restrictedTabs = ['bodymap', 'conditions', 'redflag', 'profile', 'connect', 'history'];
+  const restrictedTabs = ['conditions', 'redflag', 'profile', 'connect', 'history'];
 
   // Handle restricted access for guests
   if (restrictedTabs.includes(name) && isGuest) {
@@ -446,6 +446,46 @@ function hideGuestRestriction(name) {
 
 function goProfile(el) { go('profile', el); }
 function goHistory(el) { go('history', el); }
+
+const BODY_ZONE_LABELS = {
+  head: 'head',
+  throat: 'throat',
+  shoulder: 'shoulder',
+  chest: 'chest',
+  left_arm: 'left arm',
+  right_arm: 'right arm',
+  left_hand: 'left hand',
+  right_hand: 'right hand',
+  abdomen: 'stomach',
+  pelvis: 'pelvic area',
+  left_leg: 'left leg',
+  right_leg: 'right leg',
+  left_foot: 'left foot',
+  right_foot: 'right foot',
+  neck_back: 'back of my neck',
+  back: 'upper back',
+  lower_back: 'lower back',
+};
+
+function selectZone(zone, el) {
+  const label = BODY_ZONE_LABELS[zone] || zone.replace(/_/g, ' ');
+  const input = document.getElementById('tinput');
+  if (input) {
+    const phrase = `I'm having pain in my ${label}. `;
+    input.value = input.value.trim() ? `${input.value.trim()} ${phrase}` : phrase;
+  }
+
+  document.querySelectorAll('#panel-bodymap .body-zone.selected').forEach(z => z.classList.remove('selected'));
+  if (el && el.classList && el.classList.contains('body-zone')) {
+    el.classList.add('selected');
+  }
+
+  const infoEl = document.getElementById('bodymap-info');
+  if (infoEl) infoEl.textContent = `Selected: ${label}. Message drafted — review and send it in the chat.`;
+
+  go('chat', document.getElementById('nav-chat'));
+  if (input) input.focus();
+}
 
 function toggleSidebar() {
   const sb = document.querySelector('.sidebar');
@@ -741,6 +781,11 @@ async function refreshPharmacistDashboard() {
     if (p) p.textContent = s.pending_cases || 0;
     if (a) a.textContent = s.assigned_cases || 0;
     if (c) c.textContent = s.completed_cases || 0;
+
+    const acceptingToggle = document.getElementById('ph-accepting-cases');
+    if (acceptingToggle && data.pharmacist && document.activeElement !== acceptingToggle) {
+      acceptingToggle.checked = !!data.pharmacist.accepting_cases;
+    }
 
     renderPharmaQueue('pharmacist-pending-queue', data.pending_cases, 'pending');
     renderPharmaQueue('pharmacist-queue', data.assigned_cases || data.in_review_cases, 'assigned');
@@ -1052,24 +1097,36 @@ async function deliverOrder(id) {
 }
 
 async function createPharmacist() {
-  const name = document.getElementById('admin-ph-name').value, 
-        user = document.getElementById('admin-ph-username').value, 
-        email = document.getElementById('admin-ph-email').value, 
+  const name = document.getElementById('admin-ph-name').value,
+        user = document.getElementById('admin-ph-username').value,
+        email = document.getElementById('admin-ph-email').value,
         pass = document.getElementById('admin-ph-password').value,
-        license = document.getElementById('admin-ph-license').value;
+        license = document.getElementById('admin-ph-license').value,
+        phone = document.getElementById('admin-ph-phone')?.value || '';
   if (!name || !user || !email || !pass || !license) return showToast('Fill all fields including license', 'error');
   try {
-    await callApi('/admin/pharmacists', 'POST', { 
-      full_name: name, 
-      username: user, 
-      email, 
+    await callApi('/admin/pharmacists', 'POST', {
+      full_name: name,
+      username: user,
+      email,
       password: pass,
       license_number: license,
-      location: 'Main Pharmacy'
+      location: 'Main Pharmacy',
+      phone
     });
     showToast('Pharmacist created', 'success');
     refreshAdminDashboard();
   } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function toggleAcceptingCases(checkbox) {
+  try {
+    await callApi('/pharmacist/availability', 'PATCH', { accepting_cases: checkbox.checked });
+    showToast(checkbox.checked ? 'You are now accepting new cases' : 'New case alerts paused', 'success');
+  } catch (e) {
+    checkbox.checked = !checkbox.checked;
+    showToast(e.message, 'error');
+  }
 }
 
 async function verifyPharmacist(id) { await callApi(`/admin/pharmacists/${id}/verify`, 'POST'); showToast('Pharmacist verified'); refreshAdminDashboard(); }
@@ -1091,9 +1148,21 @@ function cleanupPatientPortalDuplicates() {
   ['nav-pharmacist', 'nav-admin', 'panel-pharmacist', 'panel-admin'].forEach(id => { const el = document.getElementById(id); if (el) el.remove(); });
 }
 
+function captureOAuthTokenFromUrl() {
+  const params = new URLSearchParams(location.search);
+  const token = params.get('token');
+  if (!token) return;
+  localStorage.setItem('token', token);
+  params.delete('token');
+  const cleanedSearch = params.toString();
+  const cleanedUrl = location.pathname + (cleanedSearch ? `?${cleanedSearch}` : '') + location.hash;
+  window.history.replaceState({}, document.title, cleanedUrl);
+}
+
 async function initApp() {
   showLoading('Initializing...');
   try {
+    captureOAuthTokenFromUrl();
     await fetchSessionContext();
     cleanupPatientPortalDuplicates();
     cleanupDedicatedPortalLayout();
