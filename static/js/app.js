@@ -278,43 +278,60 @@ function setLoginMode(mode = 'user', trigger = null) {
     btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
   });
   const label = document.getElementById('login-username-label'), input = document.getElementById('login-username'), help = document.getElementById('login-mode-help'), submit = document.getElementById('btn-do-login');
+  const usernameGroup = document.getElementById('login-username-group');
+  const passLabel = document.getElementById('login-pass-label');
+  const passInput = document.getElementById('login-pass');
   // Always set the login mode on the input, even if some UI elements are missing
   if (input) input.dataset.loginMode = mode;
   if (!label || !input || !help || !submit) return;
-  if (mode === 'pharmacist') { label.textContent = 'Pharmacist ID'; input.placeholder = 'Username, Email or License #'; help.textContent = 'Use your allocated pharmacist credentials.'; submit.textContent = 'Sign In as Pharmacist'; }
-
-  else if (mode === 'admin') { label.textContent = 'Admin ID'; input.placeholder = 'Enter admin identifier'; help.textContent = 'Access restricted to system administrators.'; submit.textContent = 'Sign In as Admin'; }
-  else { label.textContent = 'Username or Email'; input.placeholder = 'Enter credentials'; help.textContent = 'Use your patient account.'; submit.textContent = 'Sign In'; }
+  if (mode === 'pharmacist') {
+    if (usernameGroup) usernameGroup.style.display = '';
+    label.textContent = 'Pharmacist ID'; input.placeholder = 'Username, Email or License #';
+    if (passLabel) passLabel.textContent = 'Password';
+    help.textContent = 'Use your allocated pharmacist credentials.'; submit.textContent = 'Sign In as Pharmacist';
+  } else if (mode === 'admin') {
+    if (usernameGroup) usernameGroup.style.display = 'none';
+    if (passLabel) passLabel.textContent = 'Access Code';
+    if (passInput) passInput.placeholder = 'Enter admin access code';
+    help.textContent = 'Admin portal access is restricted to a shared access code.'; submit.textContent = 'Sign In as Admin';
+  } else {
+    if (usernameGroup) usernameGroup.style.display = '';
+    label.textContent = 'Username or Email'; input.placeholder = 'Enter credentials';
+    if (passLabel) passLabel.textContent = 'Password';
+    help.textContent = 'Use your patient account.'; submit.textContent = 'Sign In';
+  }
   if (trigger) trigger.blur();
 }
 
 async function doLogin() {
-  const username = document.getElementById('login-username').value.trim().toLowerCase();
-  const pass = document.getElementById('login-pass').value;
   // Use dataset.loginMode first, then fall back to portal mode
   const loginMode = document.getElementById('login-username').dataset.loginMode || (isPortalMode('pharmacist') ? 'pharmacist' : isPortalMode('admin') ? 'admin' : 'user');
+  const pass = document.getElementById('login-pass').value;
   const err = document.getElementById('login-err'), btn = document.getElementById('btn-do-login');
+
+  if (loginMode === 'admin') {
+    if (!pass) { err.innerHTML = '<div class="err">Required: Access code.</div>'; return; }
+    try {
+      btn.disabled = true; btn.innerHTML = 'Signing in...';
+      const data = await callApi('/auth/admin/access', 'POST', { access_code: pass });
+      localStorage.setItem('token', data.access_token);
+      currentUser = 'admin';
+      closeLoginModal();
+      showToast('Welcome back!', 'success');
+      currentSession = await callApi('/session');
+      initApp();
+    } catch (e) { err.innerHTML = `<div class="err">${e.message}</div>`; }
+    finally { btn.disabled = false; setLoginMode(loginMode); }
+    return;
+  }
+
+  const username = document.getElementById('login-username').value.trim().toLowerCase();
   if (!username || !pass) { err.innerHTML = '<div class="err">Required: Username & password.</div>'; return; }
   try {
     btn.disabled = true; btn.innerHTML = 'Signing in...';
     const body = new URLSearchParams(); body.append('username', username); body.append('password', pass);
-    let endpoint = loginMode === 'pharmacist'
-      ? '/auth/pharmacist/login'
-      : loginMode === 'admin'
-        ? '/auth/admin/login'
-        : '/auth/login';
-    let data;
-    try {
-      data = await callApi(endpoint, 'POST', body);
-    } catch (primaryErr) {
-      // Backward compatibility: older deployments may not have /auth/admin/login yet.
-      if (loginMode === 'admin' && /Method Not Allowed|Not Found/i.test(primaryErr?.message || '')) {
-        endpoint = '/auth/login';
-        data = await callApi(endpoint, 'POST', body);
-      } else {
-        throw primaryErr;
-      }
-    }
+    const endpoint = loginMode === 'pharmacist' ? '/auth/pharmacist/login' : '/auth/login';
+    const data = await callApi(endpoint, 'POST', body);
     localStorage.setItem('token', data.access_token);
     currentUser = username;
     closeLoginModal();
@@ -1166,13 +1183,21 @@ async function initApp() {
     await fetchSessionContext();
     cleanupPatientPortalDuplicates();
     cleanupDedicatedPortalLayout();
-    
-    if (isDedicatedPortal() && currentSession.role === 'guest') { 
-      setDedicatedPortalVisibility(false); 
-      updateAuthUI(); 
-      switchAuthTab('login'); 
-      openLoginModal(); 
-      return; 
+
+    const dedicatedConfig = getDedicatedPortalConfig();
+    if (dedicatedConfig && currentSession.role !== 'guest' && currentSession.role !== dedicatedConfig.role) {
+      // A token from a different portal/role (e.g. admin) is sitting in localStorage
+      // for this shared origin — it doesn't belong here, so treat this as signed out.
+      localStorage.removeItem('token');
+      currentSession = { role: 'guest' };
+    }
+
+    if (isDedicatedPortal() && currentSession.role === 'guest') {
+      setDedicatedPortalVisibility(false);
+      updateAuthUI();
+      switchAuthTab('login');
+      openLoginModal();
+      return;
     }
     
     setDedicatedPortalVisibility(true);

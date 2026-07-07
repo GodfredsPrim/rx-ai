@@ -18,6 +18,10 @@ class Token(BaseModel):
     token_type: str
 
 
+class AdminAccessRequest(BaseModel):
+    access_code: str
+
+
 class PharmacistCreate(BaseModel):
     username: str
     email: EmailStr

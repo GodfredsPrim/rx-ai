@@ -147,11 +147,6 @@
     return m[s] || 's-default';
   }
 
-  function statusEmoji(s) {
-    const m = { Pending: '⏳', 'In Review': '🔍', Reviewed: '✅', Ordered: '📦', Delivered: '🚚' };
-    return m[s] || '📋';
-  }
-
   function render(d) {
     const isDone = ['Reviewed', 'Ordered', 'Delivered', 'Completed'].includes(d.status);
 
@@ -159,7 +154,7 @@
       <div class="field">
         <label>Status</label>
         <div>
-          <span class="status-badge ${statusClass(d.status)}">${statusEmoji(d.status)} ${d.status}</span>
+          <span class="status-badge ${statusClass(d.status)}">${d.status}</span>
         </div>
       </div>`;
 
@@ -168,7 +163,7 @@
         <div class="divider"></div>
         <div class="field">
           <label>Prescribed Medication</label>
-          <div class="field-val"><span class="pill">💊 ${d.drug_name}</span></div>
+          <div class="field-val"><span class="pill">${d.drug_name}</span></div>
         </div>`;
     }
 
@@ -219,7 +214,7 @@
   function orderStatusHtml(d) {
     const amount = d.payment_amount ? `${d.payment_currency || 'GHS'} ${Number(d.payment_amount).toFixed(2)}` : '';
     if (d.payment_status === 'paid') {
-      return `<div class="divider"></div><div class="field-val" style="color:#065f46;background:#d1fae5;border-color:#a7f3d0">✅ Payment received${amount ? ' (' + amount + ')' : ''}. Your order is being prepared for delivery.</div>`;
+      return `<div class="divider"></div><div class="field-val" style="color:#065f46;background:#d1fae5;border-color:#a7f3d0">Payment received${amount ? ' (' + amount + ')' : ''}. Your order is being prepared for delivery.</div>`;
     }
     if (d.payment_status === 'pending' && d.payment_url) {
       return `<div class="divider"></div><div class="field-val">Order placed${amount ? ' — ' + amount : ''}. <a href="${d.payment_url}" target="_blank" rel="noopener">Complete your payment</a> to finish checkout.</div>`;

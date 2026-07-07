@@ -34,6 +34,14 @@
         value: https?://(www\.)?openpharmacy\.online$
       - key: DATABASE_URL
         sync: false
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_ACCESS_CODE
+        sync: false
       - key: MOOLRE_BASE_URL
         value: https://api.moolre.com
       - key: MOOLRE_SMS_PATH

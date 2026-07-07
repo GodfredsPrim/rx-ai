@@ -1,5 +1,6 @@
 from pathlib import Path
 from io import BytesIO, StringIO
+import hmac
 import logging
 import re
 import csv
@@ -1310,15 +1311,21 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@app.post("/api/auth/admin/login", response_model=schemas.Token)
-def admin_login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    login_value = form_data.username.strip().lower()
-    admin = db.query(models.User).filter(
-        models.User.is_admin == True,
-        or_(func.lower(models.User.username) == login_value, func.lower(models.User.email) == login_value),
-    ).first()
-    if not admin or not auth.verify_password(form_data.password, admin.hashed_password):
-        raise HTTPException(status_code=400, detail="Incorrect admin username or password")
+@app.post("/api/auth/admin/access", response_model=schemas.Token)
+def admin_access(request: schemas.AdminAccessRequest, db: Session = Depends(get_db)):
+    """Admin login is a single shared access code, not username/password."""
+    configured_code = os.getenv("ADMIN_ACCESS_CODE", "").strip()
+    submitted_code = (request.access_code or "").strip()
+    if not configured_code:
+        raise HTTPException(status_code=500, detail="Admin access code is not configured")
+    if not submitted_code or not hmac.compare_digest(submitted_code, configured_code):
+        raise HTTPException(status_code=400, detail="Incorrect access code")
+
+    _ensure_admin_account(db)
+    admin = db.query(models.User).filter(models.User.is_admin == True).first()
+    if not admin:
+        raise HTTPException(status_code=500, detail="No admin account is provisioned")
+
     access_token = auth.create_access_token(data={"sub": admin.email, "role": "admin"})
     return {"access_token": access_token, "token_type": "bearer"}
 

@@ -63,12 +63,12 @@
         <button type="button" class="auth-role-btn" id="login-role-admin" data-role="admin" onclick="setLoginMode('admin', this)">Admin</button>
       </div>
       <p class="auth-mode-help" id="login-mode-help">Use your patient account to continue.</p>
-      <div class="form-group">
+      <div class="form-group" id="login-username-group">
         <label for="login-username" id="login-username-label">Username or Email</label>
         <input type="text" id="login-username" placeholder="Enter username or email" autocomplete="username" required>
       </div>
       <div class="form-group">
-        <label for="login-pass">Password</label>
+        <label for="login-pass" id="login-pass-label">Password</label>
         <input type="password" id="login-pass" placeholder="Enter password" autocomplete="current-password" required>
       </div>
       <div id="login-err" role="alert"></div>
@@ -286,21 +286,16 @@
           </div>
         </div>
 
-        <div class="disclaimer-banner" role="note">
-          <strong id="disc-label">Clinical Note:</strong>
-          <span id="disc-text">BisaRx collects your health details for licensed clinical review. Do not start medication without confirmation from a qualified professional.</span>
-        </div>
-
         <!-- Quick symptom icons (compact) -->
         <div class="quick-symptoms-bar">
           <p class="quick-label">Quick select:</p>
           <div class="quick-symptoms">
-            <button class="qs-btn" onclick="selectVisualSymptom('Fever')">🤒 Fever</button>
-            <button class="qs-btn" onclick="selectVisualSymptom('Pain')">💊 Pain</button>
-            <button class="qs-btn" onclick="selectVisualSymptom('Cough')">😷 Cough</button>
-            <button class="qs-btn" onclick="selectVisualSymptom('Headache')">🤕 Headache</button>
-            <button class="qs-btn" onclick="selectVisualSymptom('Stomach ache')">🤢 Stomach</button>
-            <button class="qs-btn" onclick="selectVisualSymptom('Rash')">🦠 Rash</button>
+            <button class="qs-btn" onclick="selectVisualSymptom('Fever')">Fever</button>
+            <button class="qs-btn" onclick="selectVisualSymptom('Pain')">Pain</button>
+            <button class="qs-btn" onclick="selectVisualSymptom('Cough')">Cough</button>
+            <button class="qs-btn" onclick="selectVisualSymptom('Headache')">Headache</button>
+            <button class="qs-btn" onclick="selectVisualSymptom('Stomach ache')">Stomach</button>
+            <button class="qs-btn" onclick="selectVisualSymptom('Rash')">Rash</button>
           </div>
         </div>
 
@@ -366,10 +361,10 @@
             <p>Good for people who cannot type much. Tap a body part to draft a message, review it, then send it in the chat.</p>
           </div>
           <div class="bodymap-quick-grid">
-            <button class="bodymap-quick" onclick="selectZone('head', this)"><span>🤕</span><strong>Head</strong></button>
-            <button class="bodymap-quick" onclick="selectZone('chest', this)"><span>😮‍💨</span><strong>Chest</strong></button>
-            <button class="bodymap-quick" onclick="selectZone('abdomen', this)"><span>🤢</span><strong>Stomach</strong></button>
-            <button class="bodymap-quick" onclick="selectZone('left_leg', this)"><span>🦵</span><strong>Leg</strong></button>
+            <button class="bodymap-quick" onclick="selectZone('head', this)"><strong>Head</strong></button>
+            <button class="bodymap-quick" onclick="selectZone('chest', this)"><strong>Chest</strong></button>
+            <button class="bodymap-quick" onclick="selectZone('abdomen', this)"><strong>Stomach</strong></button>
+            <button class="bodymap-quick" onclick="selectZone('left_leg', this)"><strong>Leg</strong></button>
           </div>
         </div>
         <div class="bodymap-wrapper">
@@ -910,7 +905,7 @@
 </div>
 
 <script src="js/config.js"></script>
-<script src="js/app.js?v=20260707-oauth-tabs-fix"></script>
+<script src="js/app.js?v=20260707-role-guard"></script>
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {

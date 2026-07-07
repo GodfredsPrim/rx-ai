@@ -47,12 +47,12 @@
         <button type="button" id="login-role-admin" data-role="admin" class="on"></button>
       </div>
       <p class="auth-mode-help" id="login-mode-help">Secure Admin Access</p>
-      <div class="form-group">
+      <div class="form-group" id="login-username-group">
         <label for="login-username" id="login-username-label">Admin Username</label>
         <input type="text" id="login-username" required autocomplete="username">
       </div>
       <div class="form-group">
-        <label for="login-pass">Password</label>
+        <label for="login-pass" id="login-pass-label">Password</label>
         <input type="password" id="login-pass" required autocomplete="current-password">
       </div>
       <div id="login-err" role="alert"></div>
@@ -159,6 +159,6 @@
 
 <script>window.BISARX_PORTAL = "admin";</script>
 <script src="js/config.js"></script>
-<script src="js/app.js?v=20260707-oauth-tabs-fix"></script>
+<script src="js/app.js?v=20260707-role-guard"></script>
 </body>
 </html>
