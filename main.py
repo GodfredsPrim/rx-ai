@@ -475,70 +475,6 @@ def _get_relevant_medicine_context(messages: list[dict], limit: int = 5) -> str:
     return "\n".join(context_parts)
 
 
-def _search_medicine_dataset(symptom_summary: str, limit: int = 5) -> list[dict]:
-    """Search the medicine dataset for drugs matching symptoms. Returns at least 3 relevant results with dosage instructions."""
-    if not medicine_dataset:
-        return []
-
-    query_tokens = _tokenize(symptom_summary)
-    if not query_tokens:
-        return []
-
-    # Expanded map of symptoms to indications with dosage hints
-    symptom_info = {
-        "headache": {"indications": ["pain", "headache"], "dosage_hint": "Take 500mg-1g every 4-6 hours as needed, max 4g daily"},
-        "fever": {"indications": ["fever", "pain"], "dosage_hint": "Take 500mg-1g every 4-6 hours as needed for fever"},
-        "malaria": {"indications": ["fever", "infection", "malaria"], "dosage_hint": "Standard course: 1 tablet twice daily for 3 days with food"},
-        "cough": {"indications": ["infection", "cough"], "dosage_hint": "Take 5-10ml every 4-6 hours as needed"},
-        "cold": {"indications": ["infection", "virus", "cold"], "dosage_hint": "Take as directed, usually 1 tablet every 6-8 hours"},
-        "flu": {"indications": ["virus", "infection", "flu"], "dosage_hint": "Take 1 tablet every 6-8 hours with food"},
-        "diarrhea": {"indications": ["infection", "diarrhea"], "dosage_hint": "Take 2 tablets after each loose stool, max 8 tablets daily"},
-        "stomach": {"indications": ["pain", "stomach"], "dosage_hint": "Take 1 tablet 30 minutes before meals"},
-        "nausea": {"indications": ["nausea", "stomach"], "dosage_hint": "Take 25mg every 6-8 hours as needed"},
-        "vomiting": {"indications": ["nausea", "vomiting"], "dosage_hint": "Take as directed, usually 10mg every 8 hours"},
-        "wound": {"indications": ["wound", "infection"], "dosage_hint": "Apply topically 2-3 times daily or as directed"},
-        "cut": {"indications": ["wound", "cut"], "dosage_hint": "Clean wound and apply 2-3 times daily"},
-        "infection": {"indications": ["infection", "bacterial"], "dosage_hint": "Take 500mg every 6 hours or as prescribed"},
-        "pain": {"indications": ["pain", "inflammation"], "dosage_hint": "Take 400-800mg every 6-8 hours as needed"},
-        "inflammation": {"indications": ["pain", "inflammation"], "dosage_hint": "Take 200-400mg every 4-6 hours as needed"},
-        "allergy": {"indications": ["allergy", "allergic"], "dosage_hint": "Take 10mg once daily for allergy relief"},
-        "allergic": {"indications": ["allergy", "allergic"], "dosage_hint": "Take 10mg once daily"},
-        "diabetes": {"indications": ["diabetes", "blood sugar"], "dosage_hint": "Take 500mg-1g twice daily with meals as prescribed"},
-        "sugar": {"indications": ["diabetes", "blood sugar"], "dosage_hint": "Take as prescribed by your doctor"},
-        "blood pressure": {"indications": ["hypertension", "blood pressure"], "dosage_hint": "Take 5-10mg once daily as prescribed"},
-        "hypertension": {"indications": ["hypertension", "blood pressure"], "dosage_hint": "Take 5-10mg once daily"},
-        "depression": {"indications": ["depression", "mental health"], "dosage_hint": "Take 20-50mg once daily as prescribed by doctor"},
-        "anxiety": {"indications": ["anxiety", "mental health"], "dosage_hint": "Take as prescribed by your doctor"},
-        "fungus": {"indications": ["fungus", "fungal"], "dosage_hint": "Apply to affected area once or twice daily"},
-        "fungal": {"indications": ["fungus", "fungal"], "dosage_hint": "Apply to affected area once or twice daily"},
-        "rash": {"indications": ["rash", "skin", "allergy"], "dosage_hint": "Apply thin layer to affected area 2-3 times daily"},
-        "skin": {"indications": ["skin", "wound"], "dosage_hint": "Apply as directed to affected area"},
-        "virus": {"indications": ["virus", "viral"], "dosage_hint": "Take as directed, complete full course"},
-        "viral": {"indications": ["virus", "viral"], "dosage_hint": "Take as directed, rest and fluids important"},
-        "sore throat": {"indications": ["infection", "sore throat"], "dosage_hint": "Dissolve 1 lozenge every 2-3 hours as needed"},
-        "throat": {"indications": ["infection", "sore throat"], "dosage_hint": "Dissolve 1 lozenge every 2-3 hours"},
-        "back pain": {"indications": ["pain", "back pain"], "dosage_hint": "Apply to affected area 3-4 times daily or take oral dose as needed"},
-        "muscle": {"indications": ["pain", "muscle"], "dosage_hint": "Apply to affected muscles 3-4 times daily"},
-    }
-
-    # Build target indications from symptoms
-    target_indications = set()
-    matched_symptoms = set()
-    for word in query_tokens:
-        if word in symptom_info:
-            matched_symptoms.add(word)
-            for ind in symptom_info[word]["indications"]:
-                target_indications.add(ind.lower())
-
-    # Score each medication
-    scored = []
-    for med in medicine_dataset:
-        score = 0
-        med_indication = (med.get("Indication") or "").lower()
-        med_category = (med.get("Category") or "").lower()
-        med_name = (med.get("Name") or "").lower()
-
-        # Higher score for matched symptoms
 def _search_medicine_dataset(*args, **kwargs):
     return chat_engine.search_medicine_dataset(*args, **kwargs)
 
@@ -786,13 +722,30 @@ def _extract_ai_medication_suggestions(dataset_guidance: str) -> list[dict]:
     return unique_suggestions
 
 
-def _get_default_ai_medication(rx: models.PrescriptionHistory) -> str:
-    dataset_guidance = ""
-    for chunk in (rx.details or "").split(" || "):
+def _extract_dataset_guidance(details_text: str) -> str:
+    details_text = details_text or ""
+    if "**Dataset guidance for review:**" in details_text:
+        return details_text.split("**Dataset guidance for review:**")[1].split("\n")[0].strip()
+    for chunk in details_text.split(" || "):
         section = chunk.strip()
         if section.lower().startswith("dataset guidance for pharmacist review only:"):
-            dataset_guidance = section.split(":", 1)[1].strip()
-            break
+            return section.split(":", 1)[1].strip()
+    return ""
+
+
+def _extract_pdf_guidance(details_text: str) -> str:
+    details_text = details_text or ""
+    if "**PDF guidance for review:**" in details_text:
+        return details_text.split("**PDF guidance for review:**")[1].split("\n")[0].strip()
+    for chunk in details_text.split(" || "):
+        section = chunk.strip()
+        if section.lower().startswith("pdf guidance for pharmacist review only:"):
+            return section.split(":", 1)[1].strip()
+    return ""
+
+
+def _get_default_ai_medication(rx: models.PrescriptionHistory) -> str:
+    dataset_guidance = _extract_dataset_guidance(rx.details or "")
     suggestions = _extract_ai_medication_suggestions(dataset_guidance)
     return suggestions[0]["medication"] if suggestions else ""
 
@@ -939,14 +892,14 @@ def _serialize_case(rx: models.PrescriptionHistory) -> dict:
         elif "**Full patient conversation history:**" in details_text:
             support_sections["recent_patient_statements"] = details_text.split("**Full patient conversation history:**")[1].split("\n")[0].strip()
 
-        if "**Dataset guidance for review:**" in details_text:
-            support_sections["dataset_guidance"] = details_text.split("**Dataset guidance for review:**")[1].split("\n")[0].strip()
-        if "**PDF guidance for review:**" in details_text:
-            support_sections["pdf_guidance"] = details_text.split("**PDF guidance for review:**")[1].split("\n")[0].strip()
+        support_sections["dataset_guidance"] = _extract_dataset_guidance(details_text)
+        support_sections["pdf_guidance"] = _extract_pdf_guidance(details_text)
         if "Patient clinical profile for pharmacist review:" in details_text:
             support_sections["clinical_profile"] = details_text.split("Patient clinical profile for pharmacist review:")[1].strip()
     else:
         # Legacy parsing
+        support_sections["dataset_guidance"] = _extract_dataset_guidance(rx.details or "")
+        support_sections["pdf_guidance"] = _extract_pdf_guidance(rx.details or "")
         for chunk in (rx.details or "").split(" || "):
             section = chunk.strip()
             lowered = section.lower()
@@ -954,10 +907,6 @@ def _serialize_case(rx: models.PrescriptionHistory) -> dict:
                 support_sections["ai_intake_summary"] = section.split(":", 1)[1].strip()
             elif lowered.startswith("recent patient statements:"):
                 support_sections["recent_patient_statements"] = section.split(":", 1)[1].strip()
-            elif lowered.startswith("dataset guidance for pharmacist review only:"):
-                support_sections["dataset_guidance"] = section.split(":", 1)[1].strip()
-            elif lowered.startswith("pdf guidance for pharmacist review only:"):
-                support_sections["pdf_guidance"] = section.split(":", 1)[1].strip()
             elif lowered.startswith("patient clinical profile for pharmacist review:"):
                 support_sections["clinical_profile"] = section.split(":", 1)[1].strip()
 
@@ -1450,21 +1399,26 @@ def _background_generate_summary(case_id: int, translated_messages: list[dict]):
 
         # Generate the detailed report (this can take 5-15 seconds)
         detailed_report = chat_engine.generate_detailed_summary(translated_messages)
-        
+
+        # Preserve the dataset/PDF guidance computed at case-creation time so the
+        # rebuild below doesn't discard the actual matched drug data.
+        dataset_guidance = _extract_dataset_guidance(case.details or "") or "No specific dataset guidance matched."
+        pdf_guidance = _extract_pdf_guidance(case.details or "") or "No specific PDF guidance matched."
+
         # Update the case record
         case.ai_summary = detailed_report[:2000]
-        
+
         # ALSO update the details field which is what the pharmacist primarily sees
         # We rebuild the full clinical details block so it shows the AI analysis + history
         patient_msgs = [m["content"] for m in translated_messages if m["role"] == "user"]
         symptom_history = " | ".join(patient_msgs)
-        
+
         case.details = (
             f"### AI CLINICAL INTAKE SUMMARY\n{detailed_report}\n\n"
             f"--- \n"
             f"**Full patient conversation history:** {symptom_history or 'Not captured'} \n"
-            f"**Dataset guidance for review:** (Available in Intake) \n"
-            f"**PDF guidance for review:** (Available in Intake) \n"
+            f"**Dataset guidance for review:** {dataset_guidance} \n"
+            f"**PDF guidance for review:** {pdf_guidance} \n"
             f" || Patient clinical profile for pharmacist review: {chat_engine.build_patient_clinical_profile_snapshot(db, case.user_id)}"
 
         )
