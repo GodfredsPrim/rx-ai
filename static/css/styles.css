@@ -450,19 +450,15 @@ img,svg { max-width:100%; height:auto; }
 }
 .panel.on { display:flex; flex-direction:column; }
 .panel > * { flex-shrink:0; }
-.panel > .messages-container,
-.panel > .profile-content,
-.panel > .bodymap-wrapper,
-.panel > .connect-layout,
-.panel > .history-content,
-.panel > .pharmacist-queue,
-.panel > .conditions-grid,
-.panel > .redflags-list {
+.panel > .messages-container {
   flex:1;
   min-height:0;
   overflow-y:auto;
   -webkit-overflow-scrolling:touch;
 }
+/* .bodymap-wrapper / #profile-content / .conditions-grid / .redflags-list / .connect-layout /
+   .history-content / .pharmacist-queue: now scrolled via `.panel-content-wrapper > *`
+   rule appended near EOF — these all sit one level deeper than a direct .panel child. */
 
 #panel-chat { 
   width:100%; 
@@ -1503,14 +1499,14 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .btn-review:hover { transform:translateY(-2px); box-shadow:0 8px 20px rgba(30,58,48,.25); }
 
 /* ── Cards shared ── */
+/* background/border/box-shadow here are superseded by the gradient
+   "card look" system near EOF (~3340) for every selector below —
+   only the still-needed, non-duplicated properties are kept here. */
 .ccard,.rfbox,.zone-card,.auth-prompt-box,
 .stat-card,.info-card,.summary-card,
 .pharmacist-card,.case-card,.history-content,
 .med-item,.rxitem,.profile-inner,
 #visual-icons-container,.bodymap-wrapper {
-  background:var(--white);
-  border:1px solid var(--mist-200);
-  box-shadow:var(--sh-xs);
   border-radius:var(--r-lg);
   position:relative;
   overflow:hidden;
@@ -4313,7 +4309,7 @@ select:focus,
     justify-self: flex-end;
   }
   /* Wrap pharmacist card badge area */
-  .pharmacist-case-card [style*="display:flex"][style*="justify-content:space-between"] {
+  .pharmacist-case-card .case-card-header {
     flex-direction: column;
     gap: 8px;
   }
@@ -4383,3 +4379,180 @@ select:focus,
     padding: 10px 0;
   }
 }
+
+/* ============================================================
+   Patient Chat — Slim ChatGPT-style header (desktop/tablet)
+   Mobile (<=768px) already shrinks/hides these via existing
+   rules; this only targets >=769px where .panel-header and
+   .quick-symptoms-bar were still full size, starving
+   .messages-container of vertical space.
+   ============================================================ */
+@media (min-width: 769px) {
+  #panel-chat .panel-header {
+    padding: 10px 24px 8px;
+    margin-bottom: 4px;
+    border-bottom: none;
+  }
+  #panel-chat .panel-info h2 {
+    font-size: 1.05rem;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+  #panel-chat .panel-info p {
+    display: none;
+  }
+  #panel-chat .panel-badges {
+    gap: 6px;
+  }
+  #panel-chat .panel-badges .badge {
+    padding: 4px 10px;
+    font-size: 0.58rem;
+  }
+
+  #panel-chat .quick-symptoms-bar {
+    padding: 6px 14px;
+    margin-bottom: 6px;
+    gap: 8px;
+    border-radius: 14px;
+    box-shadow: none;
+    background: rgba(30, 58, 48, 0.03);
+  }
+  #panel-chat .quick-label {
+    font-size: 0.68rem;
+    padding: 2px 8px;
+  }
+  #panel-chat .quick-symptoms {
+    gap: 6px;
+  }
+  #panel-chat .qs-btn {
+    padding: 5px 12px;
+    font-size: 0.74rem;
+  }
+}
+
+/* ============================================================
+   Pharmacist Dashboard Visual Redesign
+   Scoped to #panel-pharmacist (shared by pharmacist.html and
+   index.html's embedded dashboard) so these rules win over both
+   the older scattered .case-card/.pharmacist-case-card/
+   .pharmacist-queue declarations above AND pharmacist.html's own
+   inline <style> block, without editing either.
+   ============================================================ */
+
+/* Stat tiles: distinct accent color + icon per status */
+#panel-pharmacist .stats-grid { gap: 14px; margin-bottom: 20px; }
+#panel-pharmacist .stat-card {
+  position: relative;
+  padding: 18px 20px 18px 54px;
+  border-radius: 18px;
+  overflow: hidden;
+}
+#panel-pharmacist .stat-card::before {
+  position: absolute; left: 16px; top: 18px;
+  font-size: 1.3rem; line-height: 1;
+}
+#panel-pharmacist .stat-card::after {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+}
+#panel-pharmacist .stat-card--queue::before,
+#panel-pharmacist .stat-card--assigned::before  { content: '📥'; }
+#panel-pharmacist .stat-card--queue::after,
+#panel-pharmacist .stat-card--assigned::after   { background: linear-gradient(180deg,#63b3ed,#3182ce); }
+#panel-pharmacist .stat-card--active::before,
+#panel-pharmacist .stat-card--inreview::before  { content: '⚙️'; }
+#panel-pharmacist .stat-card--active::after,
+#panel-pharmacist .stat-card--inreview::after   { background: linear-gradient(180deg,#cf9b4d,var(--accent)); }
+#panel-pharmacist .stat-card--done::before,
+#panel-pharmacist .stat-card--completed::before { content: '✅'; }
+#panel-pharmacist .stat-card--done::after,
+#panel-pharmacist .stat-card--completed::after  { background: linear-gradient(180deg,#4bb978,var(--success)); }
+#panel-pharmacist .stat-card--verified::before  { content: '🛡️'; }
+#panel-pharmacist .stat-card--verified::after   { background: linear-gradient(180deg,#a78bfa,#7c3aed); }
+
+/* Queue grid — single definition */
+#panel-pharmacist .pharmacist-queue {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(440px, 100%), 1fr));
+  gap: 20px;
+  align-content: start;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Case card — single consolidated definition */
+#panel-pharmacist .pharmacist-case-card {
+  display: block;
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(247,249,248,0.94));
+  border: 1px solid rgba(30,58,48,0.09);
+  border-radius: 22px;
+  padding: clamp(16px, 2.2vw, 22px);
+  box-shadow: 0 14px 34px rgba(16,24,40,0.07);
+  transition: var(--t);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  word-wrap: break-word;
+}
+#panel-pharmacist .pharmacist-case-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 44px rgba(16,24,40,0.12);
+  border-color: rgba(30,58,48,0.16);
+}
+
+/* Header: patient identity (left) vs urgency/status (right) */
+#panel-pharmacist .case-card-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 10px; margin-bottom: 12px; flex-wrap: wrap;
+}
+#panel-pharmacist .case-card-header-info { min-width: 0; }
+#panel-pharmacist .case-user-name { font-weight: 800; font-size: 0.98rem; color: var(--mist-900); }
+#panel-pharmacist .case-phone { display: block; margin-top: 2px; color: var(--mist-500); font-size: 0.8rem; }
+#panel-pharmacist .case-card-header-badges { display: flex; gap: 6px; flex-wrap: wrap; flex-shrink: 0; }
+#panel-pharmacist .case-accept-btn { margin-top: 10px; width: 100%; }
+
+/* "Take action" block (Medication Plan) visually separated from
+   the read-only summary/collapse sections above it */
+#panel-pharmacist .pharma-review-block {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255,251,240,.7), rgba(255,243,218,.5));
+  border: 1px solid rgba(183,121,31,.18);
+}
+#panel-pharmacist .pharma-review-title {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 4px;
+}
+#panel-pharmacist .pharma-review-title::before { content: '💊'; font-size: 1rem; }
+
+/* Scrollbar for the actual scrolling element (previously
+   misapplied to .pharmacist-queue, which never scrolls) */
+#panel-pharmacist .pharmacist-queue-wrapper::-webkit-scrollbar { width: 6px; }
+#panel-pharmacist .pharmacist-queue-wrapper::-webkit-scrollbar-track { background: rgba(226,232,240,.3); border-radius: 99px; }
+#panel-pharmacist .pharmacist-queue-wrapper::-webkit-scrollbar-thumb { background: var(--mist-300); border-radius: 99px; }
+#panel-pharmacist .pharmacist-queue-wrapper::-webkit-scrollbar-thumb:hover { background: var(--mist-400); }
+
+@media (max-width: 640px) {
+  #panel-pharmacist .case-card-header { flex-direction: column; align-items: stretch; gap: 8px; }
+}
+
+/* ── Panel content wrapper: wire .panel-content-wrapper into the flex/overflow chain ── */
+.panel > .panel-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.panel-content-wrapper > * { flex-shrink: 0; }
+.panel-content-wrapper > .bodymap-wrapper,
+.panel-content-wrapper > .redflags-list,
+.panel-content-wrapper > #profile-content,
+.panel-content-wrapper > .conditions-grid,
+.panel-content-wrapper > .connect-layout,
+.panel-content-wrapper > .history-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+

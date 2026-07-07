@@ -227,19 +227,25 @@
         </div>
 
         <div class="stats-grid" style="margin-bottom: 20px;">
-          <div class="stat-card"><span class="stat-label">Queue</span><span class="stat-value" id="ph-stat-pending">0</span></div>
-          <div class="stat-card"><span class="stat-label">Active</span><span class="stat-value" id="ph-stat-assigned">0</span></div>
-          <div class="stat-card"><span class="stat-label">Done</span><span class="stat-value" id="ph-stat-completed">0</span></div>
+          <div class="stat-card stat-card--queue"><span class="stat-label">Queue</span><span class="stat-value" id="ph-stat-pending">0</span></div>
+          <div class="stat-card stat-card--active"><span class="stat-label">Active</span><span class="stat-value" id="ph-stat-assigned">0</span></div>
+          <div class="stat-card stat-card--done"><span class="stat-label">Done</span><span class="stat-value" id="ph-stat-completed">0</span></div>
         </div>
 
         <div id="pharma-tab-pending">
-          <div id="pharmacist-pending-queue" class="pharmacist-queue"></div>
+          <div class="pharmacist-queue-wrapper">
+            <div id="pharmacist-pending-queue" class="pharmacist-queue"></div>
+          </div>
         </div>
         <div id="pharma-tab-assigned" style="display:none;">
-          <div id="pharmacist-queue" class="pharmacist-queue"></div>
+          <div class="pharmacist-queue-wrapper">
+            <div id="pharmacist-queue" class="pharmacist-queue"></div>
+          </div>
         </div>
         <div id="pharma-tab-completed" style="display:none;">
-          <div id="pharmacist-completed" class="pharmacist-queue"></div>
+          <div class="pharmacist-queue-wrapper">
+            <div id="pharmacist-completed" class="pharmacist-queue"></div>
+          </div>
         </div>
       </section>
     </main>

@@ -459,7 +459,9 @@ function hideGuestRestriction(name) {
   
   if (prompt) prompt.style.display = 'none';
   if (content) {
-    content.style.display = 'block';
+    // .panel-content-wrapper is a flex column (styles.css) so its scrolling
+    // children can size correctly — 'block' here would silently break that.
+    content.style.display = 'flex';
   } else {
     // If no wrapper, make sure children aren't accidentally hidden
     panel.querySelectorAll(':scope > div:not(.auth-prompt-overlay)').forEach(child => {
@@ -505,10 +507,14 @@ function selectZone(zone, el) {
   }
 
   const infoEl = document.getElementById('bodymap-info');
-  if (infoEl) infoEl.textContent = `Selected: ${label}. Message drafted — review and send it in the chat.`;
+  if (infoEl) {
+    infoEl.innerHTML = `<span>Selected: ${label}. Message drafted — review and send it in the chat.</span> <button class="btn btn-primary btn-sm" onclick="confirmBodyMapSelection()">Continue to Chat</button>`;
+  }
+}
 
+function confirmBodyMapSelection() {
   go('chat', document.getElementById('nav-chat'));
-  if (input) input.focus();
+  document.getElementById('tinput')?.focus();
 }
 
 function toggleSidebar() {
@@ -786,6 +792,14 @@ async function acceptCase(id) {
   refreshPharmacistDashboard(); 
 }
 
+// Profile Portal UI
+function showPTab(tab, el) {
+  ['overview', 'personal', 'medical', 'medications', 'emergency'].forEach(t => { const p = document.getElementById(`ptab-${t}`); if (p) p.style.display = t === tab ? 'block' : 'none'; });
+  const tabs = el.parentElement.querySelectorAll('.profile-tab');
+  tabs.forEach(t => t.classList.remove('on'));
+  el.classList.add('on');
+}
+
 function showPharmaTab(tab, el) {
   ['pending', 'assigned', 'completed'].forEach(t => { const p = document.getElementById(`pharma-tab-${t}`); if (p) p.style.display = t === tab ? 'block' : 'none'; });
   const tabs = el.parentElement.querySelectorAll('.profile-tab');
@@ -797,7 +811,10 @@ async function refreshPharmacistDashboard() {
   try {
     const activeElement = document.activeElement;
     const scrollPositions = {};
-    document.querySelectorAll('.pharmacist-queue').forEach(q => scrollPositions[q.id] = q.scrollTop);
+    document.querySelectorAll('.pharmacist-queue').forEach(q => {
+      const wrapper = q.closest('.pharmacist-queue-wrapper');
+      if (wrapper) scrollPositions[q.id] = wrapper.scrollTop;
+    });
 
     const data = await callApi('/pharmacist/dashboard');
     const s = data.stats || {};
@@ -818,7 +835,8 @@ async function refreshPharmacistDashboard() {
     // Restore scroll positions
     Object.entries(scrollPositions).forEach(([id, pos]) => {
       const q = document.getElementById(id);
-      if (q) q.scrollTop = pos;
+      const wrapper = q ? q.closest('.pharmacist-queue-wrapper') : null;
+      if (wrapper) wrapper.scrollTop = pos;
     });
 
     // Try to restore focus if it was in an input that still exists
@@ -863,20 +881,20 @@ function renderPharmaQueue(id, cases = [], mode = 'pending') {
   if (!el) return;
   el.innerHTML = cases.length ? cases.map(cs => {
     const patientName = _renderPatientName(cs);
-    const patientPhone = cs.patient?.phone ? `<span style="color:var(--mist-500);font-size:.8rem">📞 ${cs.patient.phone}</span>` : '';
+    const patientPhone = cs.patient?.phone ? `<span class="case-phone">📞 ${cs.patient.phone}</span>` : '';
     const aiSummary = cs.pharmacist_support?.ai_intake_summary || cs.ai_summary || '';
     const clinicalProfile = cs.pharmacist_support?.clinical_profile || '';
     const datasetGuidance = cs.pharmacist_support?.dataset_guidance || '';
     const urgency = cs.urgency_level || 'routine';
 
     return `
-    <div class="case-card pharmacist-case-card" id="case-evaluation-${cs.id}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap;gap:6px">
-        <div>
-          <div class="case-field-text" style="font-weight:600">${patientName}</div>
+    <div class="pharmacist-case-card" id="case-evaluation-${cs.id}">
+      <div class="case-card-header">
+        <div class="case-card-header-info">
+          <div class="case-user-name">${patientName}</div>
           ${patientPhone}
         </div>
-        <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <div class="case-card-header-badges">
           <span class="badge ${_urgencyBadgeClass(urgency)}">${urgency.toUpperCase()}</span>
           <span class="badge badge-${cs.status === 'Pending' ? 'warning' : cs.status === 'In Review' ? 'info' : 'success'}">${cs.status}</span>
         </div>
@@ -897,7 +915,7 @@ function renderPharmaQueue(id, cases = [], mode = 'pending') {
         <summary>💊 Dataset Drug Guidance</summary>
         <div class="collapse-body">${datasetGuidance}</div>
       </details>` : ''}
-      ${mode === 'pending' ? `<button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="acceptCase(${cs.id})">Accept Case</button>` : ''}
+      ${mode === 'pending' ? `<button class="btn btn-primary btn-sm case-accept-btn" onclick="acceptCase(${cs.id})">Accept Case</button>` : ''}
       ${mode === 'assigned' ? `
         <div class="pharma-review-divider"></div>
         <div class="pharma-review-block">
@@ -1218,7 +1236,7 @@ async function initApp() {
         window.FALLBACK_REDFLAGS = ref.red_flags;
       } catch (e) { console.warn('Using fallback data'); }
       // Build initial grids
-      const g = document.getElementById('conditions-grid');
+      const g = document.getElementById('cgrid');
       if (g) g.innerHTML = window.FALLBACK_CONDITIONS.map(c => `<div class="ccard" onclick="handleConditionSelection(${JSON.stringify(c).replace(/"/g, '&quot;')})"><div class="cname">${c.name}</div><div class="cdrug">${c.drug}</div></div>`).join('');
       const b = document.getElementById('rfbody');
       if (b) b.innerHTML = window.FALLBACK_REDFLAGS.map(rf => `<div class="rfbox"><div class="rftitle">⚠️ ${rf.condition}</div>${rf.flags.map(f => `<div class="rfitem">${f}</div>`).join('')}</div>`).join('');
