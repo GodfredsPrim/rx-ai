@@ -175,7 +175,9 @@ async function callApi(endpoint, method = 'GET', body = null, retries = 2) {
       const res = await fetch(API_URL + endpoint, opts);
       if (!res.ok) {
         const text = await res.text();
-        try { const j = JSON.parse(text); throw new Error(j.detail || text); } catch (e) { throw new Error(text); }
+        let detail = text;
+        try { detail = JSON.parse(text).detail || text; } catch (_) { /* not JSON */ }
+        throw new Error(detail);
       }
       return await res.json();
     } catch (e) {
@@ -286,16 +288,21 @@ function setLoginMode(mode = 'user', trigger = null) {
   if (!label || !input || !help || !submit) return;
   if (mode === 'pharmacist') {
     if (usernameGroup) usernameGroup.style.display = '';
+    input.required = true;
     label.textContent = 'Pharmacist ID'; input.placeholder = 'Username, Email or License #';
     if (passLabel) passLabel.textContent = 'Password';
     help.textContent = 'Use your allocated pharmacist credentials.'; submit.textContent = 'Sign In as Pharmacist';
   } else if (mode === 'admin') {
     if (usernameGroup) usernameGroup.style.display = 'none';
+    // A hidden field can still be "required" per its own computed display, which
+    // blocks form submission (browser tries and fails to focus it for validation).
+    input.required = false;
     if (passLabel) passLabel.textContent = 'Access Code';
     if (passInput) passInput.placeholder = 'Enter admin access code';
     help.textContent = 'Admin portal access is restricted to a shared access code.'; submit.textContent = 'Sign In as Admin';
   } else {
     if (usernameGroup) usernameGroup.style.display = '';
+    input.required = true;
     label.textContent = 'Username or Email'; input.placeholder = 'Enter credentials';
     if (passLabel) passLabel.textContent = 'Password';
     help.textContent = 'Use your patient account.'; submit.textContent = 'Sign In';
