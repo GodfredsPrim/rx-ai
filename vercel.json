@@ -7,11 +7,11 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://rx-ai-production.up.railway.app/api/$1"
+      "destination": "https://bisarx-8ym0.onrender.com/api/$1"
     },
     {
       "source": "/ws/(.*)",
-      "destination": "https://rx-ai-production.up.railway.app/ws/$1"
+      "destination": "https://bisarx-8ym0.onrender.com/ws/$1"
     },
     { "source": "/admin", "destination": "/admin.html" },
     { "source": "/pharmacist", "destination": "/pharmacist.html" },

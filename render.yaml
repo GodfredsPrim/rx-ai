@@ -29,7 +29,7 @@
       - key: GOOGLE_REDIRECT_URI
         sync: false
       - key: CORS_ORIGINS
-        value: https://bisarx-8ym0.onrender.com,https://openpharmacy.online,https://www.openpharmacy.online,https://YOUR-VERCEL-DOMAIN.vercel.app
+        value: https://bisarx-8ym0.onrender.com,https://openpharmacy.online,https://www.openpharmacy.online,https://rx-ai-six.vercel.app
       - key: CORS_ALLOW_ORIGIN_REGEX
         value: https?://(www\.)?openpharmacy\.online$
       - key: DATABASE_URL

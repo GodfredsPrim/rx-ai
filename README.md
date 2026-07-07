@@ -68,7 +68,7 @@ Open: [http://localhost:8000](http://localhost:8000)
 ## Frontend + Backend Hosting Alignment
 
 - The frontend is configured to call same-origin API routes by default (`/api` and `/ws`).
-- `vercel.json` rewrites proxy those requests to the live backend (`https://rx-ai-production.up.railway.app`), so frontend and backend work together from one public frontend domain without exposing backend hostnames in client code.
+- `vercel.json` rewrites proxy those requests to the live backend (`https://bisarx-8ym0.onrender.com`), so frontend and backend work together from one public frontend domain without exposing backend hostnames in client code.
 
 ## Guest SMS + Payment Integration
 
