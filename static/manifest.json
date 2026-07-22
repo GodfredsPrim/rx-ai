@@ -2,10 +2,10 @@
   "name": "BisaRx Clinical AI",
   "short_name": "BisaRx",
   "description": "Professional medication guidance and clinical AI assistance.",
-  "start_url": "/index.html",
+  "start_url": "/",
   "display": "standalone",
-  "background_color": "#1e3a30",
-  "theme_color": "#1e3a30",
+  "background_color": "#f3f7f9",
+  "theme_color": "#123b5d",
   "orientation": "portrait",
   "icons": [
     {

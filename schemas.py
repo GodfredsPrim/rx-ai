@@ -22,6 +22,23 @@ class AdminAccessRequest(BaseModel):
     access_code: str
 
 
+class OtpRequest(BaseModel):
+    phone: str
+
+
+class OtpVerify(BaseModel):
+    phone: str
+    code: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+
+
+class OtpRequestResponse(BaseModel):
+    status: str
+    message: str
+    dev_code: Optional[str] = None  # only populated outside production for local testing
+
+
 class PharmacistCreate(BaseModel):
     username: str
     email: EmailStr
@@ -44,7 +61,7 @@ class PharmacistReviewRequest(BaseModel):
     diagnosis: Optional[str] = None
     advice: str
     drug: Optional[str] = None
-    drugs_list: Optional[List[dict]] = None # List of {name: str, point: str}
+    drugs_list: Optional[List[dict]] = None # List of {name: str, point: str, price: float}
     referral_advice: Optional[str] = None
     follow_up_instructions: Optional[str] = None
     total_price: Optional[float] = None
@@ -119,6 +136,12 @@ class Prescription(PrescriptionBase):
     follow_up_status: Optional[str] = None
     symptom_area: Optional[str] = None
     symptom_type: Optional[str] = None
+    items_json: Optional[str] = None
+    payment_status: Optional[str] = None
+    payment_url: Optional[str] = None
+    payment_amount: Optional[float] = None
+    payment_currency: Optional[str] = None
+    delivery_address: Optional[str] = None
     class Config:
         from_attributes = True
 

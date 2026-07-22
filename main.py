@@ -1,16 +1,17 @@
 from pathlib import Path
 from io import BytesIO, StringIO
+import hashlib
 import hmac
 import logging
 import re
 import csv
+import secrets
 from typing import List
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import uuid4
 
 import os
 import httpx
-from dotenv import load_dotenv
 import pypdf
 from authlib.integrations.starlette_client import OAuth
 import json
@@ -24,6 +25,8 @@ from sqlalchemy import inspect, or_, text, func
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
+from app_config import settings
+
 import auth
 from auth import get_current_user, get_optional_user, get_current_pharmacist, get_current_admin
 import models
@@ -32,26 +35,10 @@ import chat_engine
 import whatsapp_bot
 from database import SessionLocal, engine, get_db
 
-BASE_DIR = Path(__file__).resolve().parent
-load_dotenv(BASE_DIR / '.env', override=True, verbose=True)
-STATIC_DIR = BASE_DIR / "static"
-_ALWAYS_ALLOWED_ORIGINS = [
-    "https://rx-ai-six.vercel.app",
-    "https://openpharmacy.online",
-    "https://www.openpharmacy.online",
-]
-CORS_ORIGINS = list({
-    *[
-        origin.strip()
-        for origin in os.getenv("CORS_ORIGINS", os.getenv("FRONTEND_URL", "http://127.0.0.1:8000")).split(",")
-        if origin.strip()
-    ],
-    *_ALWAYS_ALLOWED_ORIGINS,
-})
-CORS_ALLOW_ORIGIN_REGEX = os.getenv(
-    "CORS_ALLOW_ORIGIN_REGEX",
-    r"https?://(www\.)?openpharmacy\.online|https://rx-ai-[a-z0-9-]*\.vercel\.app",
-)
+BASE_DIR = settings.base_dir
+STATIC_DIR = settings.static_dir
+CORS_ORIGINS = list(settings.cors_origins)
+CORS_ALLOW_ORIGIN_REGEX = settings.cors_origin_regex
 
 
 def _ensure_legacy_schema_updates():
@@ -64,9 +51,13 @@ def _ensure_legacy_schema_updates():
                 connection.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0"))
 
 
-logger = logging.getLogger("rxai")
+logger = logging.getLogger("bisarx")
 
-app = FastAPI(title="RxAI Ghana API")
+app = FastAPI(
+    title="BisaRx Clinical API",
+    description="Patient intake, pharmacist review, and medicine delivery services for BisaRx.",
+    version="2.0.0",
+)
 
 
 @app.on_event("startup")
@@ -102,7 +93,7 @@ app.include_router(whatsapp_bot.router)
 
 app.add_middleware(
     SessionMiddleware,
-    secret_key=os.getenv("SECRET_KEY") or os.getenv("JWT_SECRET") or "dev-secret-change-me",
+    secret_key=settings.secret_key,
 )
 
 app.add_middleware(
@@ -114,26 +105,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def _env_float(name: str, default: float) -> float:
-    try:
-        return float(os.getenv(name, str(default)))
-    except (ValueError, TypeError):
-        logger.warning("Invalid value for %s; using default %s", name, default)
-        return default
-
-
-def _env_int(name: str, default: int) -> int:
-    try:
-        return int(os.getenv(name, str(default)))
-    except (ValueError, TypeError):
-        logger.warning("Invalid value for %s; using default %s", name, default)
-        return default
-
-
-api_key = os.getenv("DEEPSEEK_API_KEY", os.getenv("OPENAI_API_KEY", "dummy_key"))
-configured_base_url = os.getenv("DEEPSEEK_BASE_URL", "").strip()
-LLM_TIMEOUT_SECONDS = _env_float("LLM_TIMEOUT_SECONDS", 45.0)
-LLM_MAX_RETRIES = _env_int("LLM_MAX_RETRIES", 2)
+api_key = settings.llm_api_key
+configured_base_url = settings.llm_base_url
+LLM_TIMEOUT_SECONDS = settings.llm_timeout_seconds
+LLM_MAX_RETRIES = settings.llm_max_retries
 
 if configured_base_url:
     base_url = configured_base_url
@@ -156,26 +131,26 @@ openai_client = OpenAI(
 # Model name: default to deepseek-chat for DeepSeek keys, gpt-4o-mini for OpenAI keys
 # Can always be overridden with MODEL_NAME env variable
 _default_model = "gpt-4o-mini" if api_key.startswith("sk-") and not configured_base_url else "deepseek-chat"
-MODEL_NAME = os.getenv("MODEL_NAME", _default_model)
-MOOLRE_BASE_URL = os.getenv("MOOLRE_BASE_URL", "https://api.moolre.com").strip().rstrip("/")
-MOOLRE_API_USER = os.getenv("MOOLRE_API_USER", "").strip()
-MOOLRE_API_KEY = os.getenv("MOOLRE_API_KEY", "").strip()  # Private key
-MOOLRE_API_PUBKEY = os.getenv("MOOLRE_API_PUBKEY", "").strip()
-MOOLRE_API_VASKEY = os.getenv("MOOLRE_API_VASKEY", "").strip()
-MOOLRE_ACCOUNT_NUMBER = os.getenv("MOOLRE_ACCOUNT_NUMBER", "").strip()
-MOOLRE_SMS_SENDER_ID = os.getenv("MOOLRE_SMS_SENDER_ID", "").strip()
-MOOLRE_BUSINESS_EMAIL = os.getenv("MOOLRE_BUSINESS_EMAIL", "").strip()
-MOOLRE_SMS_PATH = os.getenv("MOOLRE_SMS_PATH", "/open/sms/send").strip()
-MOOLRE_PAYMENT_PATH = os.getenv("MOOLRE_PAYMENT_PATH", "/embed/link").strip()
-MOOLRE_PAYMENT_CALLBACK_URL = os.getenv("MOOLRE_PAYMENT_CALLBACK_URL", "").strip()
-MOOLRE_PAYMENT_REDIRECT_URL = os.getenv("MOOLRE_PAYMENT_REDIRECT_URL", "").strip()
-MOOLRE_TIMEOUT_SECONDS = _env_float("MOOLRE_TIMEOUT_SECONDS", 20.0)
+MODEL_NAME = settings.model_name or _default_model
+MOOLRE_BASE_URL = settings.moolre_base_url
+MOOLRE_API_USER = settings.moolre_api_user
+MOOLRE_API_KEY = settings.moolre_api_key
+MOOLRE_API_PUBKEY = settings.moolre_api_pubkey
+MOOLRE_API_VASKEY = settings.moolre_api_vaskey
+MOOLRE_ACCOUNT_NUMBER = settings.moolre_account_number
+MOOLRE_SMS_SENDER_ID = settings.moolre_sms_sender_id
+MOOLRE_BUSINESS_EMAIL = settings.moolre_business_email
+MOOLRE_SMS_PATH = settings.moolre_sms_path
+MOOLRE_PAYMENT_PATH = settings.moolre_payment_path
+MOOLRE_PAYMENT_CALLBACK_URL = settings.moolre_payment_callback_url
+MOOLRE_PAYMENT_REDIRECT_URL = settings.moolre_payment_redirect_url
+MOOLRE_TIMEOUT_SECONDS = settings.moolre_timeout_seconds
 
 oauth = OAuth()
 oauth.register(
     name="google",
-    client_id=os.getenv("GOOGLE_CLIENT_ID"),
-    client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+    client_id=settings.google_client_id,
+    client_secret=settings.google_client_secret,
     server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
     client_kwargs={"scope": "openid email profile"},
 )
@@ -336,7 +311,7 @@ def _load_pdf_chunks() -> tuple[str, list[dict]]:
     return "\n".join(full_text_parts), chunks
 
 
-pdf_context, pdf_chunks = _load_pdf_chunks()
+pdf_context, pdf_chunks = chat_engine.pdf_context, chat_engine.pdf_chunks
 
 
 def _load_medicine_dataset() -> List[dict]:
@@ -357,7 +332,7 @@ def _load_medicine_dataset() -> List[dict]:
     return medicines
 
 
-medicine_dataset = _load_medicine_dataset()
+medicine_dataset = chat_engine.medicine_dataset
 
 
 def _load_twi_dataset() -> List[dict]:
@@ -382,7 +357,7 @@ def _load_twi_dataset() -> List[dict]:
     return twi_entries
 
 
-twi_dataset = _load_twi_dataset()
+twi_dataset = chat_engine.twi_dataset
 
 
 def _load_final_dataset() -> List[dict]:
@@ -409,7 +384,7 @@ def _load_final_dataset() -> List[dict]:
     return entries
 
 
-final_dataset = _load_final_dataset()
+final_dataset = chat_engine.final_dataset
 
 
 def _translate_twi_to_english(text: str) -> str | None:
@@ -420,7 +395,7 @@ def _translate_twi_to_english(text: str) -> str | None:
     return None
 
 
-SYSTEM_PROMPT = f"""You are RxAI, a warm and capable clinical conversation assistant for pharmacy triage.
+SYSTEM_PROMPT = f"""You are BisaRx, a warm and capable clinical conversation assistant for pharmacy triage.
 
 STYLE:
 - Sound natural, calm, and caring.
@@ -774,6 +749,9 @@ def _ensure_db_migrations():
             conn.execute(text("UPDATE users SET username = email WHERE username IS NULL OR TRIM(username) = ''"))
             # SQLite supports IF NOT EXISTS for indexes
             conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_username ON users (username)"))
+            if "phone" not in columns:
+                conn.execute(text("ALTER TABLE users ADD COLUMN phone VARCHAR"))
+            conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_phone ON users (phone)"))
 
     # Migrations for 'emergencies' table
     if inspector.has_table("emergencies"):
@@ -839,6 +817,8 @@ def _ensure_db_migrations():
                 conn.execute(text("ALTER TABLE prescription_history ADD COLUMN payment_amount FLOAT"))
             if "payment_currency" not in columns:
                 conn.execute(text("ALTER TABLE prescription_history ADD COLUMN payment_currency VARCHAR DEFAULT 'GHS'"))
+            if "items_json" not in columns:
+                conn.execute(text("ALTER TABLE prescription_history ADD COLUMN items_json TEXT DEFAULT ''"))
 
 
 
@@ -924,9 +904,15 @@ def _serialize_case(rx: models.PrescriptionHistory) -> dict:
     ai_medication_suggestions = _extract_ai_medication_suggestions(support_sections["dataset_guidance"])
     current_drug_name = rx.drug_name if rx.drug_name != "Pharmacist review required" else None
 
+    try:
+        sale_items = json.loads(rx.items_json) if (rx.items_json or "").strip() else []
+    except (ValueError, TypeError):
+        sale_items = []
+
     return {
         "id": rx.id,
         "drug_name": current_drug_name,
+        "items": sale_items,
         "details": rx.details,
         "patient_message": rx.patient_message,
         "case_summary": rx.case_summary,
@@ -998,9 +984,9 @@ def _serialize_pharmacist(pharmacist: models.Pharmacist) -> dict:
 
 def _get_admin_seed_config(db: Session) -> tuple[str, str, str] | None:
     admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
-    raw_admin_username = os.getenv("ADMIN_USERNAME", "").strip()
+    raw_admin_username = settings.admin_username
     admin_username = _normalize_username(raw_admin_username) if raw_admin_username else ""
-    admin_password = os.getenv("ADMIN_PASSWORD", "").strip()
+    admin_password = settings.admin_password
 
     if admin_password:
         if not admin_email and admin_username:
@@ -1063,6 +1049,22 @@ def _normalize_phone(raw_phone: str) -> str:
     if cleaned.startswith("00"):
         cleaned = f"+{cleaned[2:]}"
     return cleaned
+
+
+def _canonical_ghana_phone(raw_phone: str) -> str:
+    """Canonicalize a phone number to international digits (e.g. 233241234567).
+
+    Accepts local Ghana format (0241234567), international (+233241234567,
+    00233..., 233...). Returns '' if the number can't be a valid msisdn.
+    """
+    digits = re.sub(r"\D", "", raw_phone or "")
+    if digits.startswith("00"):
+        digits = digits[2:]
+    if len(digits) == 10 and digits.startswith("0"):
+        digits = "233" + digits[1:]
+    if len(digits) < 11 or len(digits) > 15:
+        return ""
+    return digits
 
 
 def _moolre_sms_enabled() -> bool:
@@ -1215,23 +1217,19 @@ def _notify_pharmacists_of_new_case(case_id: int) -> None:
 
 @app.get("/api/auth/google/login")
 async def google_login(request: Request):
-    if not os.getenv("GOOGLE_CLIENT_ID") or not os.getenv("GOOGLE_CLIENT_SECRET"):
+    if not settings.google_client_id or not settings.google_client_secret:
         raise HTTPException(status_code=500, detail="Google OAuth is not configured")
 
-    redirect_uri = os.getenv("GOOGLE_REDIRECT_URI", "http://127.0.0.1:8000/api/auth/google/callback")
-    return await oauth.google.authorize_redirect(request, redirect_uri)
+    return await oauth.google.authorize_redirect(request, settings.google_redirect_uri)
 
 
 @app.get("/api/auth/google/callback")
 async def google_callback(request: Request, db: Session = Depends(get_db)):
     try:
         token = await oauth.google.authorize_access_token(request)
-    except Exception as e:
-        env_exists = (BASE_DIR / ".env").exists()
-        google_client_id = os.getenv("GOOGLE_CLIENT_ID", "")
-        key_prefix = google_client_id[:4] if google_client_id else "N/A"
-        detail = f"Google OAuth failed: {str(e)} | KeyPrefix: {key_prefix} | EnvExists: {env_exists} | BaseDir: {BASE_DIR}"
-        raise HTTPException(status_code=500, detail=detail)
+    except Exception as exc:
+        logger.exception("Google OAuth callback failed: %s", exc)
+        raise HTTPException(status_code=502, detail="Google sign-in could not be completed") from exc
 
     user_info = token.get("userinfo")
     if not user_info:
@@ -1274,6 +1272,108 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
     return RedirectResponse(url=f"{frontend_url}{separator}token={access_token}")
 
 
+OTP_TTL_MINUTES = 5
+OTP_MAX_ATTEMPTS = 5
+OTP_MAX_REQUESTS_PER_WINDOW = 3
+OTP_REQUEST_WINDOW_MINUTES = 10
+
+
+def _hash_otp(phone: str, code: str) -> str:
+    return hashlib.sha256(f"{settings.secret_key}:{phone}:{code}".encode("utf-8")).hexdigest()
+
+
+@app.post("/api/auth/otp/request", response_model=schemas.OtpRequestResponse)
+def request_otp(payload: schemas.OtpRequest, db: Session = Depends(get_db)):
+    """Send a one-time sign-in code to the patient's phone via MOOLRE SMS."""
+    phone = _canonical_ghana_phone(payload.phone)
+    if not phone:
+        raise HTTPException(status_code=400, detail="Enter a valid phone number, e.g. 024 123 4567")
+
+    window_start = datetime.utcnow() - timedelta(minutes=OTP_REQUEST_WINDOW_MINUTES)
+    recent = db.query(models.OtpCode).filter(
+        models.OtpCode.phone == phone,
+        models.OtpCode.created_at >= window_start,
+    ).count()
+    if recent >= OTP_MAX_REQUESTS_PER_WINDOW:
+        raise HTTPException(status_code=429, detail="Too many code requests. Please wait a few minutes and try again.")
+
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    # Invalidate previous outstanding codes for this phone
+    db.query(models.OtpCode).filter(
+        models.OtpCode.phone == phone,
+        models.OtpCode.verified == False,
+    ).delete(synchronize_session=False)
+    db.add(models.OtpCode(
+        phone=phone,
+        code_hash=_hash_otp(phone, code),
+        expires_at=datetime.utcnow() + timedelta(minutes=OTP_TTL_MINUTES),
+        created_at=datetime.utcnow(),
+    ))
+    db.commit()
+
+    message = f"Your BisaRx verification code is {code}. It expires in {OTP_TTL_MINUTES} minutes. Do not share this code."
+    sms_result = _send_moolre_sms(phone, message)
+    if sms_result.get("status") == "sent":
+        return {"status": "sent", "message": "Verification code sent by SMS.", "dev_code": None}
+    if settings.app_env == "development":
+        # Local/dev fallback: SMS gateway not reachable, surface the code for testing
+        logger.info("DEV OTP for %s: %s", phone, code)
+        return {"status": "dev", "message": "SMS not configured — using development code.", "dev_code": code}
+    logger.warning("OTP SMS delivery failed for %s: %s", phone, sms_result)
+    raise HTTPException(status_code=502, detail="Could not send SMS right now. Please try again shortly.")
+
+
+@app.post("/api/auth/otp/verify", response_model=schemas.Token)
+def verify_otp(payload: schemas.OtpVerify, db: Session = Depends(get_db)):
+    """Verify the SMS code and sign the patient in (creating the account on first use)."""
+    phone = _canonical_ghana_phone(payload.phone)
+    code = (payload.code or "").strip()
+    if not phone or not re.fullmatch(r"\d{6}", code):
+        raise HTTPException(status_code=400, detail="Enter the 6-digit code sent to your phone")
+
+    otp = db.query(models.OtpCode).filter(
+        models.OtpCode.phone == phone,
+        models.OtpCode.verified == False,
+    ).order_by(models.OtpCode.id.desc()).first()
+    if not otp or otp.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Code expired. Please request a new one.")
+    if otp.attempts >= OTP_MAX_ATTEMPTS:
+        raise HTTPException(status_code=429, detail="Too many wrong attempts. Please request a new code.")
+
+    if not hmac.compare_digest(otp.code_hash, _hash_otp(phone, code)):
+        otp.attempts += 1
+        db.commit()
+        raise HTTPException(status_code=400, detail="Incorrect code. Please check the SMS and try again.")
+
+    otp.verified = True
+
+    user = db.query(models.User).filter(models.User.phone == phone).first()
+    if not user:
+        # Auto-provision the patient account on first successful verification
+        synthetic_email = f"{phone}@phone.bisarx"
+        user = db.query(models.User).filter(models.User.email == synthetic_email).first()
+        if not user:
+            user = models.User(
+                username=_build_unique_username(db, f"patient{phone[-9:]}"),
+                email=synthetic_email,
+                phone=phone,
+                hashed_password=auth.get_password_hash(os.urandom(16).hex()),
+            )
+            db.add(user)
+        else:
+            user.phone = phone
+    db.commit()
+    db.refresh(user)
+
+    _ensure_user_profile_records(db, user.id, payload.first_name or "", payload.last_name or "")
+    if user.profile and not (user.profile.phone or "").strip():
+        user.profile.phone = phone
+        db.commit()
+
+    access_token = auth.create_access_token(data={"sub": user.email})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
 @app.post("/api/auth/register", response_model=schemas.Token)
 def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
     username = _normalize_username(user_in.username)
@@ -1314,7 +1414,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 @app.post("/api/auth/admin/access", response_model=schemas.Token)
 def admin_access(request: schemas.AdminAccessRequest, db: Session = Depends(get_db)):
     """Admin login is a single shared access code, not username/password."""
-    configured_code = os.getenv("ADMIN_ACCESS_CODE", "").strip()
+    configured_code = settings.admin_access_code
     submitted_code = (request.access_code or "").strip()
     if not configured_code:
         raise HTTPException(status_code=500, detail="Admin access code is not configured")
@@ -1816,20 +1916,37 @@ def pharmacist_review_case(
     if case.pharmacist_id != current_pharmacist.id:
         raise HTTPException(status_code=403, detail="This case is not assigned to you")
 
-    # Multi-drug handling
+    # Multi-drug handling with per-item pricing
+    sale_items: list[dict] = []
     if review.drugs_list and len(review.drugs_list) > 0:
-        drugs = [d.get("name", "").strip() for d in review.drugs_list if d.get("name")]
-        points = [f"{d.get('name')}: {d.get('point')}" for d in review.drugs_list if d.get("name")]
+        drugs = []
+        points = []
+        for d in review.drugs_list:
+            name = (d.get("name") or "").strip()
+            if not name:
+                continue
+            point = (d.get("point") or "").strip()
+            try:
+                price = round(float(d.get("price") or 0), 2)
+            except (TypeError, ValueError):
+                price = 0.0
+            drugs.append(name)
+            points.append(f"{name}: {point}" if point else name)
+            sale_items.append({"name": name, "point": point, "price": price})
         case.drug_name = ", ".join(drugs)
         case.pharmacist_feedback = "\n".join(points)
     else:
         case.drug_name = (review.drug or "Pharmacist review completed").strip()
         case.pharmacist_feedback = review.advice.strip()
 
+    case.items_json = json.dumps(sale_items) if sale_items else ""
     case.referral_advice = (review.referral_advice or "").strip()
     case.follow_up_instructions = (review.follow_up_instructions or "").strip()
+    items_total = round(sum(item["price"] for item in sale_items), 2) if sale_items else 0.0
     if review.total_price is not None and review.total_price > 0:
         case.payment_amount = float(review.total_price)
+    elif items_total > 0:
+        case.payment_amount = items_total
     if (review.currency or "").strip():
         case.payment_currency = review.currency.strip().upper()
     case.follow_up_status = "feedback_sent"
@@ -1859,19 +1976,47 @@ def pharmacist_review_case(
         "referral_advice": case.referral_advice,
         "follow_up_instructions": case.follow_up_instructions,
         "status": case.status,
+        "items": sale_items,
+        "payment_amount": case.payment_amount,
+        "payment_currency": case.payment_currency or "GHS",
     }
     # Notify logged-in user if applicable
     if case.user_id:
         background_tasks.add_task(ws_manager.notify_user, case.user_id, notification)
     # Always notify by case_id (covers guests)
     background_tasks.add_task(ws_manager.notify_case, case.id, notification)
-    if not case.user_id and (case.guest_phone or case.delivery_phone):
-        guest_phone = case.guest_phone or case.delivery_phone
-        sms_text = (
-            f"BisaRx update (Case #{case.id}): Pharmacist review is ready. "
-            f"Medication: {case.drug_name or 'See pharmacist guidance'}."
-        )
-        background_tasks.add_task(_send_moolre_sms, guest_phone, sms_text)
+
+    # SMS the results (with the price quote) to any patient who is not online.
+    patient_online = bool(
+        (case.user_id and ws_manager.active_connections.get(case.user_id))
+        or ws_manager.case_connections.get(case.id)
+    )
+    patient_user = case.owner
+    patient_phone = (
+        (patient_user.phone if patient_user else "")
+        or (patient_user.profile.phone if patient_user and patient_user.profile else "")
+        or case.guest_phone
+        or case.delivery_phone
+        or ""
+    )
+    if not patient_online and patient_phone:
+        currency = case.payment_currency or "GHS"
+        if sale_items:
+            priced = ", ".join(
+                f"{item['name']} ({currency} {item['price']:.2f})" if item["price"] else item["name"]
+                for item in sale_items
+            )
+            total_line = f" Total: {currency} {case.payment_amount:.2f}." if case.payment_amount else ""
+            sms_text = (
+                f"BisaRx (Case #{case.id}): Your pharmacist recommends: {priced}.{total_line} "
+                f"Sign in at {_get_public_base_url()} to confirm your order and pay by Mobile Money."
+            )
+        else:
+            sms_text = (
+                f"BisaRx (Case #{case.id}): Pharmacist review is ready. "
+                f"Medication: {case.drug_name or 'See pharmacist guidance'}."
+            )
+        background_tasks.add_task(_send_moolre_sms, patient_phone, sms_text)
 
     return {"status": "success", "case": serialized}
 
@@ -2994,6 +3139,4 @@ if STATIC_DIR.exists():
 
 if __name__ == "__main__":
     import uvicorn
-    host = os.getenv("APP_HOST", "0.0.0.0")
-    port = int(os.getenv("APP_PORT", os.getenv("PORT", "8000")))
-    uvicorn.run(app, host=host, port=port)
+    uvicorn.run(app, host=settings.app_host, port=settings.app_port)

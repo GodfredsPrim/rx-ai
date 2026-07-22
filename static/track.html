@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BisaRx — Track Your Case</title>
+  <title>BisaRx - Track Your Case</title>
   <script src="/js/config.js"></script>
   <style>
     :root {
@@ -217,12 +217,12 @@
       return `<div class="divider"></div><div class="field-val" style="color:#065f46;background:#d1fae5;border-color:#a7f3d0">Payment received${amount ? ' (' + amount + ')' : ''}. Your order is being prepared for delivery.</div>`;
     }
     if (d.payment_status === 'pending' && d.payment_url) {
-      return `<div class="divider"></div><div class="field-val">Order placed${amount ? ' — ' + amount : ''}. <a href="${d.payment_url}" target="_blank" rel="noopener">Complete your payment</a> to finish checkout.</div>`;
+      return `<div class="divider"></div><div class="field-val">Order placed${amount ? ': ' + amount : ''}. <a href="${d.payment_url}" target="_blank" rel="noopener">Complete your payment</a> to finish checkout.</div>`;
     }
     if (d.payment_status === 'not_configured') {
-      return `<div class="divider"></div><div class="field-val">Order placed${amount ? ' — ' + amount : ''}. The pharmacy will contact you to arrange payment.</div>`;
+      return `<div class="divider"></div><div class="field-val">Order placed${amount ? ': ' + amount : ''}. The pharmacy will contact you to arrange payment.</div>`;
     }
-    return `<div class="divider"></div><div class="field-val">Order placed${amount ? ' — ' + amount : ''}. We'll update you here once payment is confirmed.</div>`;
+    return `<div class="divider"></div><div class="field-val">Order placed${amount ? ': ' + amount : ''}. We'll update you here once payment is confirmed.</div>`;
   }
 
   function orderSectionHtml(d) {
@@ -230,7 +230,7 @@
     return `
       <div class="divider"></div>
       <div class="field">
-        <label>Order &amp; Pay${d.payment_amount ? ' — ' + amount : ''}</label>
+        <label>Order &amp; Pay${d.payment_amount ? ': ' + amount : ''}</label>
         <div class="order-form">
           <input type="text" id="order-address" placeholder="Delivery address" required>
           <input type="tel" id="order-phone" placeholder="Phone number (same as used at intake)" required>

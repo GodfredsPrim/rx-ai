@@ -3,12 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BisaRx – Patient Portal</title>
+  <title>BisaRx - Patient Portal</title>
   <meta name="description" content="BisaRx: Professional medication guidance, symptom support, multilingual access, and voice-enabled clinical assistance.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=20260417-pill-v1">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css?v=20260710-otp-sales">
+  <link rel="stylesheet" href="css/brand-system.css?v=20260710c">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1e3a30">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -22,16 +23,6 @@
 <!-- ══════════════════════════════════════
      MOBILE HEADER (CHATGPT STYLE)
      ══════════════════════════════════════ -->
-<header class="mobile-header">
-  <button class="mobile-menu-toggle" onclick="toggleSidebar()" aria-label="Menu">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-  </button>
-  <div class="mobile-brand">BisaRx</div>
-  <button class="mobile-new-chat" onclick="newChat()" aria-label="New Chat">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-  </button>
-</header>
-
 <!-- ══════════════════════════════════════
      LOGIN MODAL
      ══════════════════════════════════════ -->
@@ -41,71 +32,41 @@
 
     <div class="login-header">
       <img src="logo.png" alt="BisaRx Logo" class="modal-logo">
-      <h2>BisaRx</h2>
-      <p>Sign in to save your health records</p>
+      <h2 data-i18n="otp.title">Sign in with your phone</h2>
+      <p data-i18n="otp.subtitle">We&rsquo;ll text you a one-time verification code by SMS</p>
     </div>
 
-    <!-- Auth tabs -->
-    <div class="tab-container" role="tablist">
-      <button class="tab on" id="tab-login" role="tab" aria-selected="true" onclick="switchAuthTab('login')">Sign In</button>
-      <button class="tab"    id="tab-reg"   role="tab" aria-selected="false" onclick="switchAuthTab('register')">Register</button>
-    </div>
+    <p class="auth-mode-help" id="login-mode-help" data-i18n="otp.help">Your phone number is also how your pharmacist reaches you with results.</p>
 
-    <div class="disclaimer-banner" style="margin-bottom:14px;">
-      <strong>Access:</strong> Patients sign in here. Pharmacists and admins should use their own portal URLs.
-    </div>
-
-    <!-- Login Form -->
-    <form id="form-login" onsubmit="event.preventDefault(); doLogin();">
-      <div class="auth-role-switch" role="radiogroup" aria-label="Select sign in role" style="display:none;">
-        <button type="button" class="auth-role-btn on" id="login-role-user" data-role="user" onclick="setLoginMode('user', this)">Patient</button>
-        <button type="button" class="auth-role-btn" id="login-role-pharmacist" data-role="pharmacist" onclick="setLoginMode('pharmacist', this)">Pharmacist</button>
-        <button type="button" class="auth-role-btn" id="login-role-admin" data-role="admin" onclick="setLoginMode('admin', this)">Admin</button>
-      </div>
-      <p class="auth-mode-help" id="login-mode-help">Use your patient account to continue.</p>
-      <div class="form-group" id="login-username-group">
-        <label for="login-username" id="login-username-label">Username or Email</label>
-        <input type="text" id="login-username" placeholder="Enter username or email" autocomplete="username" required>
-      </div>
+    <!-- Step 1: phone number -->
+    <form id="otp-step-phone" onsubmit="event.preventDefault(); requestOtp();">
       <div class="form-group">
-        <label for="login-pass" id="login-pass-label">Password</label>
-        <input type="password" id="login-pass" placeholder="Enter password" autocomplete="current-password" required>
+        <label for="otp-phone" data-i18n="otp.phoneLabel">Phone Number</label>
+        <input type="tel" id="otp-phone" inputmode="tel" placeholder="e.g. 024 123 4567" data-i18n-placeholder="otp.phonePlaceholder" autocomplete="tel" required>
       </div>
       <div id="login-err" role="alert"></div>
-      <button type="submit" class="btn btn-primary btn-full" id="btn-do-login">Sign In</button>
+      <button type="submit" class="btn btn-primary btn-full" id="btn-send-otp" data-i18n="otp.sendBtn">Send Verification Code</button>
+      <p class="otp-fineprint" data-i18n="otp.fineprint">Standard SMS rates may apply. No password needed.</p>
     </form>
 
-    <!-- Register Form -->
-    <div id="form-register" style="display:none;">
-      <div class="disclaimer-banner" style="margin-bottom:14px;">
-        <strong>Patient Access:</strong> This form is for patients. Pharmacist accounts are created by admins inside the admin dashboard.
+    <!-- Step 2: verification code -->
+    <form id="otp-step-code" style="display:none;" onsubmit="event.preventDefault(); verifyOtp();">
+      <div class="otp-sent-note">
+        <span><span data-i18n="otp.sentTo">Code sent to</span> <strong id="otp-phone-display"></strong></span>
+        <button type="button" class="otp-link-btn" onclick="resetOtpFlow()" data-i18n="otp.changeNumber">Change number</button>
       </div>
-      <div class="form-row">
-        <div class="input-group"><label for="reg-fname">First Name</label><input type="text" id="reg-fname" placeholder="First name"></div>
-        <div class="input-group"><label for="reg-lname">Last Name</label><input type="text" id="reg-lname" placeholder="Last name"></div>
+      <div class="form-group">
+        <label for="otp-code" data-i18n="otp.codeLabel">6-Digit Code</label>
+        <input type="text" id="otp-code" class="otp-code-input" inputmode="numeric" pattern="\d{6}" maxlength="6" placeholder="••••••" autocomplete="one-time-code" required>
       </div>
-      <div class="input-group"><label for="reg-username">Username</label><input type="text" id="reg-username" placeholder="Choose a username" autocomplete="username"></div>
-      <div class="input-group"><label for="reg-email">Email</label><input type="email" id="reg-email" placeholder="Email address" autocomplete="email"></div>
-      <div class="input-group">
-        <label for="reg-pass">Password</label>
-        <input type="password" id="reg-pass" placeholder="Create a strong password" autocomplete="new-password" oninput="checkStrength(this.value)">
-        <div class="pw-strength"><div class="pw-fill" id="strength-fill"></div></div>
-        <div class="pw-label" id="strength-label"></div>
-      </div>
-      <div id="reg-err" role="alert"></div>
-      <button class="btn btn-primary btn-full" onclick="doRegister()" id="btn-do-register">Create Account</button>
-    </div>
-
-    <div class="divider"><span>or</span></div>
-    <button class="btn-google" onclick="doGoogleLogin()" id="btn-google-login">
-      <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-      </svg>
-      <span>Continue with Google</span>
-    </button>
+      <div id="otp-err" role="alert"></div>
+      <button type="submit" class="btn btn-primary btn-full" id="btn-verify-otp" data-i18n="otp.verifyBtn">Verify &amp; Sign In</button>
+      <p class="otp-fineprint">
+        <span data-i18n="otp.didntGet">Didn&rsquo;t get it?</span>
+        <button type="button" class="otp-link-btn" id="btn-resend-otp" onclick="requestOtp(true)" disabled data-i18n="otp.resend">Resend code</button>
+        <span id="otp-resend-count"></span>
+      </p>
+    </form>
   </div>
 </div>
 
@@ -117,10 +78,10 @@
   <div class="app-container">
 
     <!-- Mobile Header -->
-    <header class="mobile-header">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <img src="logo.png" alt="BisaRx" style="width:30px;height:30px;border-radius:10px;">
-        <span style="font-weight:900;font-size:1.1rem;color:var(--primary);letter-spacing:-.03em;">BisaRx</span>
+    <header class="mobile-header app-mobile-header">
+      <div class="mobile-brand-lockup">
+        <img src="logo.png" alt="">
+        <span class="mobile-brand-copy"><strong>BisaRx</strong><small>Patient care</small></span>
       </div>
       <button class="mobile-menu-btn" onclick="toggleMobileMenu()" id="mobile-menu-btn" aria-label="Toggle menu" style="background:var(--mist-100);border:1px solid var(--mist-200);padding:8px;border-radius:11px;cursor:pointer;color:var(--mist-600);display:flex;align-items:center;justify-content:center;">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
@@ -147,46 +108,46 @@
         <!-- New Chat -->
         <button class="new-chat-btn" onclick="newChat()" id="btn-new-chat">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          New Chat
+          <span data-i18n="nav.newChat">New Chat</span>
         </button>
 
         <div class="nav-section">
-          <span class="nav-label">Main</span>
+          <span class="nav-label" data-i18n="nav.sectionMain">Main</span>
           <a href="#" class="nav-item on" id="nav-chat" onclick="go('chat', this)">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-            <span>Chat</span>
+            <span data-i18n="nav.chat">Chat</span>
           </a>
           <a href="#" class="nav-item" id="nav-bodymap" onclick="go('bodymap', this)">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="5" r="3"/><path d="M12 8v3"/><path d="M7 11h10"/><path d="M7 14h10"/><path d="M8 17h8"/></svg>
-            <span>Body Map</span>
+            <span data-i18n="nav.bodymap">Body Map</span>
           </a>
         </div>
 
         <div class="nav-section">
-          <span class="nav-label">Reference</span>
+          <span class="nav-label" data-i18n="nav.sectionReference">Reference</span>
           <a href="#" class="nav-item" id="nav-conditions" onclick="go('conditions', this)">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            <span>Conditions</span>
+            <span data-i18n="nav.conditions">Conditions</span>
           </a>
           <a href="#" class="nav-item" id="nav-redflag" onclick="go('redflag', this)">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-            <span>Red Flags</span>
+            <span data-i18n="nav.redflags">Red Flags</span>
           </a>
         </div>
 
         <div class="nav-section">
-          <span class="nav-label">Records</span>
+          <span class="nav-label" data-i18n="nav.sectionRecords">Records</span>
           <a href="#" class="nav-item" id="nav-profile" onclick="goProfile(this)">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            <span>My Profile</span>
+            <span data-i18n="nav.profile">My Profile</span>
           </a>
           <a href="#" class="nav-item" id="nav-connect" onclick="go('connect', this)">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            <span>Care Team</span>
+            <span data-i18n="nav.careteam">Care Team</span>
           </a>
           <a href="#" class="nav-item" id="nav-history" onclick="goHistory(this)">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            <span>History</span>
+            <span data-i18n="nav.history">History</span>
           </a>
           <a href="#" class="nav-item" id="nav-pharmacist" onclick="go('pharmacist', this)" style="display:none;">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4.8 2.2c0-.2.2-.4.4-.4h13.6c.2 0 .4.2.4.4v19.6c0 .2-.2.4-.4.4H5.2c-.2 0-.4-.2-.4-.4V2.2z"/><path d="M9 10h6"/><path d="M12 7v6"/></svg>
@@ -203,7 +164,7 @@
       <div class="sidebar-footer">
         <!-- Language -->
         <div class="language-selector">
-          <span class="lang-label">Language</span>
+          <span class="lang-label" data-i18n="nav.language">Language</span>
           <div class="lang-buttons">
             <button class="lang-btn on" id="lang-btn-en" onclick="setLang('en', this)">EN</button>
             <button class="lang-btn"    id="lang-btn-tw" onclick="setLang('tw', this)">TWI</button>
@@ -216,11 +177,11 @@
         <div class="auth-footer" id="auth-footer">
           <button class="btn-send-pharmacist" onclick="openGuestCaseModal()" id="btn-guest-case" style="margin-bottom:8px;width:100%;background:var(--primary);color:#fff;padding:10px 16px;border:none;border-radius:8px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.8 2.2c0-.2.2-.4.4-.4h13.6c.2 0 .4.2.4.4v19.6c0 .2-.2.4-.4.4H5.2c-.2 0-.4-.2-.4-.4V2.2z"/><path d="M9 10h6"/><path d="M12 7v6"/></svg>
-            Send to Pharmacist
+            <span data-i18n="nav.sendToPharmacist">Send to Pharmacist</span>
           </button>
           <button class="btn-login-link" onclick="openLoginModal()" id="btn-open-login">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-            Sign In / Register
+            <span data-i18n="nav.signInPhone">Sign In with Phone</span>
           </button>
         </div>
 
@@ -230,7 +191,7 @@
             <span class="status-dot"></span>
             <span id="user-label">Online</span>
           </div>
-          <button class="btn-logout-link" onclick="signOut()" id="btn-sign-out">Sign Out</button>
+          <button class="btn-logout-link" onclick="signOut()" id="btn-sign-out" data-i18n="nav.signOut">Sign Out</button>
         </div>
       </div>
     </aside>
@@ -242,11 +203,11 @@
       <section class="panel on" id="panel-chat" aria-labelledby="chat-title">
         <div class="panel-header">
           <div class="panel-info">
-            <h2 id="chat-title">BisaRx Patient Portal</h2>
-            <p id="chat-sub">Professional guidance · Voice enabled · Multilingual support</p>
+            <h2 id="chat-title" data-i18n="chat.title">BisaRx Patient Portal</h2>
+            <p id="chat-sub" data-i18n="chat.subtitle">Professional guidance · Voice enabled · Multilingual support</p>
           </div>
           <div class="panel-badges">
-            <span class="badge badge-success">Live</span>
+            <span class="badge badge-success" data-i18n="chat.badgeLive">Live</span>
             <span class="badge badge-primary" id="lang-badge">EN</span>
           </div>
         </div>
@@ -255,31 +216,31 @@
         <div class="chat-welcome-hero" id="chat-welcome-hero">
           <div class="hero-content">
             <div class="hero-header">
-              <span class="hero-kicker">Clinical Support</span>
-              <h1>How can BisaRx help you today?</h1>
-              <p>Get instant clinical guidance, medication information, and symptom triage from our certified health platform.</p>
+              <span class="hero-kicker" data-i18n="chat.heroKicker">Clinical Support</span>
+              <h1 data-i18n="chat.heroTitle">How can BisaRx help you today?</h1>
+              <p data-i18n="chat.heroText">Get instant clinical guidance, medication information, and symptom triage from our certified health platform.</p>
             </div>
             
             <div class="hero-grid">
-              <div class="hero-card" onclick="selectVisualSymptom('Fever')">
+              <div class="hero-card" onclick="selectVisualSymptom('chat.qFever')">
                 <div class="hero-card-icon">🤒</div>
                 <div class="hero-card-text">
-                  <strong>Assess Symptoms</strong>
-                  <p>Track fever, pain, or cough with AI guidance.</p>
+                  <strong data-i18n="chat.card1Title">Assess Symptoms</strong>
+                  <p data-i18n="chat.card1Text">Track fever, pain, or cough with AI guidance.</p>
                 </div>
               </div>
               <div class="hero-card" onclick="go('conditions')">
                 <div class="hero-card-icon">💊</div>
                 <div class="hero-card-text">
-                  <strong>Medications</strong>
-                  <p>Check dosages, side effects, and guidance.</p>
+                  <strong data-i18n="chat.card2Title">Medications</strong>
+                  <p data-i18n="chat.card2Text">Check dosages, side effects, and guidance.</p>
                 </div>
               </div>
               <div class="hero-card" onclick="go('redflag')">
                 <div class="hero-card-icon">🚨</div>
                 <div class="hero-card-text">
-                  <strong>Red Flags</strong>
-                  <p>Identify urgent symptoms that need care.</p>
+                  <strong data-i18n="chat.card3Title">Red Flags</strong>
+                  <p data-i18n="chat.card3Text">Identify urgent symptoms that need care.</p>
                 </div>
               </div>
             </div>
@@ -288,21 +249,21 @@
 
         <!-- Quick symptom icons (compact) -->
         <div class="quick-symptoms-bar">
-          <p class="quick-label">Quick select:</p>
+          <p class="quick-label" data-i18n="chat.quickLabel">Quick select:</p>
           <div class="quick-symptoms">
-            <button class="qs-btn" onclick="selectVisualSymptom('Fever')">Fever</button>
-            <button class="qs-btn" onclick="selectVisualSymptom('Pain')">Pain</button>
-            <button class="qs-btn" onclick="selectVisualSymptom('Cough')">Cough</button>
-            <button class="qs-btn" onclick="selectVisualSymptom('Headache')">Headache</button>
-            <button class="qs-btn" onclick="selectVisualSymptom('Stomach ache')">Stomach</button>
-            <button class="qs-btn" onclick="selectVisualSymptom('Rash')">Rash</button>
+            <button class="qs-btn" onclick="selectVisualSymptom('chat.qFever')" data-i18n="chat.qFever">Fever</button>
+            <button class="qs-btn" onclick="selectVisualSymptom('chat.qPain')" data-i18n="chat.qPain">Pain</button>
+            <button class="qs-btn" onclick="selectVisualSymptom('chat.qCough')" data-i18n="chat.qCough">Cough</button>
+            <button class="qs-btn" onclick="selectVisualSymptom('chat.qHeadache')" data-i18n="chat.qHeadache">Headache</button>
+            <button class="qs-btn" onclick="selectVisualSymptom('chat.qStomach')" data-i18n="chat.qStomach">Stomach</button>
+            <button class="qs-btn" onclick="selectVisualSymptom('chat.qRash')" data-i18n="chat.qRash">Rash</button>
           </div>
         </div>
 
         <!-- Voice indicator -->
         <div class="voice-indicator" id="vstatus-bar" role="status" aria-live="polite">
           <div class="voice-waves" aria-hidden="true"><span></span><span></span><span></span></div>
-          <span id="vstatus-text">Listening…</span>
+          <span id="vstatus-text" data-i18n="chat.listening">Listening…</span>
         </div>
 
         <!-- Messages -->
@@ -315,18 +276,19 @@
         <div id="image-preview-container">
           <img id="image-preview" src="" alt="Image preview">
           <button class="clear-preview-btn" onclick="clearImagePreview()" aria-label="Clear image">✕</button>
+          <div class="image-preview-guidance">Use a clear, well-lit photo. Gemini checks visible features and image quality, not a diagnosis.</div>
         </div>
 
         <!-- Input bar -->
         <div class="chat-input-container">
-          <input type="file" id="image-upload" accept="image/*" capture="environment" style="display:none;" onchange="handleImageUpload(event)">
+          <input type="file" id="image-upload" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment" style="display:none;" onchange="handleImageUpload(event)">
           
           <div class="chat-pill">
             <button class="icon-btn voice-btn" id="mic-btn" onclick="toggleVoice()" title="Voice input" aria-label="Toggle voice input">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
             </button>
 
-            <textarea class="chat-input" id="tinput" placeholder="Type a message..." rows="1" onkeydown="handleKey(event)" oninput="autoResizeTextarea(this)" aria-label="Type your symptoms"></textarea>
+            <textarea class="chat-input" id="tinput" placeholder="Type a message..." data-i18n-placeholder="chat.placeholder" rows="1" onkeydown="handleKey(event)" oninput="autoResizeTextarea(this)" aria-label="Type your symptoms"></textarea>
 
             <div class="pill-tools">
               <button class="icon-btn" onclick="document.getElementById('image-upload').click()" title="Attach file" aria-label="Attach file">
@@ -343,6 +305,8 @@
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           </button>
         </div>
+
+        <div class="chat-disclaimer" id="disc"></div>
       </section>
 
       <!-- ── BODY MAP PANEL (hidden by default) ── -->
@@ -350,70 +314,128 @@
         <div class="panel-content-wrapper">
         <div class="panel-header">
           <div class="panel-info">
-            <h2 id="bodymap-title">Body Map</h2>
-            <p>Tap the area that hurts or feels strange.</p>
+            <h2 id="bodymap-title">Where do you feel it?</h2>
+            <p>Select one or more exact areas, then describe the sensation and its intensity.</p>
           </div>
+          <span class="badge badge-primary">Step-by-step intake</span>
         </div>
-        <div class="bodymap-intro">
-          <div class="bodymap-help-card">
-            <span class="hero-kicker">Easy Use</span>
-            <h3>Point to the body part first.</h3>
-            <p>Good for people who cannot type much. Tap a body part to draft a message, review it, then send it in the chat.</p>
-          </div>
-          <div class="bodymap-quick-grid">
-            <button class="bodymap-quick" onclick="selectZone('head', this)"><strong>Head</strong></button>
-            <button class="bodymap-quick" onclick="selectZone('chest', this)"><strong>Chest</strong></button>
-            <button class="bodymap-quick" onclick="selectZone('abdomen', this)"><strong>Stomach</strong></button>
-            <button class="bodymap-quick" onclick="selectZone('left_leg', this)"><strong>Leg</strong></button>
-          </div>
-        </div>
-        <div class="bodymap-wrapper">
-          <div class="bodymap-stage">
-            <div class="bodymap-stage-title">Front Body</div>
-            <svg class="bodymap-svg" viewBox="0 0 180 360" role="img" aria-label="Front body map">
-              <title>Front body map</title>
-              <ellipse cx="90" cy="34" rx="28" ry="30" class="body-zone" data-zone="head" onclick="selectZone('head', this)"/>
-              <rect x="78" y="60" width="24" height="18" rx="5" class="body-zone" data-zone="throat" onclick="selectZone('throat', this)"/>
-              <rect x="58" y="82" width="64" height="20" rx="8" class="body-zone" data-zone="shoulder" onclick="selectZone('shoulder', this)"/>
-              <rect x="50" y="104" width="80" height="48" rx="10" class="body-zone" data-zone="chest" onclick="selectZone('chest', this)"/>
-              <rect x="18" y="96" width="26" height="86" rx="10" class="body-zone" data-zone="left_arm" onclick="selectZone('left_arm', this)"/>
-              <rect x="136" y="96" width="26" height="86" rx="10" class="body-zone" data-zone="right_arm" onclick="selectZone('right_arm', this)"/>
-              <ellipse cx="30" cy="194" rx="13" ry="14" class="body-zone" data-zone="left_hand" onclick="selectZone('left_hand', this)"/>
-              <ellipse cx="150" cy="194" rx="13" ry="14" class="body-zone" data-zone="right_hand" onclick="selectZone('right_hand', this)"/>
-              <rect x="54" y="154" width="72" height="54" rx="10" class="body-zone" data-zone="abdomen" onclick="selectZone('abdomen', this)"/>
-              <rect x="58" y="212" width="64" height="32" rx="10" class="body-zone" data-zone="pelvis" onclick="selectZone('pelvis', this)"/>
-              <rect x="58" y="248" width="24" height="76" rx="10" class="body-zone" data-zone="left_leg" onclick="selectZone('left_leg', this)"/>
-              <rect x="98" y="248" width="24" height="76" rx="10" class="body-zone" data-zone="right_leg" onclick="selectZone('right_leg', this)"/>
-              <ellipse cx="70" cy="338" rx="18" ry="12" class="body-zone" data-zone="left_foot" onclick="selectZone('left_foot', this)"/>
-              <ellipse cx="110" cy="338" rx="18" ry="12" class="body-zone" data-zone="right_foot" onclick="selectZone('right_foot', this)"/>
-            </svg>
-          </div>
-          <div class="bodymap-stage">
-            <div class="bodymap-stage-title">Back Body</div>
-            <svg class="bodymap-svg" viewBox="0 0 180 360" role="img" aria-label="Back body map">
-              <title>Back body map</title>
-              <ellipse cx="90" cy="34" rx="28" ry="30" class="body-zone" data-zone="head" onclick="selectZone('head', this)"/>
-              <rect x="78" y="60" width="24" height="18" rx="5" class="body-zone" data-zone="neck_back" onclick="selectZone('neck_back', this)"/>
-              <rect x="58" y="82" width="64" height="20" rx="8" class="body-zone" data-zone="shoulder" onclick="selectZone('shoulder', this)"/>
-              <rect x="50" y="104" width="80" height="56" rx="10" class="body-zone" data-zone="back" onclick="selectZone('back', this)"/>
-              <rect x="18" y="96" width="26" height="86" rx="10" class="body-zone" data-zone="left_arm" onclick="selectZone('left_arm', this)"/>
-              <rect x="136" y="96" width="26" height="86" rx="10" class="body-zone" data-zone="right_arm" onclick="selectZone('right_arm', this)"/>
-              <ellipse cx="30" cy="194" rx="13" ry="14" class="body-zone" data-zone="left_hand" onclick="selectZone('left_hand', this)"/>
-              <ellipse cx="150" cy="194" rx="13" ry="14" class="body-zone" data-zone="right_hand" onclick="selectZone('right_hand', this)"/>
-              <rect x="56" y="164" width="68" height="44" rx="10" class="body-zone" data-zone="lower_back" onclick="selectZone('lower_back', this)"/>
-              <rect x="58" y="212" width="64" height="32" rx="10" class="body-zone" data-zone="pelvis" onclick="selectZone('pelvis', this)"/>
-              <rect x="58" y="248" width="24" height="76" rx="10" class="body-zone" data-zone="left_leg" onclick="selectZone('left_leg', this)"/>
-              <rect x="98" y="248" width="24" height="76" rx="10" class="body-zone" data-zone="right_leg" onclick="selectZone('right_leg', this)"/>
-              <ellipse cx="70" cy="338" rx="18" ry="12" class="body-zone" data-zone="left_foot" onclick="selectZone('left_foot', this)"/>
-              <ellipse cx="110" cy="338" rx="18" ry="12" class="body-zone" data-zone="right_foot" onclick="selectZone('right_foot', this)"/>
-            </svg>
-            <div class="bodymap-legend">
-              <span><strong>1.</strong> Tap body part</span>
-              <span><strong>2.</strong> Review the drafted message</span>
-              <span><strong>3.</strong> Send to clinical chat</span>
+
+        <div class="bodymap-layout">
+          <div class="bodymap-canvas">
+            <div class="bodymap-stage">
+              <span class="bodymap-stage-title">Front</span>
+              <svg class="bodymap-svg" viewBox="0 0 200 430" role="img" aria-label="Front view body map">
+                <title>Front view — tap a body area</title>
+                <g class="body-figure" aria-hidden="true">
+                  <ellipse cx="100" cy="36" rx="21" ry="26"/>
+                  <rect x="89" y="54" width="22" height="26" rx="9"/>
+                  <path d="M62,84 Q66,74 80,73 L120,73 Q134,74 138,84 L140,144 Q140,160 135,172 L136,204 Q137,232 100,238 Q63,232 64,204 L65,172 Q60,160 60,144 Z"/>
+                  <path d="M62,82 Q50,88 48,102 L42,186 Q41,196 50,198 Q59,200 61,190 L70,104 Q72,88 62,82 Z"/>
+                  <path d="M138,82 Q150,88 152,102 L158,186 Q159,196 150,198 Q141,200 139,190 L130,104 Q128,88 138,82 Z"/>
+                  <ellipse cx="45" cy="212" rx="10" ry="14"/>
+                  <ellipse cx="155" cy="212" rx="10" ry="14"/>
+                  <path d="M70,228 Q64,300 72,382 Q73,392 83,392 Q92,392 93,382 Q97,308 96,234 Z"/>
+                  <path d="M130,228 Q136,300 128,382 Q127,392 117,392 Q108,392 107,382 Q103,308 104,234 Z"/>
+                  <rect x="62" y="394" width="34" height="18" rx="9"/>
+                  <rect x="104" y="394" width="34" height="18" rx="9"/>
+                </g>
+                <g class="body-zones">
+                  <ellipse cx="100" cy="36" rx="21" ry="26" class="body-zone" data-zone="head" onclick="selectZone('head', this)"><title>Head</title></ellipse>
+                  <rect x="87" y="56" width="26" height="22" rx="9" class="body-zone" data-zone="throat" onclick="selectZone('throat', this)"><title>Throat &amp; neck</title></rect>
+                  <rect x="61" y="76" width="33" height="18" rx="9" class="body-zone" data-zone="shoulder" onclick="selectZone('shoulder', this)"><title>Left shoulder</title></rect>
+                  <rect x="106" y="76" width="33" height="18" rx="9" class="body-zone" data-zone="shoulder" onclick="selectZone('shoulder', this)"><title>Right shoulder</title></rect>
+                  <rect x="64" y="96" width="72" height="48" rx="14" class="body-zone" data-zone="chest" onclick="selectZone('chest', this)"><title>Chest &amp; lungs</title></rect>
+                  <rect x="66" y="146" width="68" height="46" rx="14" class="body-zone" data-zone="abdomen" onclick="selectZone('abdomen', this)"><title>Stomach</title></rect>
+                  <rect x="68" y="194" width="64" height="40" rx="14" class="body-zone" data-zone="pelvis" onclick="selectZone('pelvis', this)"><title>Pelvic area</title></rect>
+                  <path d="M62,82 Q50,88 48,102 L42,186 Q41,196 50,198 Q59,200 61,190 L70,104 Q72,88 62,82 Z" class="body-zone" data-zone="left_arm" onclick="selectZone('left_arm', this)"><title>Left arm</title></path>
+                  <path d="M138,82 Q150,88 152,102 L158,186 Q159,196 150,198 Q141,200 139,190 L130,104 Q128,88 138,82 Z" class="body-zone" data-zone="right_arm" onclick="selectZone('right_arm', this)"><title>Right arm</title></path>
+                  <ellipse cx="45" cy="212" rx="10" ry="14" class="body-zone" data-zone="left_hand" onclick="selectZone('left_hand', this)"><title>Left hand</title></ellipse>
+                  <ellipse cx="155" cy="212" rx="10" ry="14" class="body-zone" data-zone="right_hand" onclick="selectZone('right_hand', this)"><title>Right hand</title></ellipse>
+                  <path d="M70,228 Q64,300 72,382 Q73,392 83,392 Q92,392 93,382 Q97,308 96,234 Z" class="body-zone" data-zone="left_leg" onclick="selectZone('left_leg', this)"><title>Left leg</title></path>
+                  <path d="M130,228 Q136,300 128,382 Q127,392 117,392 Q108,392 107,382 Q103,308 104,234 Z" class="body-zone" data-zone="right_leg" onclick="selectZone('right_leg', this)"><title>Right leg</title></path>
+                  <rect x="62" y="394" width="34" height="18" rx="9" class="body-zone" data-zone="left_foot" onclick="selectZone('left_foot', this)"><title>Left foot</title></rect>
+                  <rect x="104" y="394" width="34" height="18" rx="9" class="body-zone" data-zone="right_foot" onclick="selectZone('right_foot', this)"><title>Right foot</title></rect>
+                </g>
+              </svg>
+            </div>
+
+            <div class="bodymap-stage">
+              <span class="bodymap-stage-title">Back</span>
+              <svg class="bodymap-svg" viewBox="0 0 200 430" role="img" aria-label="Back view body map">
+                <title>Back view — tap a body area</title>
+                <g class="body-figure" aria-hidden="true">
+                  <ellipse cx="100" cy="36" rx="21" ry="26"/>
+                  <rect x="89" y="54" width="22" height="26" rx="9"/>
+                  <path d="M62,84 Q66,74 80,73 L120,73 Q134,74 138,84 L140,144 Q140,160 135,172 L136,204 Q137,232 100,238 Q63,232 64,204 L65,172 Q60,160 60,144 Z"/>
+                  <path d="M62,82 Q50,88 48,102 L42,186 Q41,196 50,198 Q59,200 61,190 L70,104 Q72,88 62,82 Z"/>
+                  <path d="M138,82 Q150,88 152,102 L158,186 Q159,196 150,198 Q141,200 139,190 L130,104 Q128,88 138,82 Z"/>
+                  <ellipse cx="45" cy="212" rx="10" ry="14"/>
+                  <ellipse cx="155" cy="212" rx="10" ry="14"/>
+                  <path d="M70,228 Q64,300 72,382 Q73,392 83,392 Q92,392 93,382 Q97,308 96,234 Z"/>
+                  <path d="M130,228 Q136,300 128,382 Q127,392 117,392 Q108,392 107,382 Q103,308 104,234 Z"/>
+                  <rect x="62" y="394" width="34" height="18" rx="9"/>
+                  <rect x="104" y="394" width="34" height="18" rx="9"/>
+                </g>
+                <g class="body-zones">
+                  <ellipse cx="100" cy="36" rx="21" ry="26" class="body-zone" data-zone="head" onclick="selectZone('head', this)"><title>Head</title></ellipse>
+                  <rect x="87" y="56" width="26" height="22" rx="9" class="body-zone" data-zone="neck_back" onclick="selectZone('neck_back', this)"><title>Back of neck</title></rect>
+                  <rect x="61" y="76" width="33" height="18" rx="9" class="body-zone" data-zone="shoulder" onclick="selectZone('shoulder', this)"><title>Left shoulder</title></rect>
+                  <rect x="106" y="76" width="33" height="18" rx="9" class="body-zone" data-zone="shoulder" onclick="selectZone('shoulder', this)"><title>Right shoulder</title></rect>
+                  <rect x="64" y="96" width="72" height="54" rx="14" class="body-zone" data-zone="back" onclick="selectZone('back', this)"><title>Upper back</title></rect>
+                  <rect x="66" y="152" width="68" height="42" rx="14" class="body-zone" data-zone="lower_back" onclick="selectZone('lower_back', this)"><title>Lower back</title></rect>
+                  <rect x="68" y="196" width="64" height="38" rx="14" class="body-zone" data-zone="pelvis" onclick="selectZone('pelvis', this)"><title>Pelvic area</title></rect>
+                  <path d="M62,82 Q50,88 48,102 L42,186 Q41,196 50,198 Q59,200 61,190 L70,104 Q72,88 62,82 Z" class="body-zone" data-zone="left_arm" onclick="selectZone('left_arm', this)"><title>Left arm</title></path>
+                  <path d="M138,82 Q150,88 152,102 L158,186 Q159,196 150,198 Q141,200 139,190 L130,104 Q128,88 138,82 Z" class="body-zone" data-zone="right_arm" onclick="selectZone('right_arm', this)"><title>Right arm</title></path>
+                  <ellipse cx="45" cy="212" rx="10" ry="14" class="body-zone" data-zone="left_hand" onclick="selectZone('left_hand', this)"><title>Left hand</title></ellipse>
+                  <ellipse cx="155" cy="212" rx="10" ry="14" class="body-zone" data-zone="right_hand" onclick="selectZone('right_hand', this)"><title>Right hand</title></ellipse>
+                  <path d="M70,228 Q64,300 72,382 Q73,392 83,392 Q92,392 93,382 Q97,308 96,234 Z" class="body-zone" data-zone="left_leg" onclick="selectZone('left_leg', this)"><title>Left leg</title></path>
+                  <path d="M130,228 Q136,300 128,382 Q127,392 117,392 Q108,392 107,382 Q103,308 104,234 Z" class="body-zone" data-zone="right_leg" onclick="selectZone('right_leg', this)"><title>Right leg</title></path>
+                  <rect x="62" y="394" width="34" height="18" rx="9" class="body-zone" data-zone="left_foot" onclick="selectZone('left_foot', this)"><title>Left foot</title></rect>
+                  <rect x="104" y="394" width="34" height="18" rx="9" class="body-zone" data-zone="right_foot" onclick="selectZone('right_foot', this)"><title>Right foot</title></rect>
+                </g>
+              </svg>
             </div>
           </div>
-          <div id="bodymap-info" class="zone-info"></div>
+
+          <aside class="bodymap-side">
+            <div class="bm-help-card">
+              <span class="bm-step-count">1 of 3</span>
+              <div>
+                <strong>Mark every affected area</strong>
+                <p>Use the front and back views. You can select more than one location.</p>
+              </div>
+            </div>
+            <div id="bodymap-info" class="zone-info">
+              <div class="zone-info-empty">No area selected. Tap the figure or use a location below.</div>
+            </div>
+            <fieldset class="bm-fieldset">
+              <legend>What does it feel like?</legend>
+              <div class="bm-choice-grid" id="bodymap-sensations">
+                <button type="button" class="bm-choice selected" aria-pressed="true" onclick="selectBodySensation('pain', this)">Pain</button>
+                <button type="button" class="bm-choice" aria-pressed="false" onclick="selectBodySensation('burning', this)">Burning</button>
+                <button type="button" class="bm-choice" aria-pressed="false" onclick="selectBodySensation('itching', this)">Itching</button>
+                <button type="button" class="bm-choice" aria-pressed="false" onclick="selectBodySensation('swelling', this)">Swelling</button>
+                <button type="button" class="bm-choice" aria-pressed="false" onclick="selectBodySensation('numbness', this)">Numbness</button>
+                <button type="button" class="bm-choice" aria-pressed="false" onclick="selectBodySensation('other discomfort', this)">Other</button>
+              </div>
+            </fieldset>
+            <fieldset class="bm-fieldset">
+              <legend><span>How strong is it?</span><output id="bodymap-severity-output">5 / 10</output></legend>
+              <input id="bodymap-severity" class="bm-severity" type="range" min="1" max="10" value="5" oninput="setBodySeverity(this.value)" aria-label="Symptom intensity from 1 to 10">
+              <div class="bm-scale-labels"><span>Mild</span><span>Moderate</span><span>Severe</span></div>
+            </fieldset>
+            <button type="button" id="bodymap-continue" class="btn btn-primary bm-continue" onclick="confirmBodyMapSelection()" disabled>Continue to clinical chat</button>
+            <div class="bm-quick">
+              <span class="bm-quick-label">Common locations</span>
+              <div class="bm-quick-chips">
+                <button class="bm-chip" onclick="selectZone('head', this)">Head</button>
+                <button class="bm-chip" onclick="selectZone('chest', this)">Chest</button>
+                <button class="bm-chip" onclick="selectZone('abdomen', this)">Stomach</button>
+                <button class="bm-chip" onclick="selectZone('back', this)">Back</button>
+                <button class="bm-chip" onclick="selectZone('left_leg', this)">Leg</button>
+              </div>
+            </div>
+          </aside>
         </div>
               </div><!-- /panel-content-wrapper -->
 </section>
@@ -643,7 +665,7 @@
               <div class="pharmacist-avatar" style="background:#e3f2fd;color:#1976d2;">SL</div>
               <div class="pharmacist-info">
                 <h5>Dr. Sofia Laurent</h5>
-                <span>Clinical Pharmacist – Telehealth</span>
+                <span>Clinical Pharmacist, Telehealth</span>
                 <p>Medication counseling, chronic care support, and treatment reviews.</p>
               </div>
               <div class="pharmacist-actions">
@@ -655,7 +677,7 @@
               <div class="pharmacist-avatar" style="background:#e0f7fa;color:#00838f;">DK</div>
               <div class="pharmacist-info">
                 <h5>Daniel Kim, PharmD</h5>
-                <span>Hospital Pharmacist – Virtual Care</span>
+                <span>Hospital Pharmacist, Virtual Care</span>
                 <p>Drug interaction reviews, acute symptom triage, and medication safety.</p>
               </div>
               <div class="pharmacist-actions">
@@ -905,7 +927,8 @@
 </div>
 
 <script src="js/config.js"></script>
-<script src="js/app.js?v=20260707-role-guard"></script>
+<script src="js/ui-core.js?v=20260710"></script>
+<script src="js/app.js?v=20260710-otp-sales"></script>
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -929,11 +952,14 @@
   <div id="order-modal" class="modal-overlay" style="display: none;">
     <div class="modal-content">
       <div class="modal-header">
-        <h3>📦 Order for Delivery</h3>
+        <h3>Order for delivery</h3>
         <button class="modal-close" onclick="closeOrderModal()">&times;</button>
       </div>
       <div class="modal-body">
         <p>Please confirm your delivery details below.</p>
+        <div id="order-total-line" class="order-total-line" style="display:none;">
+          Total to pay: <strong id="order-total-display"></strong> — collected securely by Mobile Money (MoMo) after you confirm.
+        </div>
         <div class="form-group">
           <label>Delivery Address</label>
           <textarea id="order-address" class="form-control" placeholder="Enter your full street address, house number, and landmarks" rows="3"></textarea>
@@ -949,12 +975,10 @@
       </div>
       <div class="modal-actions">
         <button class="btn btn-secondary" onclick="closeOrderModal()">Cancel</button>
-        <button class="btn btn-primary" id="confirm-order-btn" onclick="submitOrder()">Confirm Order</button>
+        <button class="btn btn-primary" id="confirm-order-btn" onclick="submitOrder()">Confirm &amp; Pay</button>
       </div>
     </div>
   </div>
 
 </body>
 </html>
-
-

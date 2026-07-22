@@ -8,6 +8,7 @@ let currentSession = { role: 'guest' };
 let currentUser = null;
 let lang = 'en', history = [], ttsOn = false, isRecording = false, recognition = null;
 const synth = window.speechSynthesis;
+const { escapeHtml, renderMarkdown } = window.BisaRxUI;
 let pendingConditionSelection = null;
 let patientReportSignatures = new Map();
 let patientReportStatePrimed = false;
@@ -237,17 +238,107 @@ function openLoginModal() {
   const modal = document.getElementById('login-modal');
   if (modal) modal.style.display = 'flex';
   const loginErr = document.getElementById('login-err'); if (loginErr) loginErr.innerHTML = '';
-  const regErr = document.getElementById('reg-err'); if (regErr) regErr.innerHTML = '';
+  if (isPortalMode('patient')) {
+    resetOtpFlow();
+    if (!pendingConditionSelection) setPatientAuthPrompt('');
+    document.getElementById('otp-phone')?.focus();
+    return;
+  }
   const roleSwitch = document.querySelector('.auth-role-switch');
-  const registerTab = document.getElementById('tab-reg');
-  const googleBtn = document.getElementById('btn-google-login');
   if (roleSwitch) roleSwitch.style.display = 'none';
-  if (registerTab) registerTab.style.display = isPortalMode('patient') ? 'inline-flex' : 'none';
-  if (googleBtn) googleBtn.style.display = isPortalMode('patient') ? 'inline-flex' : 'none';
   const preferredMode = isPortalMode('pharmacist') ? 'pharmacist' : isPortalMode('admin') ? 'admin' : (document.getElementById('login-username')?.dataset.loginMode || 'user');
   setLoginMode(preferredMode);
-  if (!isPortalMode('patient')) switchAuthTab('login');
-  else if (!pendingConditionSelection) setPatientAuthPrompt('');
+  switchAuthTab('login');
+}
+
+// ── Phone + OTP sign-in (patient portal) ──────────────────────────────
+let _otpResendTimer = null;
+
+function _showOtpStep(step) {
+  const phoneStep = document.getElementById('otp-step-phone');
+  const codeStep = document.getElementById('otp-step-code');
+  if (phoneStep) phoneStep.style.display = step === 'phone' ? 'block' : 'none';
+  if (codeStep) codeStep.style.display = step === 'code' ? 'block' : 'none';
+}
+
+function resetOtpFlow() {
+  if (_otpResendTimer) { clearInterval(_otpResendTimer); _otpResendTimer = null; }
+  const codeInput = document.getElementById('otp-code');
+  if (codeInput) codeInput.value = '';
+  const otpErr = document.getElementById('otp-err'); if (otpErr) otpErr.innerHTML = '';
+  const count = document.getElementById('otp-resend-count'); if (count) count.textContent = '';
+  _showOtpStep('phone');
+}
+
+function _startResendCountdown(seconds = 30) {
+  const resendBtn = document.getElementById('btn-resend-otp');
+  const count = document.getElementById('otp-resend-count');
+  if (!resendBtn || !count) return;
+  let remaining = seconds;
+  resendBtn.disabled = true;
+  count.textContent = `(${remaining}s)`;
+  if (_otpResendTimer) clearInterval(_otpResendTimer);
+  _otpResendTimer = setInterval(() => {
+    remaining -= 1;
+    if (remaining <= 0) {
+      clearInterval(_otpResendTimer);
+      _otpResendTimer = null;
+      resendBtn.disabled = false;
+      count.textContent = '';
+    } else {
+      count.textContent = `(${remaining}s)`;
+    }
+  }, 1000);
+}
+
+async function requestOtp(isResend = false) {
+  const phone = document.getElementById('otp-phone')?.value.trim();
+  const err = document.getElementById(isResend ? 'otp-err' : 'login-err');
+  if (!phone) { if (err) err.innerHTML = '<div class="err">Enter your phone number.</div>'; return; }
+  const btn = document.getElementById('btn-send-otp');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending code…'; }
+  try {
+    const res = await callApi('/auth/otp/request', 'POST', { phone }, 0);
+    if (err) err.innerHTML = '';
+    const display = document.getElementById('otp-phone-display');
+    if (display) display.textContent = phone;
+    _showOtpStep('code');
+    _startResendCountdown();
+    const codeInput = document.getElementById('otp-code');
+    if (res.dev_code && codeInput) {
+      codeInput.value = res.dev_code;
+      showToast('Development mode: code auto-filled.', 'info');
+    }
+    codeInput?.focus();
+    if (isResend) showToast('A new code has been sent.', 'success');
+  } catch (e) {
+    if (err) err.innerHTML = `<div class="err">${e.message}</div>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Send Verification Code'; }
+  }
+}
+
+async function verifyOtp() {
+  const phone = document.getElementById('otp-phone')?.value.trim();
+  const code = document.getElementById('otp-code')?.value.trim();
+  const err = document.getElementById('otp-err');
+  if (!code || code.length !== 6) { if (err) err.innerHTML = '<div class="err">Enter the 6-digit code from the SMS.</div>'; return; }
+  const btn = document.getElementById('btn-verify-otp');
+  if (btn) { btn.disabled = true; btn.textContent = 'Verifying…'; }
+  try {
+    const data = await callApi('/auth/otp/verify', 'POST', { phone, code }, 0);
+    localStorage.setItem('token', data.access_token);
+    closeLoginModal();
+    showToast('Welcome to BisaRx!', 'success');
+    currentSession = await callApi('/session');
+    currentUser = currentSession.display_name || phone;
+    initApp();
+    if (currentSession.role === 'user') _connectPatientWebSocket();
+  } catch (e) {
+    if (err) err.innerHTML = `<div class="err">${e.message}</div>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Verify & Sign In'; }
+  }
 }
 
 function closeLoginModal() {
@@ -311,8 +402,9 @@ function setLoginMode(mode = 'user', trigger = null) {
 }
 
 async function doLogin() {
-  // Use dataset.loginMode first, then fall back to portal mode
-  const loginMode = document.getElementById('login-username').dataset.loginMode || (isPortalMode('pharmacist') ? 'pharmacist' : isPortalMode('admin') ? 'admin' : 'user');
+  // Dedicated admin login intentionally has no username field.
+  const usernameInput = document.getElementById('login-username');
+  const loginMode = usernameInput?.dataset.loginMode || (isPortalMode('pharmacist') ? 'pharmacist' : isPortalMode('admin') ? 'admin' : 'user');
   const pass = document.getElementById('login-pass').value;
   const err = document.getElementById('login-err'), btn = document.getElementById('btn-do-login');
 
@@ -332,7 +424,7 @@ async function doLogin() {
     return;
   }
 
-  const username = document.getElementById('login-username').value.trim().toLowerCase();
+  const username = (usernameInput?.value || '').trim().toLowerCase();
   if (!username || !pass) { err.innerHTML = '<div class="err">Required: Username & password.</div>'; return; }
   try {
     btn.disabled = true; btn.innerHTML = 'Signing in...';
@@ -350,19 +442,6 @@ async function doLogin() {
   finally { btn.disabled = false; setLoginMode(loginMode); }
 }
 
-async function doRegister() {
-  const username=document.getElementById('reg-username').value.trim().toLowerCase(), email=document.getElementById('reg-email').value.trim(), fname=document.getElementById('reg-fname').value.trim(), lname=document.getElementById('reg-lname').value.trim(), pass=document.getElementById('reg-pass').value;
-  const err=document.getElementById('reg-err'), btn=document.getElementById('btn-do-register');
-  if(!username||!email||!fname||!lname||!pass){ err.innerHTML='<div class="err">All fields required.</div>'; return; }
-  try {
-    btn.disabled=true; btn.innerHTML='Creating account...';
-    const data=await callApi('/auth/register','POST',{username,email,first_name:fname,last_name:lname,password:pass});
-    localStorage.setItem('token',data.access_token);
-    currentUser=username; closeLoginModal(); showToast('Account created!', 'success'); initApp();
-  } catch(e){ err.innerHTML=`<div class="err">${e.message}</div>`; }
-  finally{ btn.disabled=false; btn.innerHTML='Create Account'; }
-}
-
 function signOut() {
   stopPatientReportSync();
   localStorage.removeItem('token'); currentUser=null; currentSession={role:'guest'};
@@ -373,8 +452,15 @@ function handleImageUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
 
-  if (!file.type.startsWith('image/')) {
-    showToast('Please select an image file', 'error');
+  const supportedTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']);
+  if (!supportedTypes.has(file.type.toLowerCase())) {
+    showToast('Use a JPEG, PNG, WebP, or HEIC image.', 'error');
+    event.target.value = '';
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    showToast('The image is larger than 10 MB. Choose a smaller photo.', 'error');
+    event.target.value = '';
     return;
   }
 
@@ -405,8 +491,22 @@ function clearImagePreview() {
   currentImageData = null;
   const previewContainer = document.getElementById('image-preview-container');
   if (previewContainer) previewContainer.style.display = 'none';
-  const fileInput = document.getElementById('camera-input');
+  const fileInput = document.getElementById('image-upload');
   if (fileInput) fileInput.value = '';
+}
+
+function initializeBodyMapAccessibility() {
+  document.querySelectorAll('#panel-bodymap .body-zone').forEach(zone => {
+    zone.setAttribute('role', 'button');
+    zone.setAttribute('tabindex', '0');
+    zone.setAttribute('aria-pressed', 'false');
+    zone.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        selectZone(zone.dataset.zone, zone);
+      }
+    });
+  });
 }
 
 // Navigation & Global UI
@@ -493,28 +593,79 @@ const BODY_ZONE_LABELS = {
   lower_back: 'lower back',
 };
 
-function selectZone(zone, el) {
-  const label = BODY_ZONE_LABELS[zone] || zone.replace(/_/g, ' ');
-  const input = document.getElementById('tinput');
-  if (input) {
-    const phrase = `I'm having pain in my ${label}. `;
-    input.value = input.value.trim() ? `${input.value.trim()} ${phrase}` : phrase;
-  }
+const selectedBodyZones = new Set();
+let selectedBodySensation = 'pain';
+let selectedBodySeverity = 5;
 
-  document.querySelectorAll('#panel-bodymap .body-zone.selected').forEach(z => z.classList.remove('selected'));
-  if (el && el.classList && el.classList.contains('body-zone')) {
-    el.classList.add('selected');
-  }
+function buildBodyMapDraft() {
+  if (!selectedBodyZones.size) return '';
+  const areas = [...selectedBodyZones].map(zone => BODY_ZONE_LABELS[zone] || zone.replace(/_/g, ' '));
+  const locationText = areas.length === 1
+    ? areas[0]
+    : `${areas.slice(0, -1).join(', ')} and ${areas[areas.length - 1]}`;
+  return `I have ${selectedBodySensation} in my ${locationText}. The intensity is ${selectedBodySeverity} out of 10.`;
+}
 
+function renderBodyMapSelection() {
   const infoEl = document.getElementById('bodymap-info');
-  if (infoEl) {
-    infoEl.innerHTML = `<span>Selected: ${label}. Message drafted — review and send it in the chat.</span> <button class="btn btn-primary btn-sm" onclick="confirmBodyMapSelection()">Continue to Chat</button>`;
+  const continueBtn = document.getElementById('bodymap-continue');
+  if (continueBtn) continueBtn.disabled = selectedBodyZones.size === 0;
+  if (!infoEl) return;
+  if (!selectedBodyZones.size) {
+    infoEl.innerHTML = '<div class="zone-info-empty">No area selected. Tap the figure or use a location below.</div>';
+    return;
   }
+  const labels = [...selectedBodyZones].map(zone => BODY_ZONE_LABELS[zone] || zone.replace(/_/g, ' '));
+  infoEl.innerHTML = `
+    <div class="zone-info-card">
+      <span class="zone-info-kicker">Selected ${labels.length === 1 ? 'area' : 'areas'}</span>
+      <div class="bm-selected-list">${labels.map(label => `<span>${BisaRxUI.escapeHtml(label)}</span>`).join('')}</div>
+      <p class="zone-info-note">${BisaRxUI.escapeHtml(buildBodyMapDraft())}</p>
+    </div>`;
+}
+
+function selectZone(zone, el) {
+  const selecting = !selectedBodyZones.has(zone);
+  if (selecting) selectedBodyZones.add(zone);
+  else selectedBodyZones.delete(zone);
+  document.querySelectorAll(`#panel-bodymap .body-zone[data-zone="${zone}"]`).forEach(node => {
+    node.classList.toggle('selected', selecting);
+    node.setAttribute('aria-pressed', String(selecting));
+  });
+  document.querySelectorAll('#panel-bodymap .bm-chip').forEach(node => {
+    const click = node.getAttribute('onclick') || '';
+    if (click.includes(`'${zone}'`)) node.classList.toggle('selected', selecting);
+  });
+  renderBodyMapSelection();
+}
+
+function selectBodySensation(sensation, el) {
+  selectedBodySensation = sensation;
+  document.querySelectorAll('#bodymap-sensations .bm-choice').forEach(choice => {
+    const selected = choice === el;
+    choice.classList.toggle('selected', selected);
+    choice.setAttribute('aria-pressed', String(selected));
+  });
+  renderBodyMapSelection();
+}
+
+function setBodySeverity(value) {
+  selectedBodySeverity = Number(value);
+  const output = document.getElementById('bodymap-severity-output');
+  if (output) output.textContent = `${selectedBodySeverity} / 10`;
+  renderBodyMapSelection();
 }
 
 function confirmBodyMapSelection() {
+  const draft = buildBodyMapDraft();
+  if (!draft) {
+    showToast('Select at least one body area first.', 'error');
+    return;
+  }
+  const input = document.getElementById('tinput');
+  if (input) input.value = draft;
   go('chat', document.getElementById('nav-chat'));
-  document.getElementById('tinput')?.focus();
+  input?.focus();
 }
 
 function toggleSidebar() {
@@ -620,6 +771,32 @@ function buildLang() {
   if (d) d.innerHTML = `<strong>${LANGS[lang].discLabel}</strong> ${LANGS[lang].disc}`;
 }
 
+function _parseSaleItems(rx) {
+  if (Array.isArray(rx.items) && rx.items.length) return rx.items;
+  try {
+    const parsed = JSON.parse(rx.items_json || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_) { return []; }
+}
+
+function _renderQuoteTable(rx) {
+  const items = _parseSaleItems(rx);
+  if (!items.length && !rx.payment_amount) return '';
+  const currency = rx.payment_currency || 'GHS';
+  const rows = items.map(i => `
+    <div class="quote-row">
+      <span class="quote-name">${escapeHtml(i.name || '')}</span>
+      <span class="quote-price">${Number(i.price) ? `${currency} ${Number(i.price).toFixed(2)}` : '—'}</span>
+    </div>`).join('');
+  const total = Number(rx.payment_amount) || items.reduce((s, i) => s + (Number(i.price) || 0), 0);
+  return `
+    <div class="quote-table">
+      <div class="quote-title">💊 Pharmacy Price Quote</div>
+      ${rows}
+      ${total ? `<div class="quote-row quote-total"><span>Total</span><span>${currency} ${total.toFixed(2)}</span></div>` : ''}
+    </div>`;
+}
+
 function renderPrescriptionHistory(rxArray = []) {
   const h = document.getElementById('history-content'); if (!h) return;
   if (!rxArray.length) { h.innerHTML = '<div class="empty">No clinical reports yet.</div>'; return; }
@@ -635,13 +812,22 @@ function renderPrescriptionHistory(rxArray = []) {
           <span class="rx-status-badge status-${rx.status.toLowerCase().replace(' ', '-')}">
             <strong>Status:</strong> ${rx.status}
           </span>
-          ${rx.pharmacist_feedback ? `<div class="rx-feedback">${window.marked ? marked.parse(rx.pharmacist_feedback) : rx.pharmacist_feedback}</div>` : '<p class="pending">Awaiting pharmacist assessment...</p>'}
-          
+          ${rx.pharmacist_feedback ? `<div class="rx-feedback">${_renderMarkdown(rx.pharmacist_feedback)}</div>` : '<p class="pending">Awaiting pharmacist assessment...</p>'}
+          ${_renderQuoteTable(rx)}
+
           ${rx.status === 'Reviewed' ? `
             <div class="rx-actions">
-              <button class="btn btn-primary btn-sm" onclick="showOrderModal(${rx.id})">📦 Order for Delivery</button>
+              <button class="btn btn-primary btn-sm" onclick="showOrderModal(${rx.id}, ${Number(rx.payment_amount) || 0}, '${rx.payment_currency || 'GHS'}')">
+                ${Number(rx.payment_amount) ? 'Confirm &amp; Pay with Mobile Money' : 'Order for delivery'}
+              </button>
             </div>
           ` : ''}
+          ${rx.payment_status === 'pending' && rx.payment_url ? `
+            <div class="rx-actions">
+              <a class="btn btn-primary btn-sm" href="${rx.payment_url}" target="_blank" rel="noopener">Complete MoMo Payment</a>
+            </div>
+          ` : ''}
+          ${rx.payment_status === 'paid' ? '<span class="rx-status-badge status-paid">✓ Paid via Mobile Money</span>' : ''}
 
           ${['Ordered', 'Dispatched', 'Delivered'].includes(rx.status) ? `
             <div class="delivery-info">
@@ -858,8 +1044,7 @@ function _renderPatientName(cs) {
 }
 
 function _renderMarkdown(text) {
-  if (!text) return '';
-  return window.marked ? marked.parse(text) : text.replace(/\*\*/g, '<strong>').replace(/\n/g, '<br>');
+  return renderMarkdown(text);
 }
 
 /**
@@ -919,54 +1104,68 @@ function renderPharmaQueue(id, cases = [], mode = 'pending') {
       ${mode === 'assigned' ? `
         <div class="pharma-review-divider"></div>
         <div class="pharma-review-block">
-          <div class="pharma-review-title">Medication Plan</div>
+          <div class="pharma-review-title">Medication Plan &amp; Pricing</div>
           <div id="drug-rows-${cs.id}" class="drug-rows">
-            <div class="drug-row">
-              <div class="dashboard-field drug-name-field">
-                <label>Drug Name</label>
-                <input type="text" class="rev-drug-name" placeholder="Enter medication name" value="${cs.drug_name && cs.drug_name !== 'Pharmacist review required' ? cs.drug_name : ''}">
-              </div>
-              <div class="dashboard-field drug-point-field">
-                <label>Dosage and Counselling</label>
-                <textarea class="rev-drug-point" placeholder="Dose, duration, counselling points, and follow-up advice" rows="4">${cs.pharmacist_feedback || ''}</textarea>
-              </div>
-              <button class="btn btn-danger btn-sm drug-row-remove" onclick="this.parentElement.remove()" aria-label="Remove medication row">&times;</button>
-            </div>
+            ${(cs.items && cs.items.length ? cs.items : [{
+              name: cs.drug_name && cs.drug_name !== 'Pharmacist review required' ? cs.drug_name : '',
+              point: cs.pharmacist_feedback || '',
+              price: ''
+            }]).map(item => _drugRowHtml(cs.id, item)).join('')}
           </div>
           <div class="pharma-review-actions">
             <button class="btn btn-sm btn-secondary" onclick="addDrugRow(${cs.id})">+ Add Drug</button>
             <button class="btn btn-sm btn-magic" onclick="fillAiSuggestion(${cs.id}, this)">✨ AI Suggest</button>
           </div>
-          <button class="btn btn-primary btn-sm pharma-submit-btn" onclick="submitReview(${cs.id})">Submit to Patient</button>
+          <div class="pharma-review-total">Quote total: <strong>GHS <span id="review-total-${cs.id}">0.00</span></strong></div>
+          <button class="btn btn-primary btn-sm pharma-submit-btn" onclick="submitReview(${cs.id})">Send Results &amp; Price Quote to Patient</button>
         </div>
       ` : ''}
       ${mode === 'completed' ? `
         <div class="pharma-review-divider"></div>
         <div class="dashboard-field"><label>Medication</label><div class="case-field-text">${cs.drug_name || 'N/A'}</div></div>
+        ${cs.items && cs.items.length ? `<div class="dashboard-field"><label>Price Quote</label><div class="case-field-text">${cs.items.map(i => `${i.name}: GHS ${(Number(i.price) || 0).toFixed(2)}`).join('<br>')}<br><strong>Total: ${cs.payment_currency || 'GHS'} ${(Number(cs.payment_amount) || 0).toFixed(2)}</strong> · Payment: ${cs.payment_status || 'unpaid'}</div></div>` : ''}
         <div class="dashboard-field"><label>Counselling Points</label><div class="case-field-text case-feedback-text">${_renderMarkdown(cs.pharmacist_feedback || 'N/A')}</div></div>
       ` : ''}
     </div>
   `}).join('') : '<div class="empty">No cases here.</div>';
   revealStagger(el);
+  if (mode === 'assigned') cases.forEach(cs => updateReviewTotal(cs.id));
+}
+
+function _drugRowHtml(caseId, item = { name: '', point: '', price: '' }) {
+  const price = item.price === '' || item.price == null ? '' : Number(item.price) || '';
+  return `
+    <div class="drug-row">
+      <div class="dashboard-field drug-name-field">
+        <label>Drug Name</label>
+        <input type="text" class="rev-drug-name" placeholder="Enter medication name" value="${escapeHtml(item.name || '')}">
+      </div>
+      <div class="dashboard-field drug-point-field">
+        <label>Dosage and Counselling</label>
+        <textarea class="rev-drug-point" placeholder="Dose, duration, counselling points, and follow-up advice" rows="4">${escapeHtml(item.point || '')}</textarea>
+      </div>
+      <div class="dashboard-field drug-price-field">
+        <label>Price (GHS)</label>
+        <input type="number" class="rev-drug-price" min="0" step="0.01" placeholder="0.00" value="${price}" oninput="updateReviewTotal(${caseId})">
+      </div>
+      <button class="btn btn-danger btn-sm drug-row-remove" onclick="this.parentElement.remove(); updateReviewTotal(${caseId})" aria-label="Remove medication row">&times;</button>
+    </div>
+  `;
 }
 
 function addDrugRow(caseId) {
   const container = document.getElementById(`drug-rows-${caseId}`);
   if (!container) return;
-  const row = document.createElement('div');
-  row.className = 'drug-row';
-  row.innerHTML = `
-    <div class="dashboard-field drug-name-field">
-      <label>Drug Name</label>
-      <input type="text" class="rev-drug-name" placeholder="Enter medication name">
-    </div>
-    <div class="dashboard-field drug-point-field">
-      <label>Dosage and Counselling</label>
-      <textarea class="rev-drug-point" placeholder="Dose, duration, counselling points, and follow-up advice" rows="4"></textarea>
-    </div>
-    <button class="btn btn-danger btn-sm drug-row-remove" onclick="this.parentElement.remove()" aria-label="Remove medication row">&times;</button>
-  `;
-  container.appendChild(row);
+  container.insertAdjacentHTML('beforeend', _drugRowHtml(caseId));
+}
+
+function updateReviewTotal(caseId) {
+  const container = document.getElementById(`drug-rows-${caseId}`);
+  const totalEl = document.getElementById(`review-total-${caseId}`);
+  if (!container || !totalEl) return;
+  const total = Array.from(container.querySelectorAll('.rev-drug-price'))
+    .reduce((sum, input) => sum + (parseFloat(input.value) || 0), 0);
+  totalEl.textContent = total.toFixed(2);
 }
 
 async function fillAiSuggestion(caseId, btn) {
@@ -1014,18 +1213,22 @@ async function submitReview(id) {
   const rows = container.querySelectorAll('.drug-row');
   const drugs_list = Array.from(rows).map(row => ({
     name: row.querySelector('.rev-drug-name').value.trim(),
-    point: row.querySelector('.rev-drug-point').value.trim()
+    point: row.querySelector('.rev-drug-point').value.trim(),
+    price: parseFloat(row.querySelector('.rev-drug-price')?.value) || 0
   })).filter(d => d.name);
 
   if (drugs_list.length === 0) return showToast('Please add at least one drug', 'error');
+  const total_price = drugs_list.reduce((sum, d) => sum + d.price, 0);
 
   try {
     await callApi(`/pharmacist/review/${id}`, 'POST', {
       advice: 'Clinical review completed', // placeholder since we use drugs_list now
       drugs_list: drugs_list,
+      total_price: total_price,
+      currency: 'GHS',
       status: 'Reviewed'
     });
-    showToast('Review sent to patient!', 'success');
+    showToast('Review and price quote sent to patient!', 'success');
     refreshPharmacistDashboard();
   } catch (e) { showToast(e.message, 'error'); }
 }
@@ -1230,6 +1433,7 @@ async function initApp() {
     
     if (!isDedicatedPortal()) {
       buildLang();
+      initializeBodyMapAccessibility();
       try {
         const ref = await callApi('/reference');
         window.FALLBACK_CONDITIONS = ref.conditions;
@@ -1285,8 +1489,7 @@ function handleConditionSelection(condition) {
   }
   pendingConditionSelection = condition;
   openLoginModal();
-  switchAuthTab('register');
-  setPatientAuthPrompt('Create an account or sign in to save your clinical information for future diagnosis. This helps the pharmacist review your case faster.');
+  setPatientAuthPrompt('Sign in with your phone number to save your clinical information for future diagnosis. This helps the pharmacist review your case faster.');
 }
 
 function setPatientAuthPrompt(message = '') {
@@ -1331,9 +1534,13 @@ function _connectPatientWebSocket() {
         if (data.type === 'case_updated' && data.pharmacist_feedback) {
           if (data.play_loud_sound) playLoudNotification(true);
           showToast('Pharmacist result received!', 'success', 8000);
+          const quoteLines = (data.items || []).filter(i => Number(i.price))
+            .map(i => `- ${i.name}: ${data.payment_currency || 'GHS'} ${Number(i.price).toFixed(2)}`).join('\n');
           const resultMsg = [
             data.pharmacist_feedback,
             data.drug_name ? `**Medication:** ${data.drug_name}` : '',
+            quoteLines ? `**Price Quote:**\n${quoteLines}` : '',
+            Number(data.payment_amount) ? `**Total: ${data.payment_currency || 'GHS'} ${Number(data.payment_amount).toFixed(2)}** — open History to confirm your order and pay by Mobile Money.` : '',
             data.referral_advice ? `**Referral:** ${data.referral_advice}` : '',
             data.follow_up_instructions ? `**Follow-up:** ${data.follow_up_instructions}` : '',
           ].filter(Boolean).join('\n\n');
@@ -1382,6 +1589,16 @@ function generateEvaluationHTML(data) {
         <div class="cec-label">Pharmacist Guidance</div>
         <div class="cec-content">${feedback || 'No specific instructions provided.'}</div>
       </div>
+
+      ${(data.items || []).some(i => Number(i.price)) ? `
+      <div class="cec-section">
+        <div class="cec-label">Price Quote</div>
+        <div class="cec-content">
+          ${(data.items || []).map(i => `<div class="quote-row"><span>${cleanEvalText(i.name)}</span><span>${Number(i.price) ? `${data.payment_currency || 'GHS'} ${Number(i.price).toFixed(2)}` : '—'}</span></div>`).join('')}
+          ${Number(data.payment_amount) ? `<div class="quote-row quote-total"><span>Total</span><span>${data.payment_currency || 'GHS'} ${Number(data.payment_amount).toFixed(2)}</span></div>` : ''}
+        </div>
+      </div>
+      ` : ''}
 
       ${referral ? `
       <div class="cec-section">
@@ -1464,8 +1681,18 @@ window.addEventListener('DOMContentLoaded', initApp);
 // Delivery Ordering Logic
 let _currentOrderCaseId = null;
 
-function showOrderModal(caseId) {
+function showOrderModal(caseId, amount = 0, currency = 'GHS') {
   _currentOrderCaseId = caseId;
+  const totalLine = document.getElementById('order-total-line');
+  const totalDisplay = document.getElementById('order-total-display');
+  if (totalLine && totalDisplay) {
+    if (amount > 0) {
+      totalDisplay.textContent = `${currency} ${Number(amount).toFixed(2)}`;
+      totalLine.style.display = 'block';
+    } else {
+      totalLine.style.display = 'none';
+    }
+  }
   const modal = document.getElementById('order-modal');
   if (modal) modal.style.display = 'flex';
 }

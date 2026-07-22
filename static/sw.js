@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bisarx-v3-2026-07-07';
+const CACHE_NAME = 'bisarx-v5-2026-07-10-otp';
 const STATIC_ASSETS = [
   '/logo.png',
   '/pwa-icon.png'

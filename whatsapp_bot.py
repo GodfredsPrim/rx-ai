@@ -1,5 +1,5 @@
 """
-whatsapp_bot.py – WhatsApp Cloud API integration for RxAI / BisaRx.
+whatsapp_bot.py - WhatsApp Cloud API integration for BisaRx.
 
 Registers webhook routes on the FastAPI app and handles the full
 conversation lifecycle over WhatsApp:  incoming message → triage →

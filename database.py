@@ -1,8 +1,9 @@
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
+from app_config import settings
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./rxai.db")
+DATABASE_URL = settings.database_url
 
 # Railway (and Heroku) emit postgres:// but SQLAlchemy requires postgresql://
 if DATABASE_URL.startswith("postgres://"):

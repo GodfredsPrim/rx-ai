@@ -8,6 +8,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
     email = Column(String, unique=True, index=True)
+    phone = Column(String, unique=True, index=True, nullable=True)
     hashed_password = Column(String)
     is_admin = Column(Boolean, default=False)
     
@@ -107,6 +108,7 @@ class PrescriptionHistory(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     pharmacist_id = Column(Integer, ForeignKey("pharmacists.id"), nullable=True)
     drug_name = Column(String)
+    items_json = Column(Text, default="")  # JSON list of {name, point, price} sale items
     details = Column(String)
     patient_message = Column(Text, default="")
     case_summary = Column(Text, default="")
@@ -146,6 +148,17 @@ class CaseEvent(Base):
     created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
 
     case = relationship("PrescriptionHistory", back_populates="events")
+
+class OtpCode(Base):
+    __tablename__ = "otp_codes"
+    id = Column(Integer, primary_key=True, index=True)
+    phone = Column(String, index=True, nullable=False)
+    code_hash = Column(String, nullable=False)
+    attempts = Column(Integer, default=0)
+    verified = Column(Boolean, default=False)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+
 
 class WaitlistEntry(Base):
     __tablename__ = "waitlist_entries"

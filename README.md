@@ -1,4 +1,4 @@
-# BisaRx (RxAI Ghana) - Clinical AI Pharmacist
+# BisaRx - Clinical AI Pharmacist
 
 BisaRx is an AI-powered healthcare assistant designed for the Ghanaian context. It acts as a bridge between patients and licensed pharmacists, gathering symptoms, checking against clinical guidelines, and providing a patient summary for professional review.
 
