@@ -17,6 +17,8 @@
   <meta name="apple-mobile-web-app-title" content="BisaRx">
   <link rel="apple-touch-icon" href="pwa-icon.png">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="/css/accessibility.css">
+  <script src="/js/accessibility.js" defer></script>
 </head>
 <body data-portal="patient">
 
@@ -28,7 +30,7 @@
      ══════════════════════════════════════ -->
 <div id="login-modal" class="modal-overlay" style="display:none;">
   <div class="modal-box">
-    <button class="modal-close" onclick="closeLoginModal()" title="Close">&#x2715;</button>
+    <button class="modal-close" onclick="closeLoginModal()" title="Close" aria-label="Close dialog">&#x2715;</button>
 
     <div class="login-header">
       <img src="logo.png" alt="BisaRx Logo" class="modal-logo">
@@ -281,7 +283,7 @@
 
         <!-- Input bar -->
         <div class="chat-input-container">
-          <input type="file" id="image-upload" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment" style="display:none;" onchange="handleImageUpload(event)">
+          <input type="file" id="image-upload" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment" style="display:none;" onchange="handleImageUpload(event)" aria-label="Upload a symptom photo">
           
           <div class="chat-pill">
             <button class="icon-btn voice-btn" id="mic-btn" onclick="toggleVoice()" title="Voice input" aria-label="Toggle voice input">
@@ -324,7 +326,7 @@
           <div class="bodymap-canvas">
             <div class="bodymap-stage">
               <span class="bodymap-stage-title">Front</span>
-              <svg class="bodymap-svg" viewBox="0 0 200 430" role="img" aria-label="Front view body map">
+              <svg class="bodymap-svg" viewBox="0 0 200 430" role="group" aria-label="Front view body map">
                 <title>Front view — tap a body area</title>
                 <g class="body-figure" aria-hidden="true">
                   <ellipse cx="100" cy="36" rx="21" ry="26"/>
@@ -340,28 +342,28 @@
                   <rect x="104" y="394" width="34" height="18" rx="9"/>
                 </g>
                 <g class="body-zones">
-                  <ellipse cx="100" cy="36" rx="21" ry="26" class="body-zone" data-zone="head" onclick="selectZone('head', this)"><title>Head</title></ellipse>
-                  <rect x="87" y="56" width="26" height="22" rx="9" class="body-zone" data-zone="throat" onclick="selectZone('throat', this)"><title>Throat &amp; neck</title></rect>
-                  <rect x="61" y="76" width="33" height="18" rx="9" class="body-zone" data-zone="shoulder" onclick="selectZone('shoulder', this)"><title>Left shoulder</title></rect>
-                  <rect x="106" y="76" width="33" height="18" rx="9" class="body-zone" data-zone="shoulder" onclick="selectZone('shoulder', this)"><title>Right shoulder</title></rect>
-                  <rect x="64" y="96" width="72" height="48" rx="14" class="body-zone" data-zone="chest" onclick="selectZone('chest', this)"><title>Chest &amp; lungs</title></rect>
-                  <rect x="66" y="146" width="68" height="46" rx="14" class="body-zone" data-zone="abdomen" onclick="selectZone('abdomen', this)"><title>Stomach</title></rect>
-                  <rect x="68" y="194" width="64" height="40" rx="14" class="body-zone" data-zone="pelvis" onclick="selectZone('pelvis', this)"><title>Pelvic area</title></rect>
-                  <path d="M62,82 Q50,88 48,102 L42,186 Q41,196 50,198 Q59,200 61,190 L70,104 Q72,88 62,82 Z" class="body-zone" data-zone="left_arm" onclick="selectZone('left_arm', this)"><title>Left arm</title></path>
-                  <path d="M138,82 Q150,88 152,102 L158,186 Q159,196 150,198 Q141,200 139,190 L130,104 Q128,88 138,82 Z" class="body-zone" data-zone="right_arm" onclick="selectZone('right_arm', this)"><title>Right arm</title></path>
-                  <ellipse cx="45" cy="212" rx="10" ry="14" class="body-zone" data-zone="left_hand" onclick="selectZone('left_hand', this)"><title>Left hand</title></ellipse>
-                  <ellipse cx="155" cy="212" rx="10" ry="14" class="body-zone" data-zone="right_hand" onclick="selectZone('right_hand', this)"><title>Right hand</title></ellipse>
-                  <path d="M70,228 Q64,300 72,382 Q73,392 83,392 Q92,392 93,382 Q97,308 96,234 Z" class="body-zone" data-zone="left_leg" onclick="selectZone('left_leg', this)"><title>Left leg</title></path>
-                  <path d="M130,228 Q136,300 128,382 Q127,392 117,392 Q108,392 107,382 Q103,308 104,234 Z" class="body-zone" data-zone="right_leg" onclick="selectZone('right_leg', this)"><title>Right leg</title></path>
-                  <rect x="62" y="394" width="34" height="18" rx="9" class="body-zone" data-zone="left_foot" onclick="selectZone('left_foot', this)"><title>Left foot</title></rect>
-                  <rect x="104" y="394" width="34" height="18" rx="9" class="body-zone" data-zone="right_foot" onclick="selectZone('right_foot', this)"><title>Right foot</title></rect>
+                  <ellipse cx="100" cy="36" rx="21" ry="26" class="body-zone" data-zone="head" onclick="selectZone('head', this)" aria-label="Head"><title>Head</title></ellipse>
+                  <rect x="87" y="56" width="26" height="22" rx="9" class="body-zone" data-zone="throat" onclick="selectZone('throat', this)" aria-label="Throat"><title>Throat &amp; neck</title></rect>
+                  <rect x="61" y="76" width="33" height="18" rx="9" class="body-zone" data-zone="shoulder" onclick="selectZone('shoulder', this)" aria-label="Shoulder"><title>Left shoulder</title></rect>
+                  <rect x="106" y="76" width="33" height="18" rx="9" class="body-zone" data-zone="shoulder" onclick="selectZone('shoulder', this)" aria-label="Shoulder"><title>Right shoulder</title></rect>
+                  <rect x="64" y="96" width="72" height="48" rx="14" class="body-zone" data-zone="chest" onclick="selectZone('chest', this)" aria-label="Chest"><title>Chest &amp; lungs</title></rect>
+                  <rect x="66" y="146" width="68" height="46" rx="14" class="body-zone" data-zone="abdomen" onclick="selectZone('abdomen', this)" aria-label="Abdomen"><title>Stomach</title></rect>
+                  <rect x="68" y="194" width="64" height="40" rx="14" class="body-zone" data-zone="pelvis" onclick="selectZone('pelvis', this)" aria-label="Pelvis"><title>Pelvic area</title></rect>
+                  <path d="M62,82 Q50,88 48,102 L42,186 Q41,196 50,198 Q59,200 61,190 L70,104 Q72,88 62,82 Z" class="body-zone" data-zone="left_arm" onclick="selectZone('left_arm', this)" aria-label="Left arm"><title>Left arm</title></path>
+                  <path d="M138,82 Q150,88 152,102 L158,186 Q159,196 150,198 Q141,200 139,190 L130,104 Q128,88 138,82 Z" class="body-zone" data-zone="right_arm" onclick="selectZone('right_arm', this)" aria-label="Right arm"><title>Right arm</title></path>
+                  <ellipse cx="45" cy="212" rx="10" ry="14" class="body-zone" data-zone="left_hand" onclick="selectZone('left_hand', this)" aria-label="Left hand"><title>Left hand</title></ellipse>
+                  <ellipse cx="155" cy="212" rx="10" ry="14" class="body-zone" data-zone="right_hand" onclick="selectZone('right_hand', this)" aria-label="Right hand"><title>Right hand</title></ellipse>
+                  <path d="M70,228 Q64,300 72,382 Q73,392 83,392 Q92,392 93,382 Q97,308 96,234 Z" class="body-zone" data-zone="left_leg" onclick="selectZone('left_leg', this)" aria-label="Left leg"><title>Left leg</title></path>
+                  <path d="M130,228 Q136,300 128,382 Q127,392 117,392 Q108,392 107,382 Q103,308 104,234 Z" class="body-zone" data-zone="right_leg" onclick="selectZone('right_leg', this)" aria-label="Right leg"><title>Right leg</title></path>
+                  <rect x="62" y="394" width="34" height="18" rx="9" class="body-zone" data-zone="left_foot" onclick="selectZone('left_foot', this)" aria-label="Left foot"><title>Left foot</title></rect>
+                  <rect x="104" y="394" width="34" height="18" rx="9" class="body-zone" data-zone="right_foot" onclick="selectZone('right_foot', this)" aria-label="Right foot"><title>Right foot</title></rect>
                 </g>
               </svg>
             </div>
 
             <div class="bodymap-stage">
               <span class="bodymap-stage-title">Back</span>
-              <svg class="bodymap-svg" viewBox="0 0 200 430" role="img" aria-label="Back view body map">
+              <svg class="bodymap-svg" viewBox="0 0 200 430" role="group" aria-label="Back view body map">
                 <title>Back view — tap a body area</title>
                 <g class="body-figure" aria-hidden="true">
                   <ellipse cx="100" cy="36" rx="21" ry="26"/>
@@ -377,21 +379,21 @@
                   <rect x="104" y="394" width="34" height="18" rx="9"/>
                 </g>
                 <g class="body-zones">
-                  <ellipse cx="100" cy="36" rx="21" ry="26" class="body-zone" data-zone="head" onclick="selectZone('head', this)"><title>Head</title></ellipse>
-                  <rect x="87" y="56" width="26" height="22" rx="9" class="body-zone" data-zone="neck_back" onclick="selectZone('neck_back', this)"><title>Back of neck</title></rect>
-                  <rect x="61" y="76" width="33" height="18" rx="9" class="body-zone" data-zone="shoulder" onclick="selectZone('shoulder', this)"><title>Left shoulder</title></rect>
-                  <rect x="106" y="76" width="33" height="18" rx="9" class="body-zone" data-zone="shoulder" onclick="selectZone('shoulder', this)"><title>Right shoulder</title></rect>
-                  <rect x="64" y="96" width="72" height="54" rx="14" class="body-zone" data-zone="back" onclick="selectZone('back', this)"><title>Upper back</title></rect>
-                  <rect x="66" y="152" width="68" height="42" rx="14" class="body-zone" data-zone="lower_back" onclick="selectZone('lower_back', this)"><title>Lower back</title></rect>
-                  <rect x="68" y="196" width="64" height="38" rx="14" class="body-zone" data-zone="pelvis" onclick="selectZone('pelvis', this)"><title>Pelvic area</title></rect>
-                  <path d="M62,82 Q50,88 48,102 L42,186 Q41,196 50,198 Q59,200 61,190 L70,104 Q72,88 62,82 Z" class="body-zone" data-zone="left_arm" onclick="selectZone('left_arm', this)"><title>Left arm</title></path>
-                  <path d="M138,82 Q150,88 152,102 L158,186 Q159,196 150,198 Q141,200 139,190 L130,104 Q128,88 138,82 Z" class="body-zone" data-zone="right_arm" onclick="selectZone('right_arm', this)"><title>Right arm</title></path>
-                  <ellipse cx="45" cy="212" rx="10" ry="14" class="body-zone" data-zone="left_hand" onclick="selectZone('left_hand', this)"><title>Left hand</title></ellipse>
-                  <ellipse cx="155" cy="212" rx="10" ry="14" class="body-zone" data-zone="right_hand" onclick="selectZone('right_hand', this)"><title>Right hand</title></ellipse>
-                  <path d="M70,228 Q64,300 72,382 Q73,392 83,392 Q92,392 93,382 Q97,308 96,234 Z" class="body-zone" data-zone="left_leg" onclick="selectZone('left_leg', this)"><title>Left leg</title></path>
-                  <path d="M130,228 Q136,300 128,382 Q127,392 117,392 Q108,392 107,382 Q103,308 104,234 Z" class="body-zone" data-zone="right_leg" onclick="selectZone('right_leg', this)"><title>Right leg</title></path>
-                  <rect x="62" y="394" width="34" height="18" rx="9" class="body-zone" data-zone="left_foot" onclick="selectZone('left_foot', this)"><title>Left foot</title></rect>
-                  <rect x="104" y="394" width="34" height="18" rx="9" class="body-zone" data-zone="right_foot" onclick="selectZone('right_foot', this)"><title>Right foot</title></rect>
+                  <ellipse cx="100" cy="36" rx="21" ry="26" class="body-zone" data-zone="head" onclick="selectZone('head', this)" aria-label="Head"><title>Head</title></ellipse>
+                  <rect x="87" y="56" width="26" height="22" rx="9" class="body-zone" data-zone="neck_back" onclick="selectZone('neck_back', this)" aria-label="Neck back"><title>Back of neck</title></rect>
+                  <rect x="61" y="76" width="33" height="18" rx="9" class="body-zone" data-zone="shoulder" onclick="selectZone('shoulder', this)" aria-label="Shoulder"><title>Left shoulder</title></rect>
+                  <rect x="106" y="76" width="33" height="18" rx="9" class="body-zone" data-zone="shoulder" onclick="selectZone('shoulder', this)" aria-label="Shoulder"><title>Right shoulder</title></rect>
+                  <rect x="64" y="96" width="72" height="54" rx="14" class="body-zone" data-zone="back" onclick="selectZone('back', this)" aria-label="Back"><title>Upper back</title></rect>
+                  <rect x="66" y="152" width="68" height="42" rx="14" class="body-zone" data-zone="lower_back" onclick="selectZone('lower_back', this)" aria-label="Lower back"><title>Lower back</title></rect>
+                  <rect x="68" y="196" width="64" height="38" rx="14" class="body-zone" data-zone="pelvis" onclick="selectZone('pelvis', this)" aria-label="Pelvis"><title>Pelvic area</title></rect>
+                  <path d="M62,82 Q50,88 48,102 L42,186 Q41,196 50,198 Q59,200 61,190 L70,104 Q72,88 62,82 Z" class="body-zone" data-zone="left_arm" onclick="selectZone('left_arm', this)" aria-label="Left arm"><title>Left arm</title></path>
+                  <path d="M138,82 Q150,88 152,102 L158,186 Q159,196 150,198 Q141,200 139,190 L130,104 Q128,88 138,82 Z" class="body-zone" data-zone="right_arm" onclick="selectZone('right_arm', this)" aria-label="Right arm"><title>Right arm</title></path>
+                  <ellipse cx="45" cy="212" rx="10" ry="14" class="body-zone" data-zone="left_hand" onclick="selectZone('left_hand', this)" aria-label="Left hand"><title>Left hand</title></ellipse>
+                  <ellipse cx="155" cy="212" rx="10" ry="14" class="body-zone" data-zone="right_hand" onclick="selectZone('right_hand', this)" aria-label="Right hand"><title>Right hand</title></ellipse>
+                  <path d="M70,228 Q64,300 72,382 Q73,392 83,392 Q92,392 93,382 Q97,308 96,234 Z" class="body-zone" data-zone="left_leg" onclick="selectZone('left_leg', this)" aria-label="Left leg"><title>Left leg</title></path>
+                  <path d="M130,228 Q136,300 128,382 Q127,392 117,392 Q108,392 107,382 Q103,308 104,234 Z" class="body-zone" data-zone="right_leg" onclick="selectZone('right_leg', this)" aria-label="Right leg"><title>Right leg</title></path>
+                  <rect x="62" y="394" width="34" height="18" rx="9" class="body-zone" data-zone="left_foot" onclick="selectZone('left_foot', this)" aria-label="Left foot"><title>Left foot</title></rect>
+                  <rect x="104" y="394" width="34" height="18" rx="9" class="body-zone" data-zone="right_foot" onclick="selectZone('right_foot', this)" aria-label="Right foot"><title>Right foot</title></rect>
                 </g>
               </svg>
             </div>
@@ -580,13 +582,13 @@
               <h4>Chronic Conditions</h4>
               <div class="tags-container" id="conds-tags"></div>
               <div class="add-field">
-                <input type="text" id="cond-input" placeholder="Add condition (e.g. Hypertension)">
+                <input type="text" id="cond-input" placeholder="Add condition (e.g. Hypertension)" aria-label="Add condition (e.g. Hypertension)">
                 <button class="btn btn-secondary" onclick="addCondition()">Add</button>
               </div>
               <h4>Known Allergies</h4>
               <div class="tags-container" id="allergy-tags"></div>
               <div class="add-field">
-                <input type="text" id="allergy-input" placeholder="Add allergy (e.g. Penicillin)">
+                <input type="text" id="allergy-input" placeholder="Add allergy (e.g. Penicillin)" aria-label="Add allergy (e.g. Penicillin)">
                 <button class="btn btn-secondary" onclick="addAllergy()">Add</button>
               </div>
               <h4>Lifestyle</h4>
@@ -632,7 +634,7 @@
               </div>
               <div class="form-group"><label for="ec-address">Address</label><input type="text" id="ec-address" placeholder="Home or work address"></div>
               <h4>Medical Alert <small style="font-weight:500;color:var(--mist-500);">(for first responders)</small></h4>
-              <div class="form-group"><textarea id="ec-alert" rows="3" placeholder="e.g. Diabetic. Allergic to Penicillin."></textarea></div>
+              <div class="form-group"><textarea id="ec-alert" rows="3" placeholder="e.g. Diabetic. Allergic to Penicillin." aria-label="Emergency medical alert information"></textarea></div>
               <div id="ec-msg" role="alert"></div>
               <button class="btn btn-primary" onclick="saveEmergency()">Save Emergency Contacts</button>
             </div>
@@ -870,7 +872,7 @@
      ══════════════════════════════════════ -->
 <div id="guest-case-modal" class="modal-overlay" style="display:none;">
   <div class="modal-box">
-    <button class="modal-close" onclick="closeGuestCaseModal()" title="Close">&#x2715;</button>
+    <button class="modal-close" onclick="closeGuestCaseModal()" title="Close" aria-label="Close dialog">&#x2715;</button>
     <div class="login-header">
       <img src="logo.png" alt="BisaRx Logo" class="modal-logo">
       <h2>Send to Pharmacist</h2>
@@ -899,7 +901,7 @@
      ══════════════════════════════════════ -->
 <div id="guest-status-modal" class="modal-overlay" style="display:none;">
   <div class="modal-box">
-    <button class="modal-close" onclick="closeGuestStatusModal()" title="Close">&#x2715;</button>
+    <button class="modal-close" onclick="closeGuestStatusModal()" title="Close" aria-label="Close dialog">&#x2715;</button>
     <div class="login-header">
       <img src="logo.png" alt="BisaRx Logo" class="modal-logo">
       <h2>Check Case Status</h2>
@@ -953,7 +955,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <h3>Order for delivery</h3>
-        <button class="modal-close" onclick="closeOrderModal()">&times;</button>
+        <button class="modal-close" onclick="closeOrderModal()" aria-label="Close dialog">&times;</button>
       </div>
       <div class="modal-body">
         <p>Please confirm your delivery details below.</p>
@@ -961,15 +963,15 @@
           Total to pay: <strong id="order-total-display"></strong> — collected securely by Mobile Money (MoMo) after you confirm.
         </div>
         <div class="form-group">
-          <label>Delivery Address</label>
-          <textarea id="order-address" class="form-control" placeholder="Enter your full street address, house number, and landmarks" rows="3"></textarea>
+          <label for="order-address">Delivery Address</label>
+          <textarea id="order-address" class="form-control" placeholder="Enter your full street address, house number, and landmarks" rows="3" aria-label="Enter your full street address, house number, and landmarks"></textarea>
         </div>
         <div class="form-group">
-          <label>Contact Phone</label>
+          <label for="order-phone">Contact Phone</label>
           <input type="tel" id="order-phone" class="form-control" placeholder="e.g. +233 24 000 0000">
         </div>
         <div class="form-group">
-          <label>Delivery Notes (Optional)</label>
+          <label for="order-notes">Delivery Notes (Optional)</label>
           <input type="text" id="order-notes" class="form-control" placeholder="e.g. Leave at the gate">
         </div>
       </div>

@@ -34,7 +34,7 @@
         wrapper = document.createElement('div');
         wrapper.className = 'bisarx-widget-wrapper';
         wrapper.innerHTML = `
-            <div class="bx-window" id="bx-window">
+            <div class="bx-window" id="bx-window" role="region" aria-label="BisaRx symptom chat" inert>
                 <div class="bx-header">
                     <div class="bx-header-info">
                         <div class="bx-header-text">
@@ -42,34 +42,34 @@
                             <span>AI Symptom Triage</span>
                         </div>
                     </div>
-                    <button class="bx-close" id="bx-close">
+                    <button class="bx-close" id="bx-close" aria-label="Close symptom chat">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
                     </button>
                 </div>
-                <div class="bx-messages" id="bx-messages"></div>
+                <div class="bx-messages" id="bx-messages" role="log" aria-live="polite" aria-label="Chat messages"></div>
                 <div class="bx-input-area">
                     <div id="bx-image-preview" style="display:none; margin-bottom: 8px; position:relative;">
-                        <img src="" style="height:60px; border-radius:8px; border:1px solid #ddd;">
-                        <button style="position:absolute; top:-5px; right:-5px; background:red; color:white; border:none; border-radius:50%; width:18px; height:18px; font-size:10px; cursor:pointer;">✕</button>
+                        <img src="" alt="Selected symptom photo" style="height:60px; border-radius:8px; border:1px solid #ddd;">
+                        <button aria-label="Remove symptom photo" style="position:absolute; top:-5px; right:-5px; background:red; color:white; border:none; border-radius:50%; width:18px; height:18px; font-size:10px; cursor:pointer;">✕</button>
                     </div>
                     <div class="bx-input-container">
-                        <button class="bx-btn-icon" id="bx-camera-btn">
+                        <button class="bx-btn-icon" id="bx-camera-btn" aria-label="Upload a symptom photo">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
                         </button>
-                        <button class="bx-btn-icon" id="bx-mic-btn">
+                        <button class="bx-btn-icon" id="bx-mic-btn" aria-label="Dictate symptoms">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
                         </button>
-                        <textarea class="bx-textarea" placeholder="Describe symptoms..." rows="1"></textarea>
-                        <button class="bx-btn-send" id="bx-send-btn">
+                        <textarea class="bx-textarea" aria-label="Describe your symptoms" placeholder="Describe symptoms..." rows="1"></textarea>
+                        <button class="bx-btn-send" id="bx-send-btn" aria-label="Send message">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                         </button>
                     </div>
                 </div>
             </div>
-            <button class="bx-fab" id="bx-fab">
+            <button class="bx-fab" id="bx-fab" aria-label="Open symptom chat" aria-controls="bx-window" aria-expanded="false">
                 <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             </button>
-            <input type="file" id="bx-file-input" style="display:none;" accept="image/*">
+            <input type="file" id="bx-file-input" aria-label="Upload a symptom photo" style="display:none;" accept="image/*">
         `;
         document.body.appendChild(wrapper);
 
@@ -125,6 +125,9 @@
     function toggleWindow() {
         isOpen = !isOpen;
         chatWindow.classList.toggle('open', isOpen);
+        chatWindow.inert = !isOpen;
+        fab.setAttribute('aria-expanded', String(isOpen));
+        (isOpen ? textarea : fab).focus();
     }
 
     async function handleSend() {

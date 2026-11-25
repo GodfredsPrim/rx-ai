@@ -407,3 +407,9 @@
     align-self: flex-end;
   }
 }
+/* Keyboard focus must remain visible inside an embedded host page. */
+.bisarx-widget-wrapper :focus-visible {
+    outline: 3px solid #123b5d;
+    outline-offset: 3px;
+    box-shadow: 0 0 0 3px #fff;
+}

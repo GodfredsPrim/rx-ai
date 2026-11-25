@@ -13,3 +13,6 @@ env2/
 *.sqlite
 *.sqlite-*
 *.log
+.pytest_cache/
+.playwright-cli/
+output/playwright/

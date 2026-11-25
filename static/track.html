@@ -105,6 +105,8 @@
       .card { padding: 24px 18px; }
     }
   </style>
+  <link rel="stylesheet" href="/css/accessibility.css">
+  <script src="/js/accessibility.js" defer></script>
 </head>
 <body>
 <div class="card">
@@ -232,9 +234,9 @@
       <div class="field">
         <label>Order &amp; Pay${d.payment_amount ? ': ' + amount : ''}</label>
         <div class="order-form">
-          <input type="text" id="order-address" placeholder="Delivery address" required>
-          <input type="tel" id="order-phone" placeholder="Phone number (same as used at intake)" required>
-          <textarea id="order-notes" rows="2" placeholder="Delivery notes (optional)"></textarea>
+          <input type="text" id="order-address" placeholder="Delivery address" required aria-label="Delivery address">
+          <input type="tel" id="order-phone" placeholder="Phone number (same as used at intake)" required aria-label="Phone number (same as used at intake)">
+          <textarea id="order-notes" rows="2" placeholder="Delivery notes (optional)" aria-label="Delivery notes (optional)"></textarea>
           <button class="btn-order" id="order-submit-btn" onclick="submitGuestOrder(${d.case_id})">Order &amp; Pay</button>
           <div class="order-error" id="order-error" style="display:none"></div>
         </div>

@@ -292,6 +292,11 @@ final_dataset = load_final_dataset()
 
 # ── Twi translation ─────────────────────────────────────────────────
 def translate_twi_to_english(text: str) -> str | None:
+    """Match a normalized phrase in the local bilingual CSV; None means no match.
+
+    This is exact phrase lookup, not general language detection or translation.
+    Callers preserve unmatched patient text rather than guessing its meaning.
+    """
     normalized = text.strip().lower()
     for pair in twi_dataset:
         if pair["twi"].strip().lower() == normalized:
@@ -410,6 +415,7 @@ def get_relevant_medicine_context(messages: list[dict], limit: int = 5) -> str:
 
 
 def get_relevant_pdf_context(messages: list[dict], limit: int = 3) -> str:
+    """Rank local PDF chunks by user-token overlap and retain page attribution."""
     if not pdf_chunks:
         return ""
     query_text = " ".join(
@@ -1178,7 +1184,12 @@ def process_chat(
 
 # ── streaming helper ─────────────────────────────────────────────────
 def build_system_messages(messages: list[dict], image_data: str | None = None) -> list[dict]:
-    """Build the full messages list (system prompt + history) for streaming endpoints."""
+    """Assemble streaming instructions, retrieved evidence, and translated history.
+
+    The clinical system instructions stay first. Exact CSV matches trigger Twi
+    response instructions; unmatched text is retained. Optional image analysis
+    may call Gemini, but this builder never calls the conversational model.
+    """
     input_language = "en"
     for m in messages:
         if m["role"] == "user" and translate_twi_to_english(m["content"]):

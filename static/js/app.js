@@ -498,6 +498,8 @@ function clearImagePreview() {
 function initializeBodyMapAccessibility() {
   document.querySelectorAll('#panel-bodymap .body-zone').forEach(zone => {
     zone.setAttribute('role', 'button');
+    const title = zone.querySelector('title')?.textContent.trim();
+    if (title) zone.setAttribute('aria-label', title);
     zone.setAttribute('tabindex', '0');
     zone.setAttribute('aria-pressed', 'false');
     zone.addEventListener('keydown', event => {
@@ -1138,15 +1140,15 @@ function _drugRowHtml(caseId, item = { name: '', point: '', price: '' }) {
     <div class="drug-row">
       <div class="dashboard-field drug-name-field">
         <label>Drug Name</label>
-        <input type="text" class="rev-drug-name" placeholder="Enter medication name" value="${escapeHtml(item.name || '')}">
+        <input type="text" class="rev-drug-name" aria-label="Drug name" placeholder="Enter medication name" value="${escapeHtml(item.name || '')}">
       </div>
       <div class="dashboard-field drug-point-field">
         <label>Dosage and Counselling</label>
-        <textarea class="rev-drug-point" placeholder="Dose, duration, counselling points, and follow-up advice" rows="4">${escapeHtml(item.point || '')}</textarea>
+        <textarea class="rev-drug-point" aria-label="Dosage and counselling" placeholder="Dose, duration, counselling points, and follow-up advice" rows="4">${escapeHtml(item.point || '')}</textarea>
       </div>
       <div class="dashboard-field drug-price-field">
         <label>Price (GHS)</label>
-        <input type="number" class="rev-drug-price" min="0" step="0.01" placeholder="0.00" value="${price}" oninput="updateReviewTotal(${caseId})">
+        <input type="number" class="rev-drug-price" aria-label="Price in GHS" min="0" step="0.01" placeholder="0.00" value="${price}" oninput="updateReviewTotal(${caseId})">
       </div>
       <button class="btn btn-danger btn-sm drug-row-remove" onclick="this.parentElement.remove(); updateReviewTotal(${caseId})" aria-label="Remove medication row">&times;</button>
     </div>

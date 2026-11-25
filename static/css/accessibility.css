@@ -1,0 +1,36 @@
+/* Two-tone focus stays visible on both the pale panels and dark navigation. */
+body :is(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid #123b5d;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 3px #fff;
+}
+body .body-zone:focus-visible {
+  stroke: #123b5d;
+  stroke-width: 3px;
+}
+body input::placeholder,
+body textarea::placeholder,
+body textarea.chat-input::placeholder { color: #52636b; opacity: 1; }
+@media (prefers-color-scheme: dark) {
+  body[data-portal] input::placeholder,
+  body[data-portal] textarea::placeholder { color: #b6c8ce; }
+  /* The chat pill keeps a white surface in the existing dark theme. */
+  body[data-portal] textarea.chat-input::placeholder { color: #52636b; }
+  /* Body-map cards retain pale surfaces in the incumbent theme. Keep their
+     text palette paired with those surfaces instead of inheriting dark tokens. */
+  body[data-portal] #panel-bodymap {
+    --mist-900: #0c2029;
+    --mist-800: #172c35;
+    --mist-700: #2c414a;
+    --mist-600: #435b66;
+    --mist-500: #52636b;
+    --mist-400: #52636b;
+    color: #172c35;
+  }
+  body[data-portal] #panel-bodymap .badge { color: #fff; }
+  body[data-portal] .modal-box h2,
+  body[data-portal] .modal-content h3 { color: #e4ecef; }
+}
+@media (forced-colors: active) {
+  body :focus-visible { outline-color: Highlight; }
+}

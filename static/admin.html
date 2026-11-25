@@ -10,6 +10,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css?v=20260710-otp-sales">
   <link rel="stylesheet" href="css/brand-system.css?v=20260710c">
+  <link rel="stylesheet" href="/css/accessibility.css">
+  <script src="/js/accessibility.js" defer></script>
 </head>
 <body data-portal="admin" class="portal-locked">
 <style>
@@ -37,7 +39,7 @@
 <!-- LOGIN MODAL -->
 <div id="login-modal" class="modal-overlay" style="display:none;">
   <div class="modal-box">
-    <button class="modal-close" onclick="closeLoginModal()">&#x2715;</button>
+    <button class="modal-close" onclick="closeLoginModal()" aria-label="Close dialog">&#x2715;</button>
     <div class="login-header">
       <img src="logo.png" alt="BisaRx Logo" class="modal-logo">
       <h2>BisaRx Admin</h2>
@@ -129,16 +131,16 @@
             <h4>Add New Pharmacist</h4>
             <div class="dashboard-form">
               <div class="form-row">
-                <input type="text" id="admin-ph-name" placeholder="Full Name">
-                <input type="text" id="admin-ph-username" placeholder="Username">
+                <input type="text" id="admin-ph-name" placeholder="Full Name" aria-label="Full Name">
+                <input type="text" id="admin-ph-username" placeholder="Username" aria-label="Username">
               </div>
               <div class="form-row">
-                <input type="email" id="admin-ph-email" placeholder="Email">
-                <input type="text" id="admin-ph-license" placeholder="License Number (PH-XXXX)">
+                <input type="email" id="admin-ph-email" placeholder="Email" aria-label="Email">
+                <input type="text" id="admin-ph-license" placeholder="License Number (PH-XXXX)" aria-label="License Number (PH-XXXX)">
               </div>
               <div class="form-row">
-                <input type="tel" id="admin-ph-phone" placeholder="Phone (for SMS case alerts)">
-                <input type="password" id="admin-ph-password" placeholder="Temporary Password">
+                <input type="tel" id="admin-ph-phone" placeholder="Phone (for SMS case alerts)" aria-label="Phone (for SMS case alerts)">
+                <input type="password" id="admin-ph-password" placeholder="Temporary Password" aria-label="Temporary Password">
               </div>
               <button class="btn btn-primary" onclick="createPharmacist()">Create Account</button>
             </div>
