@@ -302,6 +302,9 @@ async function requestOtp(isResend = false) {
   const err = document.getElementById(isResend ? 'otp-err' : 'login-err');
   if (!phone) { if (err) err.innerHTML = '<div class="err">Enter your phone number.</div>'; return; }
   const btn = document.getElementById('btn-send-otp');
+  const resendBtn = document.getElementById('btn-resend-otp');
+  if (btn?.disabled || (isResend && resendBtn?.disabled)) return;
+  if (isResend && resendBtn) resendBtn.disabled = true;
   if (btn) { btn.disabled = true; btn.textContent = 'Sending code…'; }
   try {
     const res = await callApi('/auth/otp/request', 'POST', { phone }, 0);
@@ -319,6 +322,7 @@ async function requestOtp(isResend = false) {
     if (isResend) showToast('A new code has been sent.', 'success');
   } catch (e) {
     if (err) err.innerHTML = `<div class="err">${escapeHtml(e.message)}</div>`;
+    if (isResend && resendBtn) resendBtn.disabled = false;
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Send Verification Code'; }
   }
@@ -334,12 +338,16 @@ async function verifyOtp() {
   try {
     const data = await callApi('/auth/otp/verify', 'POST', { phone, code }, 0);
     localStorage.setItem('token', data.access_token);
+    const session = await callApi('/session');
+    if (session.role !== 'user') {
+      localStorage.removeItem('token');
+      throw new Error('Your session could not be verified. Please request a new code.');
+    }
+    currentSession = session;
+    currentUser = session.display_name || phone;
+    await initApp(session);
     closeLoginModal();
     showToast('Welcome to BisaRx!', 'success');
-    currentSession = await callApi('/session');
-    currentUser = currentSession.display_name || phone;
-    initApp();
-    if (currentSession.role === 'user') _connectPatientWebSocket();
   } catch (e) {
     if (err) err.innerHTML = `<div class="err">${escapeHtml(e.message)}</div>`;
   } finally {
@@ -1474,7 +1482,10 @@ async function initApp(verifiedSession = null) {
       if (b) b.innerHTML = window.FALLBACK_REDFLAGS.map(rf => `<div class="rfbox"><div class="rftitle">⚠️ ${rf.condition}</div>${rf.flags.map(f => `<div class="rfitem">${f}</div>`).join('')}</div>`).join('');
     }
     
-    if (currentSession.role === 'user') loadProfileData();
+    if (currentSession.role === 'user') {
+      loadProfileData();
+      _connectPatientWebSocket();
+    }
     if (currentSession.role === 'pharmacist') { 
       go('pharmacist', document.getElementById('nav-pharmacist')); 
       refreshPharmacistDashboard(); 

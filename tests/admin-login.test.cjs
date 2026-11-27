@@ -8,6 +8,12 @@ function setup(role, portal = 'admin') {
   const elements = Object.fromEntries(['login-pass', 'login-err', 'btn-do-login', 'login-modal'].map(id => [id, { value: 'test-code', style: { display: 'flex' } }]));
   const storage = new Map();
   if (portal === 'pharmacist') elements['login-username'] = { value: 'demo.pharm', dataset: { loginMode: portal } };
+  if (portal === 'patient') {
+    elements['otp-phone'] = { value: '0241234567' };
+    elements['otp-code'] = { value: '123456' };
+    elements['otp-err'] = {};
+    elements['btn-verify-otp'] = {};
+  }
   const requests = [];
   const events = [];
   const context = vm.createContext({
@@ -22,7 +28,7 @@ function setup(role, portal = 'admin') {
   });
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../static/js/app.js'), 'utf8'), context);
   context.events = events;
-  context.expectedRole = portal;
+  context.expectedRole = portal === 'patient' ? 'user' : portal;
   vm.runInContext(`showToast = message => events.push(message);
     initApp = async session => { if (session.role !== expectedRole) throw Error('Wrong role'); events.push('dashboard'); };`, context);
   return { context, elements, requests, storage, events };
@@ -36,6 +42,24 @@ test('admin sign-in verifies a fresh session before opening dashboard and announ
   assert.equal(state.requests.length, 2);
   assert.equal(state.requests[1].options.headers.Authorization, 'Bearer test-token');
   assert.ok(state.requests.every(r => r.options.cache === 'no-store'));
+});
+
+test('patient OTP sign-in verifies the session before welcoming the patient', async () => {
+  const state = setup('user', 'patient');
+  await vm.runInContext('verifyOtp()', state.context);
+  assert.deepEqual(state.events, ['dashboard', 'Welcome to BisaRx!']);
+  assert.equal(state.elements['login-modal'].style.display, 'none');
+  assert.equal(state.requests[0].url, '/api/auth/otp/verify');
+  assert.equal(state.requests.length, 2);
+});
+
+test('patient OTP verification leaves session failures visible', async () => {
+  const state = setup('guest', 'patient');
+  await vm.runInContext('verifyOtp()', state.context);
+  assert.deepEqual(state.events, []);
+  assert.equal(state.elements['login-modal'].style.display, 'flex');
+  assert.match(state.elements['otp-err'].innerHTML, /could not be verified/);
+  assert.equal(state.storage.has('token'), false);
 });
 
 test('pharmacist sign-in verifies session before opening the dashboard', async () => {

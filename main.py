@@ -1083,6 +1083,33 @@ def _moolre_sms_enabled() -> bool:
     return bool(MOOLRE_BASE_URL and MOOLRE_API_VASKEY and MOOLRE_SMS_SENDER_ID)
 
 
+@app.get("/api/admin/integrations/sms")
+def sms_configuration_status(
+    current_admin: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """Report runtime configuration presence without disclosing credentials."""
+    required = {
+        "MOOLRE_BASE_URL": MOOLRE_BASE_URL,
+        "MOOLRE_API_VASKEY": MOOLRE_API_VASKEY,
+        "MOOLRE_SMS_SENDER_ID": MOOLRE_SMS_SENDER_ID,
+        "MOOLRE_SMS_PATH": MOOLRE_SMS_PATH,
+    }
+    return {
+        "provider": "moolre",
+        "configured": all(required.values()),
+        "missing_variables": [key for key, value in required.items() if not value],
+        "sender_id_valid_length": 1 <= len(MOOLRE_SMS_SENDER_ID) <= 11,
+        "eligible_pharmacists_with_phone": db.query(models.Pharmacist).filter(
+            models.Pharmacist.is_verified == True,
+            models.Pharmacist.accepting_cases == True,
+            models.Pharmacist.phone != "",
+            models.Pharmacist.phone != None,
+        ).count(),
+        "provider_delivery_verified": False,
+    }
+
+
 def _moolre_payment_enabled() -> bool:
     return bool(MOOLRE_BASE_URL and MOOLRE_API_USER and MOOLRE_API_PUBKEY and MOOLRE_ACCOUNT_NUMBER)
 
@@ -1106,7 +1133,7 @@ def _moolre_payment_headers() -> dict[str, str]:
 
 
 def _send_moolre_sms(phone: str, message: str) -> dict:
-    phone_number = _normalize_phone(phone)
+    phone_number = _canonical_ghana_phone(phone)
     if not phone_number or not message.strip():
         return {"status": "skipped", "reason": "missing_phone_or_message"}
     if not _moolre_sms_enabled():
@@ -1537,7 +1564,10 @@ def get_profile(current_user: models.User = Depends(auth.get_current_user), db: 
         "allergies": [a.name for a in current_user.allergies],
         "medications": current_user.medications,
         "emergency": current_user.emergency,
-        "prescriptions": current_user.prescriptions,
+        "prescriptions": [
+            schemas.Prescription.model_validate(case).model_dump()
+            for case in current_user.prescriptions
+        ],
     }
 
 
@@ -1998,11 +2028,7 @@ def pharmacist_review_case(
     # Always notify by case_id (covers guests)
     background_tasks.add_task(ws_manager.notify_case, case.id, notification)
 
-    # SMS the results (with the price quote) to any patient who is not online.
-    patient_online = bool(
-        (case.user_id and ws_manager.active_connections.get(case.user_id))
-        or ws_manager.case_connections.get(case.id)
-    )
+    # SMS and portal feedback are independent channels, including for online patients.
     patient_user = case.owner
     patient_phone = (
         (patient_user.phone if patient_user else "")
@@ -2011,7 +2037,7 @@ def pharmacist_review_case(
         or case.delivery_phone
         or ""
     )
-    if not patient_online and patient_phone:
+    if patient_phone:
         currency = case.payment_currency or "GHS"
         if sale_items:
             priced = ", ".join(
@@ -2028,6 +2054,11 @@ def pharmacist_review_case(
                 f"BisaRx (Case #{case.id}): Pharmacist review is ready. "
                 f"Medication: {case.drug_name or 'See pharmacist guidance'}."
             )
+        sms_text += f" Advice: {case.pharmacist_feedback}"
+        if case.referral_advice:
+            sms_text += f" Referral: {case.referral_advice}"
+        if case.follow_up_instructions:
+            sms_text += f" Follow-up: {case.follow_up_instructions}"
         background_tasks.add_task(_send_moolre_sms, patient_phone, sms_text)
 
     return {"status": "success", "case": serialized}

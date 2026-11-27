@@ -184,6 +184,37 @@ Open: [http://localhost:8000](http://localhost:8000)
 
 ## Guest SMS + Payment Integration
 
+### Moolre SMS on Render
+
+In the Render service serving `bisarx-8ym0.onrender.com`, configure:
+
+- `MOOLRE_API_VASKEY`: the key from the Moolre **SMS service**, not a payment key.
+- `MOOLRE_SMS_SENDER_ID`: the exact registered, approved sender ID (maximum 11 characters).
+- `MOOLRE_BASE_URL=https://api.moolre.com`
+- `MOOLRE_SMS_PATH=/open/sms/send`
+- `APP_ENV=production`
+- `FRONTEND_URL`: the public patient portal origin used in SMS links.
+
+Save and redeploy after changing variables. Entries marked `sync: false` in
+`render.yaml` declare required operator input; their presence in that file does
+not confirm that values exist in the live service. Moolre also requires an SMS
+bundle and sender approval.
+
+An authenticated admin can inspect `/api/admin/integrations/sms` for missing
+runtime variable names and the count of verified, available pharmacists with
+phone numbers. The endpoint never returns keys. Configuration presence does
+not prove sender approval, SMS balance, or handset delivery.
+
+Patients request a six-digit code through `/api/auth/otp/request` and verify it
+through `/api/auth/otp/verify`. Codes expire after five minutes. Production
+never returns the code in the response if SMS fails.
+
+New cases alert verified pharmacists who are accepting cases and have a phone
+number, in addition to dashboard updates. Pharmacist feedback is saved to the
+patient's portal, broadcast over its live connection, and sent by SMS even if
+the patient is online. A failed SMS does not discard the portal feedback.
+Long feedback may consume multiple SMS segments.
+
 - Guests can now submit a phone number after AI intake using:
   - `POST /api/cases/{case_id}/guest-contact`
 - When pharmacists complete a guest review, the backend can send SMS updates via MOOLRE.
