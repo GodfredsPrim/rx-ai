@@ -448,11 +448,17 @@ async function doLogin() {
     const endpoint = loginMode === 'pharmacist' ? '/auth/pharmacist/login' : '/auth/login';
     const data = await callApi(endpoint, 'POST', body);
     localStorage.setItem('token', data.access_token);
+    const session = await callApi('/session');
+    const expectedRole = loginMode === 'pharmacist' ? 'pharmacist' : 'user';
+    if (session.role !== expectedRole) {
+      localStorage.removeItem('token');
+      throw new Error('Your session could not be verified. Please sign in again.');
+    }
+    currentSession = session;
     currentUser = username;
+    await initApp(session);
     closeLoginModal();
     showToast('Welcome back!', 'success');
-    const sess = await callApi('/session'); currentSession = sess;
-    initApp();
     if (currentSession.role === 'user') _connectPatientWebSocket();
   } catch (e) { err.innerHTML = `<div class="err">${escapeHtml(e.message)}</div>`; }
   finally { btn.disabled = false; setLoginMode(loginMode); }
