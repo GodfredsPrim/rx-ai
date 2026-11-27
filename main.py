@@ -1083,6 +1083,39 @@ def _moolre_sms_enabled() -> bool:
     return bool(MOOLRE_BASE_URL and MOOLRE_API_VASKEY and MOOLRE_SMS_SENDER_ID)
 
 
+def _is_ghana_phone(phone: str) -> bool:
+    number = _canonical_ghana_phone(phone)
+    return len(number) == 12 and number.startswith("233")
+
+
+def _send_email(recipient: str, subject: str, message: str) -> dict:
+    if not settings.resend_api_key or not settings.email_from:
+        logger.warning("Email delivery skipped: Resend is not configured")
+        return {"status": "skipped", "reason": "not_configured"}
+    try:
+        with httpx.Client(timeout=20) as client:
+            response = client.post("https://api.resend.com/emails", headers={
+                "Authorization": f"Bearer {settings.resend_api_key}",
+                "Idempotency-Key": f"bisarx-{uuid4().hex}",
+            }, json={"from": settings.email_from, "to": [recipient], "subject": subject, "text": message})
+        body = response.json()
+        if response.is_success and body.get("id"):
+            return {"status": "sent", "reference": body["id"]}
+        logger.warning("Resend rejected email: HTTP %s", response.status_code)
+        return {"status": "failed", "status_code": response.status_code}
+    except Exception:
+        logger.warning("Resend email request failed", exc_info=True)
+        return {"status": "error"}
+
+
+@app.get("/api/admin/integrations/email")
+def email_configuration_status(current_admin: models.User = Depends(get_current_admin)):
+    required = {"RESEND_API_KEY": settings.resend_api_key, "EMAIL_FROM": settings.email_from}
+    return {"provider": "resend", "configured": all(required.values()),
+            "missing_variables": [name for name, value in required.items() if not value],
+            "provider_delivery_verified": False}
+
+
 @app.get("/api/admin/integrations/sms")
 def sms_configuration_status(
     current_admin: models.User = Depends(get_current_admin),
@@ -1223,14 +1256,12 @@ def _init_moolre_payment(case: models.PrescriptionHistory, payer_phone: str, pay
 
 
 def _notify_pharmacists_of_new_case(case_id: int) -> None:
-    """SMS every verified, on-duty pharmacist that a new case is waiting.
+    """Alert verified, on-duty pharmacists by Ghana SMS or international email.
 
     Decentralized by design: no admin dispatch step, every pharmacist who has
     opted into accepting_cases is alerted at once and can pick it up first.
     Runs as a background task with its own DB session.
     """
-    if not _moolre_sms_enabled():
-        return
     db = SessionLocal()
     try:
         case = db.query(models.PrescriptionHistory).filter(models.PrescriptionHistory.id == case_id).first()
@@ -1239,7 +1270,6 @@ def _notify_pharmacists_of_new_case(case_id: int) -> None:
         pharmacists = db.query(models.Pharmacist).filter(
             models.Pharmacist.is_verified == True,
             models.Pharmacist.accepting_cases == True,
-            models.Pharmacist.phone != "",
         ).all()
         if not pharmacists:
             return
@@ -1249,7 +1279,10 @@ def _notify_pharmacists_of_new_case(case_id: int) -> None:
             f"Log in to the dashboard to review."
         )
         for pharmacist in pharmacists:
-            _send_moolre_sms(pharmacist.phone, message)
+            if _is_ghana_phone(pharmacist.phone):
+                _send_moolre_sms(pharmacist.phone, message)
+            elif pharmacist.email:
+                _send_email(pharmacist.email, "BisaRx: New case awaiting review", message)
     finally:
         db.close()
 
@@ -1321,12 +1354,75 @@ def _hash_otp(phone: str, code: str) -> str:
     return hashlib.sha256(f"{settings.secret_key}:{phone}:{code}".encode("utf-8")).hexdigest()
 
 
+@app.post("/api/auth/email/otp/request", response_model=schemas.OtpRequestResponse)
+def request_email_otp(payload: schemas.EmailOtpRequest, db: Session = Depends(get_db)):
+    email = str(payload.email).strip().lower()
+    # Namespace email identifiers in the existing challenge table; no schema change.
+    identity = f"email:{email}"
+    recent = db.query(models.OtpCode).filter(
+        models.OtpCode.phone == identity,
+        models.OtpCode.created_at >= datetime.utcnow() - timedelta(minutes=OTP_REQUEST_WINDOW_MINUTES),
+    ).count()
+    if recent >= OTP_MAX_REQUESTS_PER_WINDOW:
+        raise HTTPException(status_code=429, detail="Too many code requests. Please wait a few minutes and try again.")
+    if not settings.resend_api_key or not settings.email_from:
+        raise HTTPException(status_code=503, detail="Email sign-in is not configured yet. Please try again later.")
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    db.query(models.OtpCode).filter(models.OtpCode.phone == identity, models.OtpCode.verified == False).update(
+        {models.OtpCode.verified: True}, synchronize_session=False)
+    challenge = models.OtpCode(phone=identity, code_hash=_hash_otp(identity, code),
+        expires_at=datetime.utcnow() + timedelta(minutes=OTP_TTL_MINUTES), created_at=datetime.utcnow())
+    db.add(challenge)
+    db.commit()
+    result = _send_email(email, "Your BisaRx verification code",
+        f"Your BisaRx verification code is {code}. It expires in {OTP_TTL_MINUTES} minutes. Do not share this code.")
+    if result.get("status") != "sent":
+        challenge.verified = True
+        db.commit()
+        raise HTTPException(status_code=502, detail="Could not send your email. Please try again shortly.")
+    return {"status": "sent", "message": "Verification code sent by email.", "dev_code": None}
+
+
+@app.post("/api/auth/email/otp/verify", response_model=schemas.Token)
+def verify_email_otp(payload: schemas.EmailOtpVerify, db: Session = Depends(get_db)):
+    email = str(payload.email).strip().lower()
+    identity = f"email:{email}"
+    code = payload.code.strip()
+    if not re.fullmatch(r"\d{6}", code):
+        raise HTTPException(status_code=400, detail="Enter the 6-digit code sent to your email.")
+    challenge = db.query(models.OtpCode).filter(models.OtpCode.phone == identity,
+        models.OtpCode.verified == False).order_by(models.OtpCode.id.desc()).first()
+    if not challenge or challenge.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Code expired. Please request a new one.")
+    if challenge.attempts >= OTP_MAX_ATTEMPTS:
+        raise HTTPException(status_code=429, detail="Too many wrong attempts. Please request a new code.")
+    if not hmac.compare_digest(challenge.code_hash, _hash_otp(identity, code)):
+        challenge.attempts += 1
+        db.commit()
+        raise HTTPException(status_code=400, detail="Incorrect code. Please check your email and try again.")
+    challenge.verified = True
+    user = db.query(models.User).filter(func.lower(models.User.email) == email).first()
+    if user and user.is_admin:
+        db.commit()
+        raise HTTPException(status_code=403, detail="Use the admin portal to sign in to this account.")
+    if not user:
+        user = models.User(username=_build_unique_username(db, email.split("@")[0]), email=email,
+            hashed_password=auth.get_password_hash(os.urandom(16).hex()))
+        db.add(user)
+    db.commit()
+    db.refresh(user)
+    _ensure_user_profile_records(db, user.id)
+    return {"access_token": auth.create_access_token(data={"sub": user.email}), "token_type": "bearer"}
+
+
 @app.post("/api/auth/otp/request", response_model=schemas.OtpRequestResponse)
 def request_otp(payload: schemas.OtpRequest, db: Session = Depends(get_db)):
     """Send a one-time sign-in code to the patient's phone via MOOLRE SMS."""
     phone = _canonical_ghana_phone(payload.phone)
     if not phone:
         raise HTTPException(status_code=400, detail="Enter a valid phone number, e.g. 024 123 4567")
+    if not _is_ghana_phone(phone):
+        raise HTTPException(status_code=400, detail="SMS sign-in supports Ghana numbers. Choose email for other countries.")
 
     window_start = datetime.utcnow() - timedelta(minutes=OTP_REQUEST_WINDOW_MINUTES)
     recent = db.query(models.OtpCode).filter(
@@ -2037,7 +2133,7 @@ def pharmacist_review_case(
         or case.delivery_phone
         or ""
     )
-    if patient_phone:
+    if patient_phone and _is_ghana_phone(patient_phone):
         currency = case.payment_currency or "GHS"
         if sale_items:
             priced = ", ".join(
@@ -2060,6 +2156,17 @@ def pharmacist_review_case(
         if case.follow_up_instructions:
             sms_text += f" Follow-up: {case.follow_up_instructions}"
         background_tasks.add_task(_send_moolre_sms, patient_phone, sms_text)
+
+    elif patient_user and patient_user.email and not patient_user.email.endswith("@phone.bisarx"):
+        email_text = (
+            f"Your pharmacist has reviewed case #{case.id}.\n\n"
+            f"{case.pharmacist_feedback or ''}\n\n"
+            f"Medication: {case.drug_name or 'See portal'}\n"
+            f"Referral: {case.referral_advice or 'None'}\n"
+            f"Follow-up: {case.follow_up_instructions or 'See portal'}\n\n"
+            f"View the full review and any price quote: {_get_public_base_url()}"
+        )
+        background_tasks.add_task(_send_email, patient_user.email, "BisaRx: Your pharmacist review", email_text)
 
     return {"status": "success", "case": serialized}
 

@@ -56,6 +56,10 @@
         sync: false
       - key: MOOLRE_API_VASKEY
         sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
       - key: MOOLRE_ACCOUNT_NUMBER
         sync: false
       - key: MOOLRE_SMS_SENDER_ID

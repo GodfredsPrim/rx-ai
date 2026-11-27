@@ -39,6 +39,14 @@ class OtpRequestResponse(BaseModel):
     dev_code: Optional[str] = None  # only populated outside production for local testing
 
 
+class EmailOtpRequest(BaseModel):
+    email: EmailStr
+
+
+class EmailOtpVerify(EmailOtpRequest):
+    code: str
+
+
 class PharmacistCreate(BaseModel):
     username: str
     email: EmailStr

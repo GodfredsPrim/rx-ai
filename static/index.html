@@ -34,28 +34,39 @@
 
     <div class="login-header">
       <img src="logo.png" alt="BisaRx Logo" class="modal-logo">
-      <h2 data-i18n="otp.title">Sign in with your phone</h2>
-      <p data-i18n="otp.subtitle">We&rsquo;ll text you a one-time verification code by SMS</p>
+      <h2>Sign in with a verification code</h2>
+      <p>Choose Ghana SMS or email for other countries.</p>
     </div>
 
-    <p class="auth-mode-help" id="login-mode-help" data-i18n="otp.help">Your phone number is also how your pharmacist reaches you with results.</p>
+    <p class="auth-mode-help" id="login-mode-help">Your pharmacist will send feedback to the same contact.</p>
 
     <!-- Step 1: phone number -->
     <form id="otp-step-phone" onsubmit="event.preventDefault(); requestOtp();">
       <div class="form-group">
+        <label for="otp-channel">Receive your code by</label>
+        <select id="otp-channel" onchange="setOtpChannel()">
+          <option value="sms">SMS — Ghana phone number</option>
+          <option value="email">Email — outside Ghana</option>
+        </select>
+      </div>
+      <div class="form-group" id="otp-phone-group">
         <label for="otp-phone" data-i18n="otp.phoneLabel">Phone Number</label>
         <input type="tel" id="otp-phone" inputmode="tel" placeholder="e.g. 024 123 4567" data-i18n-placeholder="otp.phonePlaceholder" autocomplete="tel" required>
       </div>
+      <div class="form-group" id="otp-email-group" style="display:none;">
+        <label for="otp-email">Email address</label>
+        <input type="email" id="otp-email" autocomplete="email" placeholder="you@example.com" disabled>
+      </div>
       <div id="login-err" role="alert"></div>
       <button type="submit" class="btn btn-primary btn-full" id="btn-send-otp" data-i18n="otp.sendBtn">Send Verification Code</button>
-      <p class="otp-fineprint" data-i18n="otp.fineprint">Standard SMS rates may apply. No password needed.</p>
+      <p class="otp-fineprint">No password needed. For email, check your spam folder too.</p>
     </form>
 
     <!-- Step 2: verification code -->
     <form id="otp-step-code" style="display:none;" onsubmit="event.preventDefault(); verifyOtp();">
       <div class="otp-sent-note">
         <span><span data-i18n="otp.sentTo">Code sent to</span> <strong id="otp-phone-display"></strong></span>
-        <button type="button" class="otp-link-btn" onclick="resetOtpFlow()" data-i18n="otp.changeNumber">Change number</button>
+        <button type="button" class="otp-link-btn" onclick="resetOtpFlow()">Change contact</button>
       </div>
       <div class="form-group">
         <label for="otp-code" data-i18n="otp.codeLabel">6-Digit Code</label>
@@ -930,7 +941,7 @@
 
 <script src="js/config.js"></script>
 <script src="js/ui-core.js?v=20260710"></script>
-<script src="js/app.js?v=20261127-sms-otp"></script>
+<script src="js/app.js?v=20261127-email-otp"></script>
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {

@@ -184,7 +184,30 @@ Open: [http://localhost:8000](http://localhost:8000)
 
 ## Guest SMS + Payment Integration
 
-### Moolre SMS on Render
+### International email sign-in and notifications
+
+Patients outside Ghana choose **Email** in the patient sign-in form. Set
+`RESEND_API_KEY` and `EMAIL_FROM` on Render and redeploy. `EMAIL_FROM` must be
+a sending address on a domain verified in Resend, for example
+`BisaRx <notifications@your-verified-domain.com>`; use your real domain.
+See https://resend.com/docs/dashboard/domains/introduction for verification.
+Never commit the API key or paste it into chat.
+
+Email OTP uses `/api/auth/email/otp/request` and `/api/auth/email/otp/verify`.
+Codes expire in five minutes, are single-use, permit five incorrect attempts,
+and allow at most three requests per destination in ten minutes. Email
+and SMS challenges are separate. Existing patient emails reuse their patient
+account; admin accounts must use the admin portal. Choosing a different email
+from an existing phone-only account creates a separate account, not a merge.
+
+Patients without a Ghana phone number receive feedback by email and in their
+portal. Available, verified pharmacists without a Ghana phone number receive
+new-case alerts at the email saved by the admin. Ghana numbers continue using
+Moolre. Guests must sign in by email for email feedback. Provider acceptance
+does not guarantee inbox delivery. The admin-only endpoint
+`/api/admin/integrations/email` reports configuration presence without secrets.
+
+### Ghana SMS configuration
 
 In the Render service serving `bisarx-8ym0.onrender.com`, configure:
 

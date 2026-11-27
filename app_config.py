@@ -88,6 +88,8 @@ class Settings:
     moolre_payment_callback_url: str = os.getenv("MOOLRE_PAYMENT_CALLBACK_URL", "").strip()
     moolre_payment_redirect_url: str = os.getenv("MOOLRE_PAYMENT_REDIRECT_URL", "").strip()
     moolre_timeout_seconds: float = _as_float("MOOLRE_TIMEOUT_SECONDS", 20.0)
+    resend_api_key: str = os.getenv("RESEND_API_KEY", "").strip()
+    email_from: str = os.getenv("EMAIL_FROM", "").strip()
 
     @property
     def production_safe(self) -> bool:

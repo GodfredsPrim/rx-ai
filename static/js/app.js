@@ -259,6 +259,21 @@ function openLoginModal() {
 
 // ── Phone + OTP sign-in (patient portal) ──────────────────────────────
 let _otpResendTimer = null;
+let _otpDestination = null;
+
+function setOtpChannel() {
+  const emailMode = document.getElementById('otp-channel')?.value === 'email';
+  const phone = document.getElementById('otp-phone');
+  const email = document.getElementById('otp-email');
+  if (phone) { phone.disabled = emailMode; phone.required = !emailMode; }
+  if (email) { email.disabled = !emailMode; email.required = emailMode; }
+  const phoneGroup = document.getElementById('otp-phone-group');
+  const emailGroup = document.getElementById('otp-email-group');
+  if (phoneGroup) phoneGroup.style.display = emailMode ? 'none' : 'block';
+  if (emailGroup) emailGroup.style.display = emailMode ? 'block' : 'none';
+  resetOtpFlow();
+  (emailMode ? email : phone)?.focus();
+}
 
 function _showOtpStep(step) {
   const phoneStep = document.getElementById('otp-step-phone');
@@ -268,6 +283,7 @@ function _showOtpStep(step) {
 }
 
 function resetOtpFlow() {
+  _otpDestination = null;
   if (_otpResendTimer) { clearInterval(_otpResendTimer); _otpResendTimer = null; }
   const codeInput = document.getElementById('otp-code');
   if (codeInput) codeInput.value = '';
@@ -298,19 +314,26 @@ function _startResendCountdown(seconds = 30) {
 }
 
 async function requestOtp(isResend = false) {
-  const phone = document.getElementById('otp-phone')?.value.trim();
+  const emailMode = isResend && _otpDestination
+    ? _otpDestination.channel === 'email' : document.getElementById('otp-channel')?.value === 'email';
+  const contact = isResend && _otpDestination ? _otpDestination.contact
+    : document.getElementById(emailMode ? 'otp-email' : 'otp-phone')?.value.trim();
   const err = document.getElementById(isResend ? 'otp-err' : 'login-err');
-  if (!phone) { if (err) err.innerHTML = '<div class="err">Enter your phone number.</div>'; return; }
+  if (!contact) { if (err) err.innerHTML = `<div class="err">Enter your ${emailMode ? 'email address' : 'phone number'}.</div>`; return; }
   const btn = document.getElementById('btn-send-otp');
   const resendBtn = document.getElementById('btn-resend-otp');
   if (btn?.disabled || (isResend && resendBtn?.disabled)) return;
   if (isResend && resendBtn) resendBtn.disabled = true;
+  const channelInput = document.getElementById('otp-channel');
+  if (channelInput) channelInput.disabled = true;
   if (btn) { btn.disabled = true; btn.textContent = 'Sending code…'; }
   try {
-    const res = await callApi('/auth/otp/request', 'POST', { phone }, 0);
+    const res = await callApi(emailMode ? '/auth/email/otp/request' : '/auth/otp/request', 'POST',
+      emailMode ? { email: contact } : { phone: contact }, 0);
+    _otpDestination = { channel: emailMode ? 'email' : 'sms', contact };
     if (err) err.innerHTML = '';
     const display = document.getElementById('otp-phone-display');
-    if (display) display.textContent = phone;
+    if (display) display.textContent = contact;
     _showOtpStep('code');
     _startResendCountdown();
     const codeInput = document.getElementById('otp-code');
@@ -324,19 +347,23 @@ async function requestOtp(isResend = false) {
     if (err) err.innerHTML = `<div class="err">${escapeHtml(e.message)}</div>`;
     if (isResend && resendBtn) resendBtn.disabled = false;
   } finally {
+    if (channelInput) channelInput.disabled = false;
     if (btn) { btn.disabled = false; btn.textContent = 'Send Verification Code'; }
   }
 }
 
 async function verifyOtp() {
-  const phone = document.getElementById('otp-phone')?.value.trim();
+  const emailMode = _otpDestination?.channel === 'email';
+  const contact = _otpDestination?.contact || document.getElementById('otp-phone')?.value.trim();
   const code = document.getElementById('otp-code')?.value.trim();
   const err = document.getElementById('otp-err');
-  if (!code || code.length !== 6) { if (err) err.innerHTML = '<div class="err">Enter the 6-digit code from the SMS.</div>'; return; }
+  if (!code || code.length !== 6) { if (err) err.innerHTML = '<div class="err">Enter the 6-digit verification code.</div>'; return; }
   const btn = document.getElementById('btn-verify-otp');
+  if (btn?.disabled) return;
   if (btn) { btn.disabled = true; btn.textContent = 'Verifying…'; }
   try {
-    const data = await callApi('/auth/otp/verify', 'POST', { phone, code }, 0);
+    const data = await callApi(emailMode ? '/auth/email/otp/verify' : '/auth/otp/verify', 'POST',
+      emailMode ? { email: contact, code } : { phone: contact, code }, 0);
     localStorage.setItem('token', data.access_token);
     const session = await callApi('/session');
     if (session.role !== 'user') {
@@ -344,7 +371,7 @@ async function verifyOtp() {
       throw new Error('Your session could not be verified. Please request a new code.');
     }
     currentSession = session;
-    currentUser = session.display_name || phone;
+    currentUser = session.display_name || contact;
     await initApp(session);
     closeLoginModal();
     showToast('Welcome to BisaRx!', 'success');
