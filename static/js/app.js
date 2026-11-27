@@ -178,11 +178,17 @@ async function callApi(endpoint, method = 'GET', body = null, retries = 2) {
         const text = await res.text();
         let detail = text;
         try { detail = JSON.parse(text).detail || text; } catch (_) { /* not JSON */ }
-        throw new Error(detail);
+        const error = new Error(typeof detail === 'string' ? detail :
+          Array.isArray(detail) ? detail.map(item => item.msg || 'Invalid input').join('; ') : 'Request failed');
+        error.status = res.status;
+        throw error;
       }
       return await res.json();
     } catch (e) {
       lastError = e;
+      // Only reads may be retried automatically; a lost response to a write can
+      // mean the operation already succeeded (orders, SMS, case creation).
+      if (method !== 'GET' || (e.status && e.status < 500)) break;
       if (attempt < retries) await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 500));
     }
   }
@@ -312,7 +318,7 @@ async function requestOtp(isResend = false) {
     codeInput?.focus();
     if (isResend) showToast('A new code has been sent.', 'success');
   } catch (e) {
-    if (err) err.innerHTML = `<div class="err">${e.message}</div>`;
+    if (err) err.innerHTML = `<div class="err">${escapeHtml(e.message)}</div>`;
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Send Verification Code'; }
   }
@@ -335,7 +341,7 @@ async function verifyOtp() {
     initApp();
     if (currentSession.role === 'user') _connectPatientWebSocket();
   } catch (e) {
-    if (err) err.innerHTML = `<div class="err">${e.message}</div>`;
+    if (err) err.innerHTML = `<div class="err">${escapeHtml(e.message)}</div>`;
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Verify & Sign In'; }
   }
@@ -376,6 +382,11 @@ function setLoginMode(mode = 'user', trigger = null) {
   const passInput = document.getElementById('login-pass');
   // Always set the login mode on the input, even if some UI elements are missing
   if (input) input.dataset.loginMode = mode;
+  if (mode === 'admin' && !input) {
+    if (help) help.textContent = 'Use your configured admin access code or password.';
+    if (submit) submit.textContent = 'Enter Dashboard';
+    return;
+  }
   if (!label || !input || !help || !submit) return;
   if (mode === 'pharmacist') {
     if (usernameGroup) usernameGroup.style.display = '';
@@ -419,7 +430,7 @@ async function doLogin() {
       showToast('Welcome back!', 'success');
       currentSession = await callApi('/session');
       initApp();
-    } catch (e) { err.innerHTML = `<div class="err">${e.message}</div>`; }
+    } catch (e) { err.innerHTML = `<div class="err">${escapeHtml(e.message)}</div>`; }
     finally { btn.disabled = false; setLoginMode(loginMode); }
     return;
   }
@@ -438,7 +449,7 @@ async function doLogin() {
     const sess = await callApi('/session'); currentSession = sess;
     initApp();
     if (currentSession.role === 'user') _connectPatientWebSocket();
-  } catch (e) { err.innerHTML = `<div class="err">${e.message}</div>`; }
+  } catch (e) { err.innerHTML = `<div class="err">${escapeHtml(e.message)}</div>`; }
   finally { btn.disabled = false; setLoginMode(loginMode); }
 }
 

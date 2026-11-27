@@ -986,7 +986,9 @@ def _get_admin_seed_config(db: Session) -> tuple[str, str, str] | None:
     admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
     raw_admin_username = settings.admin_username
     admin_username = _normalize_username(raw_admin_username) if raw_admin_username else ""
-    admin_password = settings.admin_password
+    admin_password = settings.admin_password or settings.admin_access_code
+    if admin_password and not admin_email and not admin_username:
+        admin_username = "admin"
 
     if admin_password:
         if not admin_email and admin_username:
@@ -1298,11 +1300,11 @@ def request_otp(payload: schemas.OtpRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=429, detail="Too many code requests. Please wait a few minutes and try again.")
 
     code = f"{secrets.randbelow(1_000_000):06d}"
-    # Invalidate previous outstanding codes for this phone
+    # Retain request history for rate limiting while invalidating older codes.
     db.query(models.OtpCode).filter(
         models.OtpCode.phone == phone,
         models.OtpCode.verified == False,
-    ).delete(synchronize_session=False)
+    ).update({models.OtpCode.verified: True}, synchronize_session=False)
     db.add(models.OtpCode(
         phone=phone,
         code_hash=_hash_otp(phone, code),
@@ -1414,11 +1416,11 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 @app.post("/api/auth/admin/access", response_model=schemas.Token)
 def admin_access(request: schemas.AdminAccessRequest, db: Session = Depends(get_db)):
     """Admin login is a single shared access code, not username/password."""
-    configured_code = settings.admin_access_code
+    configured_code = settings.admin_access_code or settings.admin_password
     submitted_code = (request.access_code or "").strip()
     if not configured_code:
         raise HTTPException(status_code=500, detail="Admin access code is not configured")
-    if not submitted_code or not hmac.compare_digest(submitted_code, configured_code):
+    if not submitted_code or not hmac.compare_digest(submitted_code.encode("utf-8"), configured_code.encode("utf-8")):
         raise HTTPException(status_code=400, detail="Incorrect access code")
 
     _ensure_admin_account(db)

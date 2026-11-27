@@ -132,6 +132,10 @@ Edit `.env` and set your keys:
 
 - `DEEPSEEK_API_KEY`: Your model API key.
 - `SECRET_KEY`: A long random string for JWT security.
+- `ADMIN_ACCESS_CODE`: Shared credential for the `/admin` portal. If unset,
+  `ADMIN_PASSWORD` is accepted instead. Either setting provisions the admin
+  account; `ADMIN_USERNAME` and `ADMIN_EMAIL` optionally customize its identity.
+  When both credentials are set, the portal requires `ADMIN_ACCESS_CODE`.
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`: For Google Auth integration.
 - `APP_PORT`: Local server port (default `8000`). Change this if `8000` is already in use.
 - `LLM_TIMEOUT_SECONDS`: Timeout for model API calls (default `45`).

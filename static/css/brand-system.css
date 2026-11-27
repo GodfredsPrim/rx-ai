@@ -241,6 +241,8 @@ body.portal-locked .modal-box { max-width: 520px; }
   }
   .app-mobile-header {
     display: flex;
+    position: relative;
+    flex-shrink: 0;
     min-height: var(--mobile-header-h);
     align-items: center;
     justify-content: space-between;
