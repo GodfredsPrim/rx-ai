@@ -166,7 +166,7 @@ async function callApi(endpoint, method = 'GET', body = null, retries = 2) {
   if (body && !(body instanceof URLSearchParams)) headers['Content-Type'] = 'application/json';
   const token = getToken();
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  const opts = { method, headers };
+  const opts = { method, headers, cache: 'no-store' };
   if (body) opts.body = (body instanceof URLSearchParams) ? body.toString() : JSON.stringify(body);
   if (body instanceof URLSearchParams) opts.headers['Content-Type'] = 'application/x-www-form-urlencoded';
   
@@ -425,11 +425,16 @@ async function doLogin() {
       btn.disabled = true; btn.innerHTML = 'Signing in...';
       const data = await callApi('/auth/admin/access', 'POST', { access_code: pass });
       localStorage.setItem('token', data.access_token);
+      const session = await callApi('/session');
+      if (session.role !== 'admin') {
+        localStorage.removeItem('token');
+        throw new Error('Admin session could not be verified. Please sign in again.');
+      }
+      currentSession = session;
       currentUser = 'admin';
+      await initApp(session);
       closeLoginModal();
       showToast('Welcome back!', 'success');
-      currentSession = await callApi('/session');
-      initApp();
     } catch (e) { err.innerHTML = `<div class="err">${escapeHtml(e.message)}</div>`; }
     finally { btn.disabled = false; setLoginMode(loginMode); }
     return;
@@ -1417,11 +1422,15 @@ function captureOAuthTokenFromUrl() {
   window.history.replaceState({}, document.title, cleanedUrl);
 }
 
-async function initApp() {
+async function initApp(verifiedSession = null) {
   showLoading('Initializing...');
   try {
     captureOAuthTokenFromUrl();
-    await fetchSessionContext();
+    if (verifiedSession && typeof verifiedSession.role === 'string') {
+      currentSession = verifiedSession;
+    } else {
+      await fetchSessionContext();
+    }
     cleanupPatientPortalDuplicates();
     cleanupDedicatedPortalLayout();
 

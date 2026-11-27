@@ -27,6 +27,9 @@ def test_admin_configuration_provisions_account(client, monkeypatch, code, passw
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.delenv("ADMIN_EMAIL", raising=False)
     token = headers(client.post("/api/auth/admin/access", json={"access_code": code or password}))
+    guest = client.get("/api/session")
+    assert guest.json()["role"] == "guest"
+    assert guest.headers["cache-control"] == "no-store"
     assert client.get("/api/session", headers=token).json()["role"] == "admin"
     for route in ("dashboard", "stats", "users", "waitlist"):
         assert client.get("/api/admin/" + route, headers=token).status_code == 200

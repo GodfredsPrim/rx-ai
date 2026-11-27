@@ -91,6 +91,16 @@ async def _init_database() -> None:
 
 app.include_router(whatsapp_bot.router)
 
+
+@app.middleware("http")
+async def prevent_api_caching(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["CDN-Cache-Control"] = "no-store"
+        response.headers["Vercel-CDN-Cache-Control"] = "no-store"
+    return response
+
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.secret_key,
