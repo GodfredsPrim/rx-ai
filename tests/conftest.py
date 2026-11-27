@@ -10,7 +10,7 @@ os.environ.update(APP_ENV="test", DATABASE_URL="sqlite://", SECRET_KEY="offline-
 for name in ("DEEPSEEK_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "ABENA_API_KEY",
              "MOOLRE_API_USER", "MOOLRE_API_KEY", "MOOLRE_API_PUBKEY", "MOOLRE_API_VASKEY",
              "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "ADMIN_PASSWORD", "ADMIN_ACCESS_CODE",
-             "RESEND_API_KEY", "EMAIL_FROM"):
+             "GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN", "GMAIL_SENDER"):
     os.environ[name] = ""
 os.environ["DEEPSEEK_API_KEY"] = "offline-test-only"
 

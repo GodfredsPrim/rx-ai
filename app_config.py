@@ -88,8 +88,10 @@ class Settings:
     moolre_payment_callback_url: str = os.getenv("MOOLRE_PAYMENT_CALLBACK_URL", "").strip()
     moolre_payment_redirect_url: str = os.getenv("MOOLRE_PAYMENT_REDIRECT_URL", "").strip()
     moolre_timeout_seconds: float = _as_float("MOOLRE_TIMEOUT_SECONDS", 20.0)
-    resend_api_key: str = os.getenv("RESEND_API_KEY", "").strip()
-    email_from: str = os.getenv("EMAIL_FROM", "").strip()
+    gmail_client_id: str = os.getenv("GMAIL_CLIENT_ID", "").strip()
+    gmail_client_secret: str = os.getenv("GMAIL_CLIENT_SECRET", "").strip()
+    gmail_refresh_token: str = os.getenv("GMAIL_REFRESH_TOKEN", "").strip()
+    gmail_sender: str = os.getenv("GMAIL_SENDER", "").strip()
 
     @property
     def production_safe(self) -> bool:

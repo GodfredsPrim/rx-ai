@@ -56,9 +56,13 @@
         sync: false
       - key: MOOLRE_API_VASKEY
         sync: false
-      - key: RESEND_API_KEY
+      - key: GMAIL_CLIENT_ID
         sync: false
-      - key: EMAIL_FROM
+      - key: GMAIL_CLIENT_SECRET
+        sync: false
+      - key: GMAIL_REFRESH_TOKEN
+        sync: false
+      - key: GMAIL_SENDER
         sync: false
       - key: MOOLRE_ACCOUNT_NUMBER
         sync: false

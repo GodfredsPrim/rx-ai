@@ -14,7 +14,7 @@ import auth
 @pytest.fixture
 def email_delivery(monkeypatch):
     monkeypatch.setattr(main, "settings", replace(main.settings,
-        resend_api_key="test-resend-key", email_from="BisaRx <test@example.com>"))
+        gmail_client_id="test-client", gmail_client_secret="test-secret", gmail_refresh_token="test-refresh", gmail_sender="sender@gmail.com"))
     sender = Mock(return_value={"status": "sent", "reference": "test-email"})
     monkeypatch.setattr(main, "_send_email", sender)
     monkeypatch.setattr(main.secrets, "randbelow", lambda _: 123456)
@@ -97,19 +97,39 @@ def test_email_otp_cannot_sign_in_admin(client, db, email_delivery):
     (200, {"id": "email-123"}, "sent"),
     (403, {"message": "unverified domain"}, "failed"),
 ])
-def test_resend_contract(monkeypatch, status, body, expected):
+def test_gmail_contract(monkeypatch, status, body, expected):
     monkeypatch.setattr(main, "settings", replace(main.settings,
-        resend_api_key="test-key", email_from="BisaRx <test@example.com>"))
+        gmail_client_id="test-client", gmail_client_secret="test-secret", gmail_refresh_token="test-refresh", gmail_sender="sender@gmail.com"))
     factory = MagicMock()
     gateway = factory.return_value.__enter__.return_value
-    gateway.post.return_value = httpx.Response(status, json=body)
+    gateway.post.side_effect = [httpx.Response(200, json={"access_token": "test-access"}), httpx.Response(status, json=body)]
     monkeypatch.setattr(main.httpx, "Client", factory)
     assert main._send_email("patient@example.com", "Test subject", "Test text")["status"] == expected
     args, kwargs = gateway.post.call_args
-    assert args == ("https://api.resend.com/emails",)
-    assert kwargs["headers"]["Authorization"] == "Bearer test-key"
-    assert kwargs["json"]["to"] == ["patient@example.com"]
-    assert kwargs["json"]["text"] == "Test text"
+    assert args == ("https://gmail.googleapis.com/gmail/v1/users/me/messages/send",)
+    assert kwargs["headers"]["Authorization"] == "Bearer test-access"
+    import base64
+    from email import message_from_bytes
+    mail = message_from_bytes(base64.urlsafe_b64decode(kwargs["json"]["raw"]))
+    assert mail["To"] == "patient@example.com"
+    assert mail["From"] == "sender@gmail.com"
+    assert "Test text" in mail.get_payload()
+    refresh_args, refresh_kwargs = gateway.post.call_args_list[0]
+    assert refresh_args == ("https://oauth2.googleapis.com/token",)
+    assert refresh_kwargs["data"]["grant_type"] == "refresh_token"
+
+
+def test_gmail_refresh_failure_does_not_send(monkeypatch):
+    monkeypatch.setattr(main, "settings", replace(main.settings,
+        gmail_client_id="test-client", gmail_client_secret="test-secret",
+        gmail_refresh_token="test-refresh", gmail_sender="sender@gmail.com"))
+    factory = MagicMock()
+    gateway = factory.return_value.__enter__.return_value
+    gateway.post.return_value = httpx.Response(400, json={"error": "invalid_grant"})
+    monkeypatch.setattr(main.httpx, "Client", factory)
+    result = main._send_email("patient@example.com", "Test subject", "Test text")
+    assert result == {"status": "failed", "reason": "authorization_failed"}
+    gateway.post.assert_called_once()
 
 
 def test_international_patient_gets_feedback_by_email_and_portal(client, db, email_delivery, monkeypatch):

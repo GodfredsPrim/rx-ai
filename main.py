@@ -1,6 +1,8 @@
 from pathlib import Path
 from io import BytesIO, StringIO
 import hashlib
+import base64
+from email.message import EmailMessage
 import hmac
 import logging
 import re
@@ -1088,30 +1090,51 @@ def _is_ghana_phone(phone: str) -> bool:
     return len(number) == 12 and number.startswith("233")
 
 
+def _email_configuration() -> dict:
+    return {"GMAIL_CLIENT_ID": settings.gmail_client_id,
+            "GMAIL_CLIENT_SECRET": settings.gmail_client_secret,
+            "GMAIL_REFRESH_TOKEN": settings.gmail_refresh_token,
+            "GMAIL_SENDER": settings.gmail_sender}
+
+
 def _send_email(recipient: str, subject: str, message: str) -> dict:
-    if not settings.resend_api_key or not settings.email_from:
-        logger.warning("Email delivery skipped: Resend is not configured")
+    if not all(_email_configuration().values()):
+        logger.warning("Email delivery skipped: Gmail API is not configured")
         return {"status": "skipped", "reason": "not_configured"}
     try:
         with httpx.Client(timeout=20) as client:
-            response = client.post("https://api.resend.com/emails", headers={
-                "Authorization": f"Bearer {settings.resend_api_key}",
-                "Idempotency-Key": f"bisarx-{uuid4().hex}",
-            }, json={"from": settings.email_from, "to": [recipient], "subject": subject, "text": message})
+            token_response = client.post("https://oauth2.googleapis.com/token", data={
+                "client_id": settings.gmail_client_id,
+                "client_secret": settings.gmail_client_secret,
+                "refresh_token": settings.gmail_refresh_token,
+                "grant_type": "refresh_token",
+            })
+            token = token_response.json().get("access_token")
+            if not token_response.is_success or not token:
+                logger.warning("Gmail authorization failed: HTTP %s", token_response.status_code)
+                return {"status": "failed", "reason": "authorization_failed"}
+            mail = EmailMessage()
+            mail["From"] = settings.gmail_sender
+            mail["To"] = recipient
+            mail["Subject"] = subject
+            mail.set_content(message)
+            raw = base64.urlsafe_b64encode(mail.as_bytes()).decode("ascii")
+            response = client.post("https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+                headers={"Authorization": f"Bearer {token}"}, json={"raw": raw})
         body = response.json()
         if response.is_success and body.get("id"):
             return {"status": "sent", "reference": body["id"]}
-        logger.warning("Resend rejected email: HTTP %s", response.status_code)
+        logger.warning("Gmail rejected email: HTTP %s", response.status_code)
         return {"status": "failed", "status_code": response.status_code}
     except Exception:
-        logger.warning("Resend email request failed", exc_info=True)
+        logger.warning("Gmail email request failed")
         return {"status": "error"}
 
 
 @app.get("/api/admin/integrations/email")
 def email_configuration_status(current_admin: models.User = Depends(get_current_admin)):
-    required = {"RESEND_API_KEY": settings.resend_api_key, "EMAIL_FROM": settings.email_from}
-    return {"provider": "resend", "configured": all(required.values()),
+    required = _email_configuration()
+    return {"provider": "gmail", "configured": all(required.values()),
             "missing_variables": [name for name, value in required.items() if not value],
             "provider_delivery_verified": False}
 
@@ -1365,7 +1388,7 @@ def request_email_otp(payload: schemas.EmailOtpRequest, db: Session = Depends(ge
     ).count()
     if recent >= OTP_MAX_REQUESTS_PER_WINDOW:
         raise HTTPException(status_code=429, detail="Too many code requests. Please wait a few minutes and try again.")
-    if not settings.resend_api_key or not settings.email_from:
+    if not all(_email_configuration().values()):
         raise HTTPException(status_code=503, detail="Email sign-in is not configured yet. Please try again later.")
     code = f"{secrets.randbelow(1_000_000):06d}"
     db.query(models.OtpCode).filter(models.OtpCode.phone == identity, models.OtpCode.verified == False).update(

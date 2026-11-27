@@ -186,12 +186,36 @@ Open: [http://localhost:8000](http://localhost:8000)
 
 ### International email sign-in and notifications
 
-Patients outside Ghana choose **Email** in the patient sign-in form. Set
-`RESEND_API_KEY` and `EMAIL_FROM` on Render and redeploy. `EMAIL_FROM` must be
-a sending address on a domain verified in Resend, for example
-`BisaRx <notifications@your-verified-domain.com>`; use your real domain.
-See https://resend.com/docs/dashboard/domains/introduction for verification.
-Never commit the API key or paste it into chat.
+Patients outside Ghana choose **Email** in the patient sign-in form. Email is
+sent through Gmail API over HTTPS; no custom domain or SMTP connection is needed.
+Use a dedicated Gmail account. Configure these secrets directly in Render:
+`GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, and
+`GMAIL_SENDER` (the authorized Gmail address). Save and redeploy. Do not paste
+tokens or client secrets into chat or commit them. Old Resend variables are unused.
+
+Google setup:
+
+1. Create/select a Google Cloud project and enable **Gmail API**.
+2. Configure Google Auth Platform branding and audience. During testing, add
+   the sending Gmail account as a test user. Testing refresh tokens for Gmail
+   scopes expire after seven days; complete the appropriate production setup
+   before relying on unattended delivery.
+3. Create a Web application OAuth client. Add
+   `https://developers.google.com/oauthplayground` as an authorized redirect URI.
+4. Open Google OAuth Playground, enable **Use your own OAuth credentials** in
+   settings, and enter that client's ID and secret there. Request only
+   `https://www.googleapis.com/auth/gmail.send` and authorize the dedicated Gmail
+   account. Request offline access and exchange the authorization code for tokens.
+5. Copy the refresh token directly into Render as `GMAIL_REFRESH_TOKEN`; copy
+   the client ID/secret into the matching variables. Set `GMAIL_SENDER` to the
+   exact authorized account. A short-lived access token is not a refresh token.
+
+The app refreshes authorization server-side before sending each message. If
+authorization is revoked or expires, email requests fail visibly and need
+reauthorization. No automatic send retry is performed after an ambiguous failure.
+Gmail sending limits apply. A live inbox test is still required after setup.
+See https://developers.google.com/workspace/gmail/api/guides/sending and
+https://developers.google.com/identity/protocols/oauth2/web-server.
 
 Email OTP uses `/api/auth/email/otp/request` and `/api/auth/email/otp/verify`.
 Codes expire in five minutes, are single-use, permit five incorrect attempts,
