@@ -6,7 +6,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && groupadd --system bisarx \
     && useradd --system --gid bisarx --home-dir /app bisarx \
     && mkdir -p /app/data && chown bisarx:bisarx /app/data
-COPY app_config.py auth.py chat_engine.py database.py main.py models.py schemas.py ./
+COPY app_config.py auth.py chat_engine.py database.py main.py models.py schemas.py whatsapp_bot.py ./
 COPY *.csv *.pdf ./
 COPY static ./static
 USER bisarx
