@@ -5,119 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BisaRx - Pharmacist Portal</title>
   <meta name="description" content="BisaRx: Professional medication guidance and clinical review.">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=20260710-otp-sales">
-  <link rel="stylesheet" href="css/brand-system.css?v=20261127-demo">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <link rel="stylesheet" href="/css/accessibility.css">
-  <script src="/js/accessibility.js" defer></script>
+  <script src="/js/accessibility.js?v=20261127-workspace" defer></script>
+<link rel="stylesheet" href="/css/workspace.css?v=20261127-redesign">
+<link rel="stylesheet" href="/css/workspace-glass.css?v=20261127-glass"><script src="/js/workspace.js?v=20261127-glass"></script>
 </head>
 <body data-portal="pharmacist" class="portal-locked">
-<style>
-  body.portal-locked #main-app { display:none; }
-  #portal-gate {
-    min-height:100vh;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    padding:32px;
-    background:radial-gradient(circle at top, rgba(26,122,74,0.12), transparent 48%), linear-gradient(180deg, #f8fbf9 0%, #eef4f1 100%);
-  }
-  body:not(.portal-locked) #portal-gate { display:none; }
-  .portal-gate-card {
-    width:min(100%, 620px);
-    padding:40px 32px;
-    border-radius:28px;
-    background:#ffffff;
-    border:1px solid rgba(15,23,42,0.08);
-    box-shadow:0 24px 60px rgba(15,23,42,0.12);
-    text-align:center;
-  }
-  .portal-gate-card h1 {
-    margin:12px 0;
-    font-size:clamp(2rem,5vw,3rem);
-    line-height:1.05;
-    color:#163120;
-  }
-  .portal-gate-card p {
-    margin:0 auto 20px;
-    max-width:42ch;
-    color:#4b6356;
-  }
-  .portal-gate-actions {
-    display:flex;
-    justify-content:center;
-    gap:12px;
-    flex-wrap:wrap;
-  }
-  /* Dashboard layout — mobile-safe grid */
-  .pharmacist-queue {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
-    gap: 22px;
-    padding: 20px 0;
-    min-width: 0;
-    width: 100%;
-  }
-  .case-card {
-    background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(247,249,248,0.9));
-    border: 1px solid rgba(30,58,48,0.08);
-    border-radius: 24px;
-    padding: clamp(14px, 2.5vw, 22px);
-    box-shadow: 0 16px 40px rgba(16,24,40,0.08);
-    transition: transform 0.25s cubic-bezier(.16,1,.3,1), box-shadow 0.25s;
-    min-width: 0;
-    overflow: hidden;
-    word-wrap: break-word;
-  }
-  .case-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 24px 48px rgba(16,24,40,0.14);
-  }
-  .dashboard-field {
-    margin-bottom: 14px;
-    min-width: 0;
-  }
-  .dashboard-field label {
-    display: block;
-    font-size: 0.72rem;
-    font-weight: 700;
-    color: var(--mist-500);
-    text-transform: uppercase;
-    letter-spacing: .06em;
-    margin-bottom: 4px;
-  }
-  .dashboard-field input, .dashboard-field textarea {
-    width: 100%;
-    padding: 12px 14px;
-    border: 1px solid rgba(30,58,48,0.1);
-    border-radius: 14px;
-    font-size: 0.92rem;
-    background: rgba(255,255,255,0.94);
-    transition: box-shadow .2s, border-color .2s;
-  }
-  .dashboard-field input:focus, .dashboard-field textarea:focus {
-    outline: none;
-    border-color: rgba(30,58,48,0.3);
-    box-shadow: 0 0 0 3px rgba(30,58,48,0.1);
-  }
-  .dashboard-field textarea {
-    min-height: 120px;
-    resize: vertical;
-  }
-  @media (max-width: 640px) {
-    .pharmacist-queue { grid-template-columns: 1fr !important; }
-    .drug-row { grid-template-columns: 1fr !important; }
-    .case-card { padding: 14px; }
-  }
-</style>
+
 
 <!-- LOGIN MODAL -->
 <div id="login-modal" class="modal-overlay" style="display:none;">
   <div class="modal-box">
-    <button class="modal-close" onclick="closeLoginModal()" title="Close" aria-label="Close dialog">&#x2715;</button>
+    <button class="modal-close" onclick="closeLoginModal()" title="Close" aria-label="Close dialog"><span data-icon="close"></span></button>
     <div class="login-header">
       <img src="logo.png" alt="BisaRx Logo" class="modal-logo">
       <h2>BisaRx</h2>
@@ -180,12 +79,9 @@
         <div class="nav-section">
           <a href="#" class="nav-item on" id="nav-pharmacist" onclick="go('pharmacist', this)">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M22 6l-10 7L2 6"/></svg>
-            <span>My Dashboard</span>
+            <span>Case workspace</span>
           </a>
-          <a href="#" class="nav-item" onclick="go('chat', this)">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-            <span>Intake Archive</span>
-          </a>
+
         </div>
       </nav>
       <div class="sidebar-footer">
@@ -196,23 +92,14 @@
     </aside>
 
     <main class="main-content">
-      <!-- Chat Panel (Intake Archive) -->
-      <section class="panel" id="panel-chat">
-        <div class="panel-header">
-          <div class="panel-info">
-            <h2>Patient Intake Archive</h2>
-            <p>Review patient symptom history and AI summaries</p>
-          </div>
-        </div>
-        <div class="messages-container" id="msgs"></div>
-      </section>
+
 
       <!-- Pharmacist Dashboard -->
       <section class="panel on" id="panel-pharmacist">
         <div class="panel-header">
           <div class="panel-info">
-            <h2>Pharmacist Dashboard</h2>
-            <p>Review and fulfill prescription requests</p>
+            <h2>Patient cases</h2>
+            <p>Review intake, provide guidance, and manage your cases.</p>
           </div>
           <div class="panel-badges">
             <span class="badge badge-success">Online</span>
@@ -224,8 +111,8 @@
         </div>
 
         <div class="profile-tabs">
-          <button class="profile-tab ntab on" onclick="showPharmaTab('pending',this)">Pending Cases</button>
-          <button class="profile-tab ntab" onclick="showPharmaTab('assigned',this)">My Active Cases</button>
+          <button class="profile-tab ntab on" onclick="showPharmaTab('pending',this)">Available cases</button>
+          <button class="profile-tab ntab" onclick="showPharmaTab('assigned',this)">Assigned to me</button>
           <button class="profile-tab ntab" onclick="showPharmaTab('completed',this)">Completed</button>
         </div>
 
@@ -258,6 +145,6 @@
 <script>window.BISARX_PORTAL = "pharmacist";</script>
 <script src="js/config.js"></script>
 <script src="js/ui-core.js?v=20260710"></script>
-<script src="js/app.js?v=20261127-pharmacist-session"></script>
+<script src="js/app.js?v=20261127-redesign"></script>
 </body>
 </html>

@@ -5,20 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BisaRx - Patient Portal</title>
   <meta name="description" content="BisaRx: Professional medication guidance, symptom support, multilingual access, and voice-enabled clinical assistance.">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=20260710-otp-sales">
-  <link rel="stylesheet" href="css/brand-system.css?v=20261127-demo">
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#1e3a30">
+  <meta name="theme-color" content="#ffffff">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="BisaRx">
-  <link rel="apple-touch-icon" href="pwa-icon.png">
+  <link rel="icon" href="/logo.png" type="image/png">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <link rel="stylesheet" href="/css/accessibility.css">
-  <script src="/js/accessibility.js" defer></script>
+  <script src="/js/accessibility.js?v=20261127-workspace" defer></script>
+<link rel="stylesheet" href="/css/workspace.css?v=20261127-redesign">
+<link rel="stylesheet" href="/css/workspace-glass.css?v=20261127-glass"><script src="/js/workspace.js?v=20261127-glass"></script>
 </head>
 <body data-portal="patient">
 
@@ -30,7 +26,7 @@
      ══════════════════════════════════════ -->
 <div id="login-modal" class="modal-overlay" style="display:none;">
   <div class="modal-box">
-    <button class="modal-close" onclick="closeLoginModal()" title="Close" aria-label="Close dialog">&#x2715;</button>
+    <button class="modal-close" onclick="closeLoginModal()" title="Close" aria-label="Close dialog"><span data-icon="close"></span></button>
 
     <div class="login-header">
       <img src="logo.png" alt="BisaRx Logo" class="modal-logo">
@@ -38,7 +34,7 @@
       <p>Choose Ghana SMS or email for other countries.</p>
     </div>
 
-    <p class="auth-mode-help" id="login-mode-help">Your pharmacist will send feedback to the same contact.</p>
+    <p class="auth-mode-help" id="login-mode-help">Sign in before chatting. Use a Ghana phone number or email outside Ghana. Pharmacist replies appear in your portal chat.</p>
 
     <!-- Step 1: phone number -->
     <form id="otp-step-phone" onsubmit="event.preventDefault(); requestOtp();">
@@ -188,13 +184,13 @@
 
         <!-- Unauthenticated -->
         <div class="auth-footer" id="auth-footer">
-          <button class="btn-send-pharmacist" onclick="openGuestCaseModal()" id="btn-guest-case" style="margin-bottom:8px;width:100%;background:var(--primary);color:#fff;padding:10px 16px;border:none;border-radius:8px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+          <button class="btn-send-pharmacist" onclick="openLoginModal()" id="btn-guest-case" style="margin-bottom:8px;width:100%;background:var(--primary);color:#fff;padding:10px 16px;border:none;border-radius:8px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.8 2.2c0-.2.2-.4.4-.4h13.6c.2 0 .4.2.4.4v19.6c0 .2-.2.4-.4.4H5.2c-.2 0-.4-.2-.4-.4V2.2z"/><path d="M9 10h6"/><path d="M12 7v6"/></svg>
             <span data-i18n="nav.sendToPharmacist">Send to Pharmacist</span>
           </button>
           <button class="btn-login-link" onclick="openLoginModal()" id="btn-open-login">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-            <span data-i18n="nav.signInPhone">Sign In with Phone</span>
+            <span>Sign in or create an account</span>
           </button>
         </div>
 
@@ -213,10 +209,10 @@
     <main class="main-content" id="main-content">
 
       <!-- ── CHAT PANEL ── -->
-      <section class="panel on" id="panel-chat" aria-labelledby="chat-title">
+      <section class="panel on chat-welcome-state" id="panel-chat" aria-labelledby="chat-title">
         <div class="panel-header">
           <div class="panel-info">
-            <h2 id="chat-title" data-i18n="chat.title">BisaRx Patient Portal</h2>
+            <h2 id="chat-title">BisaRx <span class="chat-title-detail">Assistant</span></h2>
             <p id="chat-sub" data-i18n="chat.subtitle">Professional guidance · Voice enabled · Multilingual support</p>
           </div>
           <div class="panel-badges">
@@ -229,34 +225,11 @@
         <div class="chat-welcome-hero" id="chat-welcome-hero">
           <div class="hero-content">
             <div class="hero-header">
-              <span class="hero-kicker" data-i18n="chat.heroKicker">Clinical Support</span>
-              <h1 data-i18n="chat.heroTitle">How can BisaRx help you today?</h1>
-              <p data-i18n="chat.heroText">Get instant clinical guidance, medication information, and symptom triage from our certified health platform.</p>
+
+              <h1>How can we help you feel better?</h1>
+              <p>A place to understand your symptoms, ask questions, and connect with a pharmacist.</p>
             </div>
-            
-            <div class="hero-grid">
-              <div class="hero-card" onclick="selectVisualSymptom('chat.qFever')">
-                <div class="hero-card-icon">🤒</div>
-                <div class="hero-card-text">
-                  <strong data-i18n="chat.card1Title">Assess Symptoms</strong>
-                  <p data-i18n="chat.card1Text">Track fever, pain, or cough with AI guidance.</p>
-                </div>
-              </div>
-              <div class="hero-card" onclick="go('conditions')">
-                <div class="hero-card-icon">💊</div>
-                <div class="hero-card-text">
-                  <strong data-i18n="chat.card2Title">Medications</strong>
-                  <p data-i18n="chat.card2Text">Check dosages, side effects, and guidance.</p>
-                </div>
-              </div>
-              <div class="hero-card" onclick="go('redflag')">
-                <div class="hero-card-icon">🚨</div>
-                <div class="hero-card-text">
-                  <strong data-i18n="chat.card3Title">Red Flags</strong>
-                  <p data-i18n="chat.card3Text">Identify urgent symptoms that need care.</p>
-                </div>
-              </div>
-            </div>
+
           </div>
         </div>
 
@@ -287,27 +260,22 @@
 
         <!-- Image Preview -->
         <div id="image-preview-container">
-          <img id="image-preview" src="" alt="Image preview">
-          <button class="clear-preview-btn" onclick="clearImagePreview()" aria-label="Clear image">✕</button>
+          <button class="clear-preview-btn" onclick="clearImagePreview()" aria-label="Clear image"></button>
           <div class="image-preview-guidance">Use a clear, well-lit photo. Gemini checks visible features and image quality, not a diagnosis.</div>
         </div>
 
         <!-- Input bar -->
         <div class="chat-input-container">
           <input type="file" id="image-upload" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment" style="display:none;" onchange="handleImageUpload(event)" aria-label="Upload a symptom photo">
-          
+
           <div class="chat-pill">
             <button class="icon-btn voice-btn" id="mic-btn" onclick="toggleVoice()" title="Voice input" aria-label="Toggle voice input">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
             </button>
 
-            <textarea class="chat-input" id="tinput" placeholder="Type a message..." data-i18n-placeholder="chat.placeholder" rows="1" onkeydown="handleKey(event)" oninput="autoResizeTextarea(this)" aria-label="Type your symptoms"></textarea>
+            <textarea class="chat-input" id="tinput" placeholder="Ask about your health…" rows="1" onkeydown="handleKey(event)" oninput="autoResizeTextarea(this)" aria-label="Type your symptoms"></textarea>
 
             <div class="pill-tools">
-              <button class="icon-btn" onclick="document.getElementById('image-upload').click()" title="Attach file" aria-label="Attach file">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2.12 2.12 0 1 1-3-3l9.19-9.19"></path></svg>
-              </button>
-              
               <button class="icon-btn" id="camera-btn" onclick="document.getElementById('image-upload').click()" title="Take photo" aria-label="Upload photo">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
               </button>
@@ -549,15 +517,15 @@
                 <div class="stat-card"><span class="stat-label">Allergies</span><span class="stat-value" id="ov-allergies">0</span></div>
               </div>
               <div class="info-cards">
-                <div class="info-card"><h4>Active Medications</h4><div id="ov-meds-list"><p class="empty">No medications recorded</p></div></div>
-                <div class="info-card"><h4>Known Allergies</h4><div id="ov-allergy-list"><p class="empty">No allergies recorded</p></div></div>
-                <div class="info-card full"><h4>Chronic Conditions</h4><div id="ov-conds-list"><p class="empty">No conditions recorded</p></div></div>
+                <div class="info-card"><h3>Active Medications</h3><div id="ov-meds-list"><p class="empty">No medications recorded</p></div></div>
+                <div class="info-card"><h3>Known Allergies</h3><div id="ov-allergy-list"><p class="empty">No allergies recorded</p></div></div>
+                <div class="info-card full"><h3>Chronic Conditions</h3><div id="ov-conds-list"><p class="empty">No conditions recorded</p></div></div>
               </div>
             </div>
 
             <!-- Personal -->
             <div id="ptab-personal" style="display:none;">
-              <h4>Basic Information</h4>
+              <h3>Basic Information</h3>
               <div class="form-row">
                 <div class="form-group"><label for="p-fname">First Name</label><input type="text" id="p-fname" placeholder="First name"></div>
                 <div class="form-group"><label for="p-lname">Last Name</label><input type="text" id="p-lname" placeholder="Last name"></div>
@@ -572,7 +540,7 @@
                 <div class="form-group"><label for="p-city">City</label><input type="text" id="p-city" placeholder="City"></div>
                 <div class="form-group"><label for="p-ghcard">National / Government ID</label><input type="text" id="p-ghcard" placeholder="Enter ID number"></div>
               </div>
-              <h4>Blood Type</h4>
+              <h3>Blood Type</h3>
               <div class="blood-grid">
                 <button class="blood-btn" onclick="selBlood(this,'A+')">A+</button>
                 <button class="blood-btn" onclick="selBlood(this,'A-')">A-</button>
@@ -590,19 +558,19 @@
 
             <!-- Medical -->
             <div id="ptab-medical" style="display:none;">
-              <h4>Chronic Conditions</h4>
+              <h3>Chronic Conditions</h3>
               <div class="tags-container" id="conds-tags"></div>
               <div class="add-field">
                 <input type="text" id="cond-input" placeholder="Add condition (e.g. Hypertension)" aria-label="Add condition (e.g. Hypertension)">
                 <button class="btn btn-secondary" onclick="addCondition()">Add</button>
               </div>
-              <h4>Known Allergies</h4>
+              <h3>Known Allergies</h3>
               <div class="tags-container" id="allergy-tags"></div>
               <div class="add-field">
                 <input type="text" id="allergy-input" placeholder="Add allergy (e.g. Penicillin)" aria-label="Add allergy (e.g. Penicillin)">
                 <button class="btn btn-secondary" onclick="addAllergy()">Add</button>
               </div>
-              <h4>Lifestyle</h4>
+              <h3>Lifestyle</h3>
               <div class="form-row">
                 <div class="form-group"><label for="p-smoking">Smoking</label><select id="p-smoking"><option value="">Select</option><option>Non-smoker</option><option>Ex-smoker</option><option>Smoker</option></select></div>
                 <div class="form-group"><label for="p-alcohol">Alcohol</label><select id="p-alcohol"><option value="">Select</option><option>None</option><option>Occasional</option><option>Regular</option></select></div>
@@ -614,7 +582,7 @@
 
             <!-- Medications -->
             <div id="ptab-medications" style="display:none;">
-              <h4>Current Medications</h4>
+              <h3>Current Medications</h3>
               <div id="meds-list" class="meds-list"></div>
               <div class="info-card" style="margin-top:16px;">
                 <h4>Add Medication</h4>
@@ -634,7 +602,7 @@
 
             <!-- Emergency -->
             <div id="ptab-emergency" style="display:none;">
-              <h4>Emergency Contact</h4>
+              <h3>Emergency Contact</h3>
               <div class="form-row">
                 <div class="form-group"><label for="ec-name">Full Name</label><input type="text" id="ec-name" placeholder="Alex Morgan"></div>
                 <div class="form-group"><label for="ec-rel">Relationship</label><select id="ec-rel"><option value="">Select</option><option>Spouse</option><option>Parent</option><option>Child</option><option>Sibling</option><option>Friend</option><option>Other</option></select></div>
@@ -644,7 +612,7 @@
                 <div class="form-group"><label for="ec-phone2">Alt Phone</label><input type="tel" id="ec-phone2" placeholder="+44 20 7946 0958"></div>
               </div>
               <div class="form-group"><label for="ec-address">Address</label><input type="text" id="ec-address" placeholder="Home or work address"></div>
-              <h4>Medical Alert <small style="font-weight:500;color:var(--mist-500);">(for first responders)</small></h4>
+              <h3>Medical Alert <small style="font-weight:500;color:var(--mist-500);">(for first responders)</small></h3>
               <div class="form-group"><textarea id="ec-alert" rows="3" placeholder="e.g. Diabetic. Allergic to Penicillin." aria-label="Emergency medical alert information"></textarea></div>
               <div id="ec-msg" role="alert"></div>
               <button class="btn btn-primary" onclick="saveEmergency()">Save Emergency Contacts</button>
@@ -673,11 +641,11 @@
         </div>
         <div class="connect-layout">
           <div class="pharmacists-section">
-            <h4>Available Now</h4>
+            <h3>Available Now</h3>
             <div class="pharmacist-card">
               <div class="pharmacist-avatar" style="background:#e3f2fd;color:#1976d2;">SL</div>
               <div class="pharmacist-info">
-                <h5>Dr. Sofia Laurent</h5>
+                <h4>Dr. Sofia Laurent</h4>
                 <span>Clinical Pharmacist, Telehealth</span>
                 <p>Medication counseling, chronic care support, and treatment reviews.</p>
               </div>
@@ -689,7 +657,7 @@
             <div class="pharmacist-card">
               <div class="pharmacist-avatar" style="background:#e0f7fa;color:#00838f;">DK</div>
               <div class="pharmacist-info">
-                <h5>Daniel Kim, PharmD</h5>
+                <h4>Daniel Kim, PharmD</h4>
                 <span>Hospital Pharmacist, Virtual Care</span>
                 <p>Drug interaction reviews, acute symptom triage, and medication safety.</p>
               </div>
@@ -700,7 +668,7 @@
             </div>
           </div>
           <div class="summary-section">
-            <h4>AI Summary</h4>
+            <h3>AI Summary</h3>
             <div class="summary-card">
               <p id="ai-summary" style="color:var(--mist-500);font-size:.875rem;">Start a consultation and your AI summary will appear here.</p>
               <button class="btn btn-secondary" onclick="copySummary()" style="margin-top:12px;">Copy Summary</button>
@@ -738,142 +706,6 @@
               </div><!-- /panel-content-wrapper -->
 </section>
 
-      <!-- ── CLINICIAN DASHBOARD ── -->
-      <section class="panel" id="panel-pharmacist" aria-labelledby="pharmacist-title">
-        <div class="panel-header">
-          <div class="panel-info">
-            <h2 id="pharmacist-title">Pharmacist Dashboard</h2>
-            <p>Review assigned cases and provide professional guidance</p>
-          </div>
-          <span class="badge badge-success" id="pharmacist-status">Active</span>
-        </div>
-        
-        <!-- Pharmacist Tabs -->
-        <div class="profile-tabs" role="tablist" style="margin-bottom:16px;">
-          <button class="profile-tab ntab on" role="tab" onclick="showPharmaTab('assigned',this)">Assigned Cases</button>
-          <button class="profile-tab ntab" role="tab" onclick="showPharmaTab('completed',this)">Completed</button>
-        </div>
-        
-        <div class="stats-grid" id="pharmacist-stats" style="flex-shrink:0;margin-bottom:16px;">
-          <div class="stat-card stat-card--assigned"><span class="stat-label">Assigned Cases</span><span class="stat-value" id="ph-stat-assigned">0</span></div>
-          <div class="stat-card stat-card--inreview"><span class="stat-label">In Review</span><span class="stat-value" id="ph-stat-inreview">0</span></div>
-          <div class="stat-card stat-card--completed"><span class="stat-label">Completed</span><span class="stat-value" id="ph-stat-completed">0</span></div>
-          <div class="stat-card stat-card--verified"><span class="stat-label">Verification</span><span class="stat-value" id="ph-stat-verified">No</span></div>
-        </div>
-        
-        <!-- Assigned Cases -->
-        <div id="pharma-tab-assigned">
-          <div class="pharmacist-queue-wrapper">
-            <div id="pharmacist-queue" class="pharmacist-queue">
-              <div class="empty">No cases assigned to you yet.</div>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Completed Cases -->
-        <div id="pharma-tab-completed" style="display:none;">
-          <div class="pharmacist-queue-wrapper">
-            <div id="pharmacist-completed" class="pharmacist-queue">
-              <div class="empty">No completed cases yet.</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ── ADMIN DASHBOARD ── -->
-      <section class="panel" id="panel-admin" aria-labelledby="admin-title">
-        <div class="panel-header">
-          <div class="panel-info">
-            <h2 id="admin-title">Admin Dashboard</h2>
-            <p>System management, user oversight, and case assignment</p>
-          </div>
-          <span class="badge badge-primary" id="admin-status-badge">Admin</span>
-        </div>
-        
-        <!-- Admin Tabs -->
-        <div class="profile-tabs" role="tablist" style="margin-bottom:16px;">
-          <button class="profile-tab ntab on" role="tab" onclick="showAdminTab('overview',this)">Overview</button>
-          <button class="profile-tab ntab" role="tab" onclick="showAdminTab('users',this)">Users</button>
-          <button class="profile-tab ntab" role="tab" onclick="showAdminTab('pharmacists',this)">Pharmacists</button>
-          <button class="profile-tab ntab" role="tab" onclick="showAdminTab('cases',this)">Cases</button>
-        </div>
-        
-        <!-- Overview Tab -->
-        <div id="admin-tab-overview">
-          <div class="dashboard-banner admin-banner" style="flex-shrink:0; margin-bottom:16px;">
-            <div>
-              <span class="hero-kicker">System Overview</span>
-              <h3>Monitor platform activity and manage resources.</h3>
-              <p>View statistics, manage users, assign cases to pharmacists, and oversee the entire system.</p>
-            </div>
-          </div>
-          <div class="stats-grid" id="admin-stats" style="flex-shrink:0;margin-bottom:16px;">
-            <div class="stat-card"><span class="stat-label">Total Users</span><span class="stat-value" id="admin-total-users">0</span></div>
-            <div class="stat-card"><span class="stat-label">Pharmacists</span><span class="stat-value" id="admin-total-pharmacists">0</span></div>
-            <div class="stat-card"><span class="stat-label">Pending Cases</span><span class="stat-value" id="admin-pending-cases">0</span></div>
-            <div class="stat-card"><span class="stat-label">In Review</span><span class="stat-value" id="admin-inreview-cases">0</span></div>
-            <div class="stat-card"><span class="stat-label">Completed</span><span class="stat-value" id="admin-completed-cases">0</span></div>
-            <div class="stat-card"><span class="stat-label">Verified Pharmacists</span><span class="stat-value" id="admin-verified-pharmacists">0</span></div>
-          </div>
-        </div>
-        
-        <!-- Users Tab -->
-        <div id="admin-tab-users" style="display:none;">
-          <div class="admin-users-wrapper">
-            <h4 style="margin-bottom:12px;">Registered Users</h4>
-            <div id="admin-users-list" class="users-list">
-              <div class="empty">Loading users...</div>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Pharmacists Tab -->
-        <div id="admin-tab-pharmacists" style="display:none;">
-          <div class="admin-pharmacists-wrapper">
-            <div class="admin-section">
-              <h4>Create Pharmacist</h4>
-              <div class="form-card">
-                <div class="dashboard-form">
-                  <div class="form-row">
-                    <div class="form-group"><label for="admin-ph-name">Full Name</label><input type="text" id="admin-ph-name" placeholder="Dr. Ama Mensah"></div>
-                    <div class="form-group"><label for="admin-ph-username">Username</label><input type="text" id="admin-ph-username" placeholder="amapharm"></div>
-                  </div>
-                  <div class="form-row">
-                    <div class="form-group"><label for="admin-ph-email">Email</label><input type="email" id="admin-ph-email" placeholder="pharmacist@example.com"></div>
-                    <div class="form-group"><label for="admin-ph-license">License Number</label><input type="text" id="admin-ph-license" placeholder="PH-0001"></div>
-                  </div>
-                  <div class="form-row">
-                    <div class="form-group"><label for="admin-ph-location">Location</label><input type="text" id="admin-ph-location" placeholder="Accra Central"></div>
-                    <div class="form-group"><label for="admin-ph-password">Temporary Password</label><input type="password" id="admin-ph-password" placeholder="Create password"></div>
-                  </div>
-                  <div class="form-row">
-                    <div class="form-group"><label for="admin-ph-phone">Phone</label><input type="tel" id="admin-ph-phone" placeholder="For SMS case alerts"></div>
-                  </div>
-                  <div id="admin-ph-msg" role="alert"></div>
-                  <button class="btn btn-primary" onclick="createPharmacist()">Create Pharmacist Account</button>
-                </div>
-              </div>
-            </div>
-            <div class="admin-section">
-              <h4>Pharmacist Management</h4>
-              <div class="list-card">
-                <div id="admin-pharmacists-list" class="admin-list"><div class="empty">No pharmacists found.</div></div>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Cases Tab -->
-        <div id="admin-tab-cases" style="display:none;">
-          <div class="admin-section">
-            <h4>Case Operations - Assign to Pharmacists</h4>
-            <div class="list-card">
-              <div id="admin-cases-list" class="admin-list"><div class="empty">No cases available.</div></div>
-            </div>
-          </div>
-        </div>
-      </section>
-
     </main><!-- /main-content -->
   </div><!-- /app-container -->
 </div><!-- /main-app -->
@@ -881,67 +713,9 @@
 <!-- ══════════════════════════════════════
      GUEST CASE MODAL
      ══════════════════════════════════════ -->
-<div id="guest-case-modal" class="modal-overlay" style="display:none;">
-  <div class="modal-box">
-    <button class="modal-close" onclick="closeGuestCaseModal()" title="Close" aria-label="Close dialog">&#x2715;</button>
-    <div class="login-header">
-      <img src="logo.png" alt="BisaRx Logo" class="modal-logo">
-      <h2>Send to Pharmacist</h2>
-      <p>Submit your case for review - no account needed</p>
-    </div>
-    <div class="disclaimer-banner" style="margin-bottom:14px;">
-      <strong>Note:</strong> Your case will be reviewed by a licensed pharmacist. You can check your case status using the case ID.
-    </div>
-    <form id="form-guest-case" onsubmit="event.preventDefault(); submitGuestCase();">
-      <div class="form-row">
-        <div class="form-group"><label for="guest-fname">First Name</label><input type="text" id="guest-fname" placeholder="First name" required></div>
-        <div class="form-group"><label for="guest-lname">Last Name</label><input type="text" id="guest-lname" placeholder="Last name" required></div>
-      </div>
-      <div class="form-group"><label for="guest-phone">Phone Number</label><input type="tel" id="guest-phone" placeholder="+233 55 123 4567" required></div>
-      <div class="form-group"><label for="guest-email">Email (optional)</label><input type="email" id="guest-email" placeholder="your@email.com"></div>
-      <div class="form-group"><label for="guest-symptoms">Your Symptoms</label><textarea id="guest-symptoms" rows="3" placeholder="Describe what you're experiencing..." required></textarea></div>
-      <div class="form-group"><label for="guest-message">Additional Message</label><textarea id="guest-message" rows="2" placeholder="Any other information you'd like to share..."></textarea></div>
-      <div id="guest-case-msg" role="alert"></div>
-      <button type="submit" class="btn btn-primary btn-full">Submit Case</button>
-    </form>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════
-     GUEST CASE STATUS MODAL
-     ══════════════════════════════════════ -->
-<div id="guest-status-modal" class="modal-overlay" style="display:none;">
-  <div class="modal-box">
-    <button class="modal-close" onclick="closeGuestStatusModal()" title="Close" aria-label="Close dialog">&#x2715;</button>
-    <div class="login-header">
-      <img src="logo.png" alt="BisaRx Logo" class="modal-logo">
-      <h2>Check Case Status</h2>
-    </div>
-    <form id="form-guest-status" onsubmit="event.preventDefault(); checkGuestCaseStatus();">
-      <div class="form-group"><label for="guest-case-id">Case ID</label><input type="number" id="guest-case-id" placeholder="Enter your case ID" required></div>
-      <div id="guest-status-msg" role="alert"></div>
-      <button type="submit" class="btn btn-primary btn-full">Check Status</button>
-    </form>
-    <div id="guest-status-result" style="margin-top:16px;display:none;">
-      <div class="case-card">
-        <div class="case-header">
-          <span class="case-user">Case #<span id="gsr-case-id"></span></span>
-          <span class="case-time" id="gsr-created-at"></span>
-        </div>
-        <div class="case-details"><strong>Status:</strong> <span id="gsr-status"></span></div>
-        <div class="case-details"><strong>Follow-up:</strong> <span id="gsr-follow-up"></span></div>
-        <div class="case-details" id="gsr-drug-section"><strong>Medication:</strong> <span id="gsr-drug"></span></div>
-        <div class="case-details" id="gsr-advice-section"><strong>Pharmacist Advice:</strong> <span id="gsr-advice"></span></div>
-        <div class="case-details" id="gsr-referral-section"><strong>Referral:</strong> <span id="gsr-referral"></span></div>
-        <div class="case-details" id="gsr-followup-section"><strong>Follow-up Instructions:</strong> <span id="gsr-followup"></span></div>
-      </div>
-    </div>
-  </div>
-</div>
-
 <script src="js/config.js"></script>
 <script src="js/ui-core.js?v=20260710"></script>
-<script src="js/app.js?v=20261127-email-otp"></script>
+<script src="js/app.js?v=20261127-redesign"></script>
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {

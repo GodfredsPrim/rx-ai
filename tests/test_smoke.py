@@ -31,7 +31,7 @@ class FrontendContractTests(unittest.TestCase):
             html = (STATIC / filename).read_text(encoding="utf-8")
             with self.subTest(filename=filename):
                 self.assertLess(html.index("js/ui-core.js"), html.index("js/app.js"))
-                self.assertIn("css/brand-system.css", html)
+                self.assertIn("css/workspace.css", html)
 
     def test_markdown_renderer_has_allowlist_and_safe_links(self):
         source = (STATIC / "js" / "ui-core.js").read_text(encoding="utf-8")

@@ -1,8 +1,8 @@
 (function() {
     // --- Widget Configuration ---
     const scriptTag = document.currentScript;
-    const API_BASE = scriptTag ? scriptTag.getAttribute('data-api-url') : 'https://bisarx-8ym0.onrender.com';
-    const CSS_URL = `${API_BASE}/css/bisarx-widget.css`;
+    const API_BASE = scriptTag?.getAttribute('data-api-url') || window.location.origin;
+    const CSS_URL = `${API_BASE}/css/widget-workspace.css?v=20261127-redesign`;
 
     // --- State ---
     let isOpen = false;
@@ -49,7 +49,7 @@
                 <div class="bx-messages" id="bx-messages" role="log" aria-live="polite" aria-label="Chat messages"></div>
                 <div class="bx-input-area">
                     <div id="bx-image-preview" style="display:none; margin-bottom: 8px; position:relative;">
-                        <img src="" alt="Selected symptom photo" style="height:60px; border-radius:8px; border:1px solid #ddd;">
+                        <img alt="Selected symptom photo" style="height:60px; border-radius:8px; border:1px solid #ddd;">
                         <button aria-label="Remove symptom photo" style="position:absolute; top:-5px; right:-5px; background:red; color:white; border:none; border-radius:50%; width:18px; height:18px; font-size:10px; cursor:pointer;">✕</button>
                     </div>
                     <div class="bx-input-container">
@@ -131,6 +131,11 @@
     }
 
     async function handleSend() {
+        if (!localStorage.getItem('token')) {
+            if (typeof window.openLoginModal === 'function') window.openLoginModal();
+            else window.location.assign(`${API_BASE}/`);
+            return;
+        }
         const text = textarea.value.trim();
         if (!text && !selectedImage) return;
 
@@ -148,12 +153,18 @@
         try {
             const response = await fetch(`${API_BASE}/api/chat`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
                 body: JSON.stringify({
                     messages: chatHistory,
                     image_data: currentSelectedImage
                 })
             });
+            if (response.status === 401) {
+                localStorage.removeItem('token');
+                addBotMessage('Please sign in to continue chatting.');
+                return;
+            }
+            if (!response.ok) throw new Error('Chat request failed');
             const data = await response.json();
             
             if (data.reply) {
@@ -164,7 +175,7 @@
             if (data.case_id && !currentCaseId) {
                 currentCaseId = data.case_id;
                 addBotMessage(`Your case has been sent to a licensed pharmacist (Case ID: ${data.case_id}). I'll notify you here when they respond.`);
-                promptGuestPhone(data.case_id);
+
                 connectWebSocket(data.case_id);
             }
         } catch (err) {
@@ -229,7 +240,7 @@
         try {
             await fetch(`${API_BASE}/api/cases/${caseId}/guest-contact`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
                 body: JSON.stringify({ phone: phone.trim() }),
             });
             addBotMessage('Phone number saved. We will send SMS updates for your case.');

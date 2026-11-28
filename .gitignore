@@ -1,5 +1,7 @@
 node_modules/
 .env
+.env.gmail.setup
+.gmail-client.json
 .claude/
 data.sqlite
 data.sqlite-*
@@ -16,3 +18,7 @@ env2/
 .pytest_cache/
 .playwright-cli/
 output/playwright/
+output/redesign-preview/
+
+.env.docker
+.vercel/

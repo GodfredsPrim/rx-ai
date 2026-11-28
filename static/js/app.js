@@ -134,14 +134,14 @@ const LANGS = {
 };
 
 const ZONES = {
-  head: { title: 'Head & Brain', icon: '🧠', sub: 'Headache, dizziness, fever, vision changes', simple: 'Head pain or dizziness', q: 'I have pain in my head. Please assess.' },
-  throat: { title: 'Throat & Neck', icon: '🦒', sub: 'Sore throat, difficulty swallowing, neck stiffness', simple: 'Throat or neck problem', q: 'I have throat or neck discomfort. Please assess.' },
-  chest: { title: 'Chest & Lungs', icon: '🫁', sub: 'Cough, shortness of breath, chest pain', simple: 'Chest pain or breathing problem', q: 'I have chest pain or breathing difficulty. Please assess.' },
-  abdomen: { title: 'Stomach', icon: '🍕', sub: 'Stomach pain, nausea, vomiting, diarrhea', simple: 'Stomach or belly pain', q: 'I have abdominal pain or stomach discomfort. Please assess.' },
-  arm: { title: 'Arms & Joints', icon: '💪', sub: 'Arm pain, joint swelling, muscle aches', simple: 'Arm or joint pain', q: 'I have pain in my arms or joints. Please assess.' },
-  lower: { title: 'Lower Abdomen', icon: '🧬', sub: 'Lower cramps, urinary problems, menstrual pain', simple: 'Lower belly or urine problem', q: 'I have lower abdominal or urinary symptoms. Please assess.' },
-  leg: { title: 'Legs', icon: '🦵', sub: 'Leg pain, swelling, muscle weakness', simple: 'Leg pain or swelling', q: 'I have pain or swelling in my legs. Please assess.' },
-  foot: { title: 'Feet & Ankles', icon: '🦶', sub: 'Foot pain, ankle swelling, wounds', simple: 'Foot pain or wound', q: 'I have pain or wounds in my feet. Please assess.' }
+  head: { title: 'Head & Brain', icon: '', sub: 'Headache, dizziness, fever, vision changes', simple: 'Head pain or dizziness', q: 'I have pain in my head. Please assess.' },
+  throat: { title: 'Throat & Neck', icon: '', sub: 'Sore throat, difficulty swallowing, neck stiffness', simple: 'Throat or neck problem', q: 'I have throat or neck discomfort. Please assess.' },
+  chest: { title: 'Chest & Lungs', icon: '', sub: 'Cough, shortness of breath, chest pain', simple: 'Chest pain or breathing problem', q: 'I have chest pain or breathing difficulty. Please assess.' },
+  abdomen: { title: 'Stomach', icon: '', sub: 'Stomach pain, nausea, vomiting, diarrhea', simple: 'Stomach or belly pain', q: 'I have abdominal pain or stomach discomfort. Please assess.' },
+  arm: { title: 'Arms & Joints', icon: '', sub: 'Arm pain, joint swelling, muscle aches', simple: 'Arm or joint pain', q: 'I have pain in my arms or joints. Please assess.' },
+  lower: { title: 'Lower Abdomen', icon: '', sub: 'Lower cramps, urinary problems, menstrual pain', simple: 'Lower belly or urine problem', q: 'I have lower abdominal or urinary symptoms. Please assess.' },
+  leg: { title: 'Legs', icon: '', sub: 'Leg pain, swelling, muscle weakness', simple: 'Leg pain or swelling', q: 'I have pain or swelling in my legs. Please assess.' },
+  foot: { title: 'Feet & Ankles', icon: '', sub: 'Foot pain, ankle swelling, wounds', simple: 'Foot pain or wound', q: 'I have pain or wounds in my feet. Please assess.' }
 };
 
 function playLoudNotification(force = false) {
@@ -530,7 +530,13 @@ function handleImageUpload(event) {
   reader.onload = function(e) {
     currentImageData = e.target.result;
     const previewContainer = document.getElementById('image-preview-container');
-    const previewImg = document.getElementById('image-preview');
+    let previewImg = document.getElementById('image-preview');
+    if (!previewImg && previewContainer) {
+      previewImg = document.createElement('img');
+      previewImg.id = 'image-preview';
+      previewImg.alt = 'Selected symptom photo';
+      previewContainer.prepend(previewImg);
+    }
     
     if (previewImg) previewImg.src = currentImageData;
     if (previewContainer) {
@@ -769,7 +775,7 @@ function newChat() {
 
 function _showGreeting() {
     if (_chatGreetingShown) return;
-    addMsg('ai', LANGS[lang].greeting, [{ t: 'BisaRx', c: 'g' }, { t: 'BisaRx Assistant', c: 'b' }, { t: 'Multilingual', c: 'a' }]);
+    updateChatWelcomeState();
     _chatGreetingShown = true;
 }
 
@@ -782,10 +788,18 @@ function updateChatWelcomeState() {
   // We show the hero when there are NO messages.
   // The first AI greeting will trigger the transition to the chat state.
   const isWelcome = items.length === 0;
+  const composer = panel.querySelector('.chat-input-container');
+  const previousTop = composer?.getBoundingClientRect().top;
+  const leavingWelcome = panel.classList.contains('chat-welcome-state') && !isWelcome;
   panel.classList.toggle('chat-welcome-state', isWelcome);
   
   const hero = document.getElementById('chat-welcome-hero');
   if (hero) hero.style.display = isWelcome ? 'flex' : 'none';
+  if (leavingWelcome && composer?.animate && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const delta = previousTop - composer.getBoundingClientRect().top;
+    composer.animate([{transform:`translateY(${delta}px)`},{transform:'translateY(0)'}],
+      {duration:320,easing:'cubic-bezier(.16,1,.3,1)'});
+  }
 }
 
 // PWA Install Logic
@@ -850,7 +864,7 @@ function _renderQuoteTable(rx) {
   const total = Number(rx.payment_amount) || items.reduce((s, i) => s + (Number(i.price) || 0), 0);
   return `
     <div class="quote-table">
-      <div class="quote-title">💊 Pharmacy Price Quote</div>
+      <div class="quote-title"> Pharmacy Price Quote</div>
       ${rows}
       ${total ? `<div class="quote-row quote-total"><span>Total</span><span>${currency} ${total.toFixed(2)}</span></div>` : ''}
     </div>`;
@@ -886,11 +900,11 @@ function renderPrescriptionHistory(rxArray = []) {
               <a class="btn btn-primary btn-sm" href="${rx.payment_url}" target="_blank" rel="noopener">Complete MoMo Payment</a>
             </div>
           ` : ''}
-          ${rx.payment_status === 'paid' ? '<span class="rx-status-badge status-paid">✓ Paid via Mobile Money</span>' : ''}
+          ${rx.payment_status === 'paid' ? '<span class="rx-status-badge status-paid"> Paid via Mobile Money</span>' : ''}
 
           ${['Ordered', 'Dispatched', 'Delivered'].includes(rx.status) ? `
             <div class="delivery-info">
-              <p>📍 <strong>Delivery Address:</strong> ${rx.delivery_address || 'N/A'}</p>
+              <p> <strong>Delivery Address:</strong> ${rx.delivery_address || 'N/A'}</p>
               <div class="delivery-progress">
                 <div class="progress-step ${['Ordered', 'Dispatched', 'Delivered'].includes(rx.status) ? 'active' : ''}">Ordered</div>
                 <div class="progress-step ${['Dispatched', 'Delivered'].includes(rx.status) ? 'active' : ''}">Dispatched</div>
@@ -940,9 +954,17 @@ function _addTypingIndicator() {
 }
 
 async function send() {
+  if (currentSession.role !== 'user') {
+    openLoginModal();
+    setPatientAuthPrompt('Sign in before chatting. Use a Ghana phone number or email outside Ghana. Pharmacist replies appear here in your portal chat.');
+    return;
+  }
   const input = document.getElementById('tinput');
+  const sendButton = document.getElementById('send-btn');
+  if (sendButton?.disabled) return;
   const text = input.value.trim();
   if (!text) return;
+  if (sendButton) sendButton.disabled = true;
 
   input.value = '';
   input.style.height = 'auto';
@@ -977,9 +999,17 @@ async function send() {
       promptGuestContact(res.case_id);
     }
   } catch (e) {
-    addMsg('ai', 'Error connecting to brain. Please try again.');
+    if (e.status === 401) {
+      localStorage.removeItem('token');
+      currentSession = { role: 'guest' };
+      stopPatientReportSync();
+      input.value = text;
+      openLoginModal();
+      setPatientAuthPrompt('Your session expired. Sign in to continue chatting.');
+    } else addMsg('ai', 'Unable to send your message. Please try again.');
   } finally {
     if (typingEl) typingEl.remove();
+    if (sendButton) sendButton.disabled = false;
   }
 }
 
@@ -1003,7 +1033,7 @@ function addMsg(role, text, tags = []) {
   const avatar = `<div class="av ${isAi ? 'ai' : 'u'}">${isAi ? 'Rx' : 'Me'}</div>`;
   const bubble = `
     <div class="bub ${isAi ? 'ai' : 'u'}">
-      <div class="bub-text">${text}</div>
+      <div class="bub-text">${isAi ? renderMarkdown(text) : escapeHtml(text)}</div>
       ${tags.length ? `<div class="tags" style="margin-top:10px;">${tags.map(t => `<span class="tag ${t.c}">${t.t}</span>`).join('')}</div>` : ''}
     </div>
   `;
@@ -1125,7 +1155,7 @@ function renderPharmaQueue(id, cases = [], mode = 'pending') {
   if (!el) return;
   el.innerHTML = cases.length ? cases.map(cs => {
     const patientName = _renderPatientName(cs);
-    const patientPhone = cs.patient?.phone ? `<span class="case-phone">📞 ${cs.patient.phone}</span>` : '';
+    const patientPhone = cs.patient?.phone ? `<span class="case-phone"> ${cs.patient.phone}</span>` : '';
     const aiSummary = cs.pharmacist_support?.ai_intake_summary || cs.ai_summary || '';
     const clinicalProfile = cs.pharmacist_support?.clinical_profile || '';
     const datasetGuidance = cs.pharmacist_support?.dataset_guidance || '';
@@ -1146,17 +1176,17 @@ function renderPharmaQueue(id, cases = [], mode = 'pending') {
       <div class="dashboard-field"><label>Case Summary</label><div class="case-field-text case-summary-text">${_renderMarkdown(cs.case_summary || 'No details')}</div></div>
       ${aiSummary ? `
       <details class="case-collapse">
-        <summary>📋 Full AI Clinical Report</summary>
+        <summary> Full AI Clinical Report</summary>
         <div class="collapse-body">${_renderMarkdown(aiSummary)}</div>
       </details>` : ''}
       ${clinicalProfile ? `
       <details class="case-collapse">
-        <summary>👤 Patient Clinical Profile</summary>
+        <summary> Patient Clinical Profile</summary>
         <div class="collapse-body">${clinicalProfile.split(' | ').map(s => `<div>${s}</div>`).join('')}</div>
       </details>` : ''}
       ${datasetGuidance && datasetGuidance !== 'No dataset guidance matched.' ? `
       <details class="case-collapse accent">
-        <summary>💊 Dataset Drug Guidance</summary>
+        <summary> Dataset Drug Guidance</summary>
         <div class="collapse-body">${datasetGuidance}</div>
       </details>` : ''}
       ${mode === 'pending' ? `<button class="btn btn-primary btn-sm case-accept-btn" onclick="acceptCase(${cs.id})">Accept Case</button>` : ''}
@@ -1173,7 +1203,7 @@ function renderPharmaQueue(id, cases = [], mode = 'pending') {
           </div>
           <div class="pharma-review-actions">
             <button class="btn btn-sm btn-secondary" onclick="addDrugRow(${cs.id})">+ Add Drug</button>
-            <button class="btn btn-sm btn-magic" onclick="fillAiSuggestion(${cs.id}, this)">✨ AI Suggest</button>
+            <button class="btn btn-sm btn-magic" onclick="fillAiSuggestion(${cs.id}, this)"> AI Suggest</button>
           </div>
           <div class="pharma-review-total">Quote total: <strong>GHS <span id="review-total-${cs.id}">0.00</span></strong></div>
           <button class="btn btn-primary btn-sm pharma-submit-btn" onclick="submitReview(${cs.id})">Send Results &amp; Price Quote to Patient</button>
@@ -1186,7 +1216,7 @@ function renderPharmaQueue(id, cases = [], mode = 'pending') {
         <div class="dashboard-field"><label>Counselling Points</label><div class="case-field-text case-feedback-text">${_renderMarkdown(cs.pharmacist_feedback || 'N/A')}</div></div>
       ` : ''}
     </div>
-  `}).join('') : '<div class="empty">No cases here.</div>';
+  `}).join('') : '<div class="empty"><strong>No cases here yet</strong><p>New cases and updates will appear in this workspace.</p></div>';
   revealStagger(el);
   if (mode === 'assigned') cases.forEach(cs => updateReviewTotal(cs.id));
 }
@@ -1320,21 +1350,21 @@ function renderAdminPharmacists(list = []) {
   const el = document.getElementById('admin-pharmacists-list');
   if (!el) return;
   el.innerHTML = list.length ? list.map(p => `
-    <div class="case-card" style="margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
-      <div><strong>${p.full_name}</strong> (${p.username})<br><small>${p.email} | ${p.license_number || 'No License'}</small></div>
-      <div style="display:flex; gap:8px;">
+    <div class="directory-row">
+      <div class="directory-person"><span class="directory-avatar">${escapeHtml((p.full_name || p.username || 'P').slice(0,1))}</span><div><strong>${escapeHtml(p.full_name)} <span class="directory-username">@${escapeHtml(p.username)}</span></strong><small>${escapeHtml(p.email)} · ${escapeHtml(p.license_number || 'No license')}</small></div></div>
+      <div class="directory-actions">
         ${!p.is_verified ? `<button class="btn btn-sm" onclick="verifyPharmacist(${p.id})">Verify</button>` : '<span class="badge badge-success">Verified</span>'}
         <button class="btn btn-sm" onclick="resetPharmacistPassword(${p.id})">Reset Pw</button>
         <button class="btn btn-danger btn-sm" onclick="deletePharmacist(${p.id})">Delete</button>
       </div>
     </div>
-  `).join('') : '<div class="empty">No pharmacists found.</div>';
+  `).join('') : '<div class="empty"><strong>Your care team starts here</strong><p>Add a pharmacist using the form above.</p></div>';
 }
 
 function renderAdminUsers(list = []) {
   const el = document.getElementById('admin-users-list');
   if (!el) return;
-  el.innerHTML = list.length ? list.map(u => `<div class="ccard"><div><strong>${u.username}</strong><br><small>${u.email}</small></div></div>`).join('') : '<div class="empty">No users found.</div>';
+  el.innerHTML = list.length ? list.map(u => `<div class="directory-row"><div class="directory-person"><span class="directory-avatar">${escapeHtml((u.username || 'P').slice(0,1))}</span><div><strong>${escapeHtml(u.username)}</strong><small>${escapeHtml(u.email)}</small></div></div><span class="badge badge-secondary">Patient</span></div>`).join('') : '<div class="empty"><strong>No patients yet</strong><p>Patient accounts will appear here after sign-in.</p></div>';
   revealStagger(el);
 }
 
@@ -1358,22 +1388,22 @@ function renderAdminCases(cases = []) {
       </div>
       <div class="case-body">
         <div class="cname"><strong>Patient:</strong> ${_renderPatientName(cs)}</div>
-        ${cs.patient?.phone ? `<div style="font-size:.8rem;color:var(--mist-500)">📞 ${cs.patient.phone}</div>` : ''}
+        ${cs.patient?.phone ? `<div style="font-size:.8rem;color:var(--mist-500)"> ${cs.patient.phone}</div>` : ''}
         ${cs.drug_name ? `<div class="cdrug"><strong>Drug:</strong> ${cs.drug_name}</div>` : ''}
         ${cs.case_summary ? `<div style="font-size:.82rem;color:var(--mist-600);margin-top:4px">${cs.case_summary}</div>` : ''}
         ${cs.delivery_address ? `
           <div class="delivery-details">
-            <p>📍 ${cs.delivery_address}</p>
-            <p>📞 ${cs.delivery_phone || 'N/A'}</p>
+            <p> ${cs.delivery_address}</p>
+            <p> ${cs.delivery_phone || 'N/A'}</p>
           </div>
         ` : ''}
       </div>
       <div class="case-actions">
         ${cs.status === 'Ordered' ? `
-          <button class="btn btn-primary btn-xs" onclick="dispatchOrder(${cs.id})">🚚 Dispatch</button>
+          <button class="btn btn-primary btn-xs" onclick="dispatchOrder(${cs.id})"> Dispatch</button>
         ` : ''}
         ${cs.status === 'Dispatched' ? `
-          <button class="btn btn-success btn-xs" onclick="deliverOrder(${cs.id})">✅ Mark Delivered</button>
+          <button class="btn btn-success btn-xs" onclick="deliverOrder(${cs.id})"> Mark Delivered</button>
         ` : ''}
       </div>
     </div>
@@ -1506,12 +1536,13 @@ async function initApp(verifiedSession = null) {
       const g = document.getElementById('cgrid');
       if (g) g.innerHTML = window.FALLBACK_CONDITIONS.map(c => `<div class="ccard" onclick="handleConditionSelection(${JSON.stringify(c).replace(/"/g, '&quot;')})"><div class="cname">${c.name}</div><div class="cdrug">${c.drug}</div></div>`).join('');
       const b = document.getElementById('rfbody');
-      if (b) b.innerHTML = window.FALLBACK_REDFLAGS.map(rf => `<div class="rfbox"><div class="rftitle">⚠️ ${rf.condition}</div>${rf.flags.map(f => `<div class="rfitem">${f}</div>`).join('')}</div>`).join('');
+      if (b) b.innerHTML = window.FALLBACK_REDFLAGS.map(rf => `<div class="rfbox"><div class="rftitle"> ${rf.condition}</div>${rf.flags.map(f => `<div class="rfitem">${f}</div>`).join('')}</div>`).join('');
     }
     
     if (currentSession.role === 'user') {
       loadProfileData();
       _connectPatientWebSocket();
+      startPatientReportSync();
     }
     if (currentSession.role === 'pharmacist') { 
       go('pharmacist', document.getElementById('nav-pharmacist')); 
@@ -1523,6 +1554,8 @@ async function initApp(verifiedSession = null) {
     if (!isDedicatedPortal() && !_chatGreetingShown) {
       _showGreeting();
     }
+
+    if (!isDedicatedPortal() && currentSession.role === 'guest') openLoginModal();
 
     // Auto-expanding chat input
     const tinput = document.getElementById('tinput');
@@ -1580,6 +1613,37 @@ async function loadProfileData(){
   }catch(e){ console.warn('Failed to load profile',e); }
 }
 
+const displayedPharmacistReplies = new Set();
+function receivePharmacistReply(data) {
+  if (!data.pharmacist_feedback) return;
+  const key = JSON.stringify([currentSession.user_id, data.case_id || data.id, data.pharmacist_feedback, data.drug_name, data.payment_amount, data.referral_advice, data.follow_up_instructions]);
+  if (displayedPharmacistReplies.has(key)) return;
+  displayedPharmacistReplies.add(key);
+  const text = [
+    `**Pharmacist reply ? Case #${data.case_id || data.id}**`,
+    data.pharmacist_feedback,
+    data.drug_name ? `**Medication:** ${data.drug_name}` : '',
+    Number(data.payment_amount) ? `**Total:** ${data.payment_currency || 'GHS'} ${Number(data.payment_amount).toFixed(2)}. Open History to review your quote and order.` : '',
+    data.referral_advice ? `**Referral:** ${data.referral_advice}` : '',
+    data.follow_up_instructions ? `**Follow-up:** ${data.follow_up_instructions}` : '',
+  ].filter(Boolean).join('\n\n');
+  addMsg('ai', text, [{ t: 'Pharmacist', c: 'g' }]);
+}
+async function syncPatientReplies() {
+  if (currentSession.role !== 'user') return;
+  try {
+    const data = await callApi('/profile');
+    if (currentSession.role !== 'user') return;
+    (data.prescriptions || []).slice().reverse().forEach(receivePharmacistReply);
+    renderPrescriptionHistory(data.prescriptions || []);
+  } catch (_) { /* Retry on the next interval after a connection failure. */ }
+}
+function startPatientReportSync() {
+  stopPatientReportSync();
+  syncPatientReplies();
+  patientReportSyncTimer = setInterval(syncPatientReplies, 15000);
+}
+
 function stopPatientReportSync() { if (patientReportSyncTimer) { clearInterval(patientReportSyncTimer); patientReportSyncTimer = null; } }
 
 function _wsBase() {
@@ -1600,17 +1664,7 @@ function _connectPatientWebSocket() {
         if (data.type === 'case_updated' && data.pharmacist_feedback) {
           if (data.play_loud_sound) playLoudNotification(true);
           showToast('Pharmacist result received!', 'success', 8000);
-          const quoteLines = (data.items || []).filter(i => Number(i.price))
-            .map(i => `- ${i.name}: ${data.payment_currency || 'GHS'} ${Number(i.price).toFixed(2)}`).join('\n');
-          const resultMsg = [
-            data.pharmacist_feedback,
-            data.drug_name ? `**Medication:** ${data.drug_name}` : '',
-            quoteLines ? `**Price Quote:**\n${quoteLines}` : '',
-            Number(data.payment_amount) ? `**Total: ${data.payment_currency || 'GHS'} ${Number(data.payment_amount).toFixed(2)}** — open History to confirm your order and pay by Mobile Money.` : '',
-            data.referral_advice ? `**Referral:** ${data.referral_advice}` : '',
-            data.follow_up_instructions ? `**Follow-up:** ${data.follow_up_instructions}` : '',
-          ].filter(Boolean).join('\n\n');
-          addMsg('ai', '📢 **Pharmacist Review Complete:**\n\n' + resultMsg, [{ t: 'Results', c: 'g' }, { t: 'Pharmacist', c: 'b' }]);
+          receivePharmacistReply(data);
           if (isLoggedIn()) callApi('/profile').then(d => renderPrescriptionHistory(d.prescriptions)).catch(() => {});
         } else if (data.type === 'case_updated') {
            showToast('Case updated.', 'info');
@@ -1626,7 +1680,7 @@ function _connectPatientWebSocket() {
 
 function cleanEvalText(text) {
   if (!text) return '';
-  return text.replace(/\*\*/g, '').replace(/📢/g, '').trim();
+  return text.replace(/\*\*/g, '').trim();
 }
 
 function generateEvaluationHTML(data) {
@@ -1638,7 +1692,7 @@ function generateEvaluationHTML(data) {
   return `
     <div class="clinical-evaluation-card">
       <div class="cec-header">
-        <div class="cec-header-icon">⚕</div>
+        <div class="cec-header-icon"></div>
         <div class="cec-header-title">Clinical Evaluation Report</div>
       </div>
       

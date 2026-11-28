@@ -4,15 +4,15 @@
   "description": "Professional medication guidance and clinical AI assistance.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f3f7f9",
-  "theme_color": "#123b5d",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "pwa-icon.png",
-      "sizes": "512x512",
+      "src": "logo.png",
+      "sizes": "any",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ],
   "categories": ["medical", "health"]

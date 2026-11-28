@@ -24,11 +24,13 @@
     if (next) {
       if (!activeDialog && !next.contains(document.activeElement)) returnFocus = document.activeElement;
       activeDialog = next;
+      document.getElementById('main-app')?.toggleAttribute('inert',true);
       if (!next.contains(document.activeElement)) {
         (Array.from(next.querySelectorAll(focusable)).find(visible) || next).focus();
       }
     } else {
       activeDialog = null;
+      document.getElementById('main-app')?.toggleAttribute('inert',false);
       if (returnFocus?.isConnected && visible(returnFocus)) returnFocus.focus();
       returnFocus = null;
     }

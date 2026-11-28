@@ -1,0 +1,14 @@
+**
+!Dockerfile
+!requirements.txt
+!app_config.py
+!auth.py
+!chat_engine.py
+!database.py
+!main.py
+!models.py
+!schemas.py
+!*.csv
+!*.pdf
+!static/
+!static/**

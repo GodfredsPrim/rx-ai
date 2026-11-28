@@ -1762,11 +1762,11 @@ def chat(
 
     request: schemas.ChatRequest, 
     background_tasks: BackgroundTasks, 
-    current_user: models.User = Depends(get_optional_user), 
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # If user is not logged in, they can still use chat (guest mode)
-    user_id = current_user.id if current_user else None
+    # Every intake belongs to an authenticated patient.
+    user_id = current_user.id
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
 
     # Use skip_summary=True to prevent freezing the request while the detailed clinical report is generated
@@ -1804,12 +1804,12 @@ def chat(
 @app.post("/api/chat/stream")
 async def chat_stream(
     request: schemas.ChatRequest,
-    current_user: models.User = Depends(get_optional_user),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Streaming SSE chat endpoint – delivers AI tokens progressively, then creates a case if needed."""
     from fastapi.responses import StreamingResponse as _SR
-    user_id = current_user.id if current_user else None
+    user_id = current_user.id
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
 
     async def event_generator():
@@ -3185,10 +3185,11 @@ def update_emergency(emergency: schemas.EmergencyUpdate, current_user: models.Us
 def submit_guest_case(
     case_data: schemas.GuestCaseSubmit,
     background_tasks: BackgroundTasks,
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Allow non-logged-in users to submit cases directly to pharmacist queue."""
-    user_id = None
+    """Submit a direct case for the authenticated patient."""
+    user_id = current_user.id
     
     translated_messages = [{"role": "user", "content": case_data.message}]
     if case_data.symptoms:
@@ -3215,7 +3216,7 @@ def submit_guest_case(
         matched_drugs=matched_drugs,
         final_matches=final_matches,
         relevant_pdf_context=relevant_pdf_context,
-        actor_note="Guest case submitted without login.",
+        actor_note="Direct case submitted by authenticated patient.",
     )
     
     case.patient_message = case_data.message

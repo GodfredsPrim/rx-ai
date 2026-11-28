@@ -299,3 +299,32 @@ claiming compliance. This pass does not rewrite or force-push existing history.
 
 All evaluation changes remain on the existing `main` branch. No extra working
 branch, generated dependency tree, or deployment configuration change is needed.
+
+## Run with Docker Compose
+
+Docker Desktop must be running with Linux containers. From this directory:
+
+```powershell
+Copy-Item .env.docker.example .env.docker
+# Edit .env.docker: set a long random SECRET_KEY and your provider credentials.
+docker compose up --build -d
+```
+
+Open http://localhost:8000 (patient), http://localhost:8000/pharmacist,
+or http://localhost:8000/admin. The API and frontend share the same origin;
+WebSockets connect directly to the app. Sign in before chatting, using Ghana
+SMS or international email verification. Configure the corresponding Moolre
+or Gmail credentials to deliver real codes. Set ADMIN_ACCESS_CODE for admin access.
+The ignored .env.docker stays on the host and is never copied into the image.
+
+```powershell
+docker compose ps
+docker compose logs --tail 100 app
+docker compose down
+```
+
+The bisarx-data named volume preserves the SQLite database across container
+rebuilds and `down`. Do not add `--volumes` unless you intend to erase local data.
+This setup binds only to localhost and uses one process for WebSocket delivery.
+It does not copy or migrate the hosted production database. To host elsewhere,
+override FRONTEND_URL, GOOGLE_REDIRECT_URI and CORS_ORIGINS and configure HTTPS.

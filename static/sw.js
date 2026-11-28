@@ -1,7 +1,6 @@
-const CACHE_NAME = 'bisarx-v5-2026-07-10-otp';
+const CACHE_NAME = 'bisarx-workspace-logo-20261127';
 const STATIC_ASSETS = [
-  '/logo.png',
-  '/pwa-icon.png'
+  '/logo.png'
 ];
 
 self.addEventListener('install', (event) => {

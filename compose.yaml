@@ -1,0 +1,25 @@
+name: bisarx
+services:
+  app:
+    build: .
+    init: true
+    restart: unless-stopped
+    env_file: .env.docker
+    environment:
+      APP_ENV: production
+      DATABASE_URL: sqlite:////app/data/rxai.db
+      FRONTEND_URL: http://localhost:8000
+      GOOGLE_REDIRECT_URI: http://localhost:8000/api/auth/google/callback
+      CORS_ORIGINS: http://localhost:8000,http://127.0.0.1:8000
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - bisarx-data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+volumes:
+  bisarx-data:

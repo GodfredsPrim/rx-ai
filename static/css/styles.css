@@ -1534,8 +1534,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .stat-value.blood { color:var(--danger); }
 
 .info-card { padding:18px; }
-.info-card h4,.summary-section h4,.pharmacists-section h4,
-#ptab-personal h4,#ptab-medical h4,#ptab-medications h4,#ptab-emergency h4 {
+.info-card :is(h3, h4),.summary-section :is(h3, h4),.pharmacists-section :is(h3, h4),
+#ptab-personal :is(h3, h4),#ptab-medical :is(h3, h4),#ptab-medications :is(h3, h4),#ptab-emergency :is(h3, h4) {
   margin-bottom:11px;
   font-size:.95rem;
   font-weight:800;
@@ -1926,7 +1926,7 @@ input:focus,textarea:focus,select:focus {
 }
 .med-name,.rxdrug,.case-user { font-weight:800; color:var(--mist-900); font-size:.9rem; }
 .med-dose,.rxdet,.case-time,.pharmacist-info span,.pharmacist-info p,.case-details { color:var(--mist-500); font-size:.83rem; }
-.med-name,.rxdrug,.case-user,.med-dose,.rxdet,.case-time,.case-details,.pharmacist-info h5,.pharmacist-info span,.pharmacist-info p {
+.med-name,.rxdrug,.case-user,.med-dose,.rxdet,.case-time,.case-details,.pharmacist-info :is(h4, h5),.pharmacist-info span,.pharmacist-info p {
   overflow-wrap:anywhere;
 }
 
@@ -1939,7 +1939,7 @@ input:focus,textarea:focus,select:focus {
   align-items:start;
 }
 .pharmacists-section,.summary-section { display:grid; gap:12px; }
-.summary-section h4,.pharmacists-section h4 { display:flex; align-items:center; justify-content:space-between; }
+.summary-section :is(h3, h4),.pharmacists-section :is(h3, h4) { display:flex; align-items:center; justify-content:space-between; }
 
 .pharmacist-card { align-items:flex-start; }
 .pharmacist-avatar {
@@ -1953,7 +1953,7 @@ input:focus,textarea:focus,select:focus {
   box-shadow:var(--sh-xs);
 }
 .pharmacist-info { flex:1; }
-.pharmacist-info h5 { margin-bottom:3px; font-size:.92rem; font-weight:800; color:var(--mist-900); }
+.pharmacist-info :is(h4, h5) { margin-bottom:3px; font-size:.92rem; font-weight:800; color:var(--mist-900); }
 .pharmacist-actions,.case-actions { display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
 
 .online { color:var(--primary); background:rgba(30,58,48,.07); border-color:rgba(30,58,48,.14); }
@@ -3578,7 +3578,7 @@ select:focus,
 .panel-info p,
 .case-list-meta,
 .case-details,
-.pharmacist-info h5,
+.pharmacist-info :is(h4, h5),
 .pharmacist-info p {
   overflow-wrap: anywhere;
 }
